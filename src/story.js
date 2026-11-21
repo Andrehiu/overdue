@@ -75,9 +75,8 @@ export function threat(d) {
   return (d.budget * d.hpMult * (1 + 1.2 * d.eliteChance) + d.bossHp / 4) * d.speedMult * d.hazardSpeed;
 }
 
-/** The spawn list for a story room. Layout seeds are fixed per wing+room; spawns vary with the run seed. */
-export function composeRoom(wing, room, rng) {
-  const d = difficulty(wing, room);
+/** The spawn list for a story room. Layout seeds are fixed per wing+room; spawns vary with the run seed. `d` = difficulty with a door applied. */
+export function composeRoom(wing, room, rng, d = difficulty(wing, room)) {
   const def = WINGS[wing - 1];
   return composeWave(room, rng, {
     boss: d.kind === 'boss', budget: d.budget, weights: def.weights, unlockShift: def.unlockShift || 0,

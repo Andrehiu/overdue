@@ -34,6 +34,8 @@ Or play online at **https://andrehiu.github.io/overdue/**. On a phone, use **Sha
     - elites burst into pages when they die (from wing 4);
     - bosses learn a new pattern every 3 wings.
 
+    **Pick your next door:** after most rooms you choose the next room from two doors: 💰 Rare Books (more elites, double fines), ☕ Break Room (heal a heart, fewer fines), 🎲 Mystery Shelf (a cursed book or a bonus perk when you clear it), or 🚪 The Stacks (a plain room, offered instead of Break Room when you're at full health). Doors never make enemies weaker. Endless mode has no doors.
+
     Each wing has its own enemy mix, shelf density, floor and rug. Shelf layouts are the same every time you play a room.
   - **Endless shift:** the original wave mode with the Hall of Fame. It plays exactly as before.
 - **Late fees (permanent progression):** every run earns **fines 🪙**:
@@ -91,6 +93,7 @@ src/arena.js        procedural shelf layouts + connectivity check            (un
 src/flowfield.js    Dijkstra flow field + grid line of sight                 (unit-tested)
 src/waves.js        budget-based, seeded wave composer                       (unit-tested)
 src/story.js        story wings: rooms, difficulty curve, rewards            (unit-tested)
+src/doors.js        story doors: offers, difficulty and fines modifiers      (unit-tested)
 src/meta.js         late fees: fines, Renovations, saved progress            (unit-tested)
 src/upgrades.js     perk definitions + weighted roller                       (unit-tested)
 src/util.js         seeded RNG, hashing, collision helpers                   (unit-tested)

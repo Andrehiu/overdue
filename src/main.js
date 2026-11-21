@@ -10,7 +10,8 @@ import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, combo
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist } from './util.js';
 import { PLAYER, bookLook } from './palette.js';
 import { SoundEngine } from './audio.js';
-import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, difficulty, composeRoom, layoutSeed, roomReward } from './story.js';
+import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, difficulty, composeRoom, layoutSeed } from './story.js';
+import { DOORS, doorOffer, applyDoor, doorReward, mysteryPrize } from './doors.js';
 import { PROGRESS_KEY, RENOVATIONS, normalizeProgress, applyRenovations, runBonuses, recordRun, level, nextCost, canBuy, buy } from './meta.js';
 
 // ======================================================================
@@ -129,6 +130,9 @@ function onKeyPress(k) {
   else if (game.state === 'upgrade' && /^Digit[1-4]$/.test(k)) {
     const b = document.querySelectorAll('#cards .card')[+k.slice(5) - 1];
     if (b && cardsArmed()) b.click();
+  } else if (game.state === 'doors' && /^Digit[1-2]$/.test(k)) {
+    const b = document.querySelectorAll('#doorCards .door')[+k.slice(5) - 1];
+    if (b) b.click();
   } else if (game.state === 'title' && (k === 'Enter') && !document.activeElement?.matches('button')) startRun();
   if (k === 'KeyM') { const on = !(settings.sfx || settings.music); setSetting('sfx', on); setSetting('music', on); toast(on ? '🔊 Sound on' : '🔇 Muted'); }
   if (k === 'KeyF' && game.state === 'playing') { setSetting('autofire', !settings.autofire); toast(`Auto-fire ${settings.autofire ? 'ON' : 'OFF'}`); }
@@ -226,6 +230,7 @@ const game = {
   seed: 1, freeze: 0, timeScale: 1, trauma: 0, flash: 0, banner: '', bannerSub: '', bannerT: 0,
   owned: {}, noHitWave: true, clearT: 0, boss: null, deathT: 0, waveT: 0, ammoT: 0, ammo: null,
   mode: 'endless', wingN: 1, diff: null, fines: 0, cards: 3, banked: null, wingCleared: false,
+  door: null, bonusPicks: 0, pickIsBonus: false,
 };
 let stats = baseStats();
 let player = makePlayer();
@@ -262,7 +267,7 @@ function startRun(mode = 'endless', wing = 1) {
   const bonus = runBonuses(progress);
   Object.assign(game, { wave: 0, score: 0, kills: 0, combo: 0, comboT: 0, bestCombo: 0, playTime: 0, owned: {}, renews: bonus.renews, banishes: bonus.banishes, banished: new Set(),
     freeze: 0, timeScale: 1, trauma: 0, flash: 0, boss: null, mode, wingN: mode === 'story' ? clamp(wing, 1, WINGS.length) : 1, diff: null,
-    fines: 0, cards: bonus.cards, banked: null, wingCleared: false });
+    fines: 0, cards: bonus.cards, banked: null, wingCleared: false, door: null, bonusPicks: 0, pickIsBonus: false });
   stats = applyRenovations(baseStats(), progress);
   player = makePlayer();
   player.hp = stats.maxHp;
@@ -283,19 +288,19 @@ function clearWorld() {
 function startWave(n) {
   game.wave = n;
   clearWorld();
-  game.diff = isStory() ? difficulty(game.wingN, n) : null;
+  game.diff = isStory() ? applyDoor(difficulty(game.wingN, n), game.door) : null;
   // Story rooms keep the same shelf layout every time you play them, like handmade levels.
   arena = isStory() ? generateArena(layoutSeed(game.wingN, n), n, game.diff.shelvesPerHalf) : generateArena(game.seed, n);
   buildBackground();
   flowCell = -1;
   player.x = W / 2; player.y = H / 2; player.vx = player.vy = 0;
-  spawnQueue = (isStory() ? composeRoom(game.wingN, n, rng) : composeWave(n, rng)).spawns;
+  spawnQueue = (isStory() ? composeRoom(game.wingN, n, rng, game.diff) : composeWave(n, rng)).spawns;
   game.waveT = 0; game.noHitWave = true; game.boss = null;
   game.ammo = pickBook(); game.ammoT = 0;
   player.dashStock = stats.dashCharges; player.dashCd = 0; player.amnesty = stats.amnesty;
   if (isStory()) {
     const kind = game.diff.kind;
-    banner(`ROOM ${n}/${ROOMS_PER_WING}`, kind === 'boss' ? 'A rogue author approaches…' : kind === 'elite' ? '★ Elite room: they fight back' : wingDef().name);
+    banner(`ROOM ${n}/${ROOMS_PER_WING}`, kind === 'boss' ? 'A rogue author approaches…' : kind === 'elite' ? '★ Elite room: they fight back' : DOORS[game.door]?.banner || wingDef().name);
   } else banner(`WAVE ${n}`, n % 5 === 0 ? 'A rogue author approaches…' : '');
   sound.setIntensity(1); sound.setMuffled(false);
   game.state = 'playing';
@@ -313,7 +318,7 @@ function waveCleared() {
   const bonus = Math.round((250 * game.wave + (game.noHitWave ? 500 : 0)) * stats.scoreMult);
   game.score += bonus;
   // Fines for the clear: story rooms pay by room type; endless pays more every 5 waves and for bosses.
-  const fine = isStory() ? roomReward(game.wingN, game.wave) : 1 + Math.floor(game.wave / 5) + (game.wave % 5 === 0 ? 15 : 0);
+  const fine = isStory() ? doorReward(game.wingN, game.wave, game.door) : 1 + Math.floor(game.wave / 5) + (game.wave % 5 === 0 ? 15 : 0);
   game.fines += fine;
   const wingDone = isStory() && game.wave >= BOSS_ROOM;
   banner(wingDone ? 'WING CLEARED!' : 'SHELF CLEARED!', `+${bonus.toLocaleString()} · +${fine} 🪙${game.noHitWave ? ' · flawless!' : ''}`);
@@ -326,6 +331,7 @@ function waveCleared() {
     player.hp = Math.min(stats.maxHp, player.hp + 1);
     floatText(player.x, player.y - 40, '+1 ♥ Reading break', '#ff6b81', 13, 1.4);
   }
+  if (isStory() && game.door === 'mystery') resolveMystery();
   game.wingCleared = wingDone;
   sound.play('wave');
   for (const h of hazards) burst(h.x, h.y, 3, ['#ff6b6b', '#fff'], 60, 0.3);
@@ -336,16 +342,90 @@ function waveCleared() {
   for (const p of pickups) p.magnet = true;
 }
 
+/** Mystery Shelf prize: 50% a cursed book you don't own (applied now), otherwise a bonus perk pick before the normal one. */
+function resolveMystery() {
+  const prize = mysteryPrize(game.seed, game.wingN, game.wave, game.owned, { banned: game.banished, lights: settings.lights });
+  if (prize.kind === 'cursed') {
+    const u = byId(prize.id);
+    game.owned[u.id] = 1; u.apply(stats, player);
+    toast(`🎲 Mystery Shelf: ${u.icon} ${u.name}! ${u.desc}`);
+    sound.play('upgrade');
+  } else {
+    game.bonusPicks++;
+    toast('🎲 Mystery Shelf: a bonus perk!');
+  }
+}
+
 function showUpgrades() {
   game.state = 'upgrade';
   game.bannerT = 0; texts.length = 0;
   sound.setMuffled(true);
+  const bonus = game.bonusPicks > 0;
+  if (bonus) game.bonusPicks--;
+  game.pickIsBonus = bonus;
   const choices = rollUpgrades(rng, game.owned, game.cards || 3, rollOpts());
-  if (!choices.length) return startWave(game.wave + 1);
-  $('#upgradeTitle').textContent = isStory() ? `Room ${game.wave}/${ROOMS_PER_WING} cleared — choose a perk` : `Wave ${game.wave} cleared — choose a perk`;
+  if (!choices.length) return bonus ? showUpgrades() : nextRoom();
+  $('#upgradeTitle').textContent = bonus ? '🎲 Mystery Shelf — bonus perk' : isStory() ? `Room ${game.wave}/${ROOMS_PER_WING} cleared — choose a perk` : `Wave ${game.wave} cleared — choose a perk`;
   renderCards(choices);
   showScreen('upgrade');
   if (!touch.enabled) $('#cards button').focus();
+}
+
+/** After a perk pick: a bonus pick first if one is owed, then (story) the door screen, then the next room. */
+function afterPick() {
+  if (game.pickIsBonus) { game.pickIsBonus = false; return showUpgrades(); }
+  nextRoom();
+}
+
+function nextRoom() {
+  game.pickIsBonus = false;
+  const full = player.hp >= stats.maxHp;
+  const offer = isStory() ? doorOffer(game.seed, game.wingN, game.wave, { atFullHp: full }) : [];
+  if (!offer.length) { game.door = null; return startWave(game.wave + 1); }
+  showDoors(offer);
+}
+
+// ---- Doors (story): choose the next room ----
+let currentDoors = [];
+function showDoors(offer) {
+  game.state = 'doors';
+  game.bannerT = 0; texts.length = 0;
+  sound.setMuffled(true);
+  currentDoors = offer;
+  const box = $('#doorCards');
+  box.textContent = '';
+  box.classList.toggle('single', offer.length === 1);
+  cardsArmedAt = performance.now() + 550;
+  box.classList.remove('dealing'); void box.offsetWidth; box.classList.add('dealing');
+  $('#doorsTitle').textContent = `Room ${game.wave}/${ROOMS_PER_WING} cleared — ${offer.length > 1 ? 'pick your next door' : 'the next door'}`;
+  offer.forEach((id, i) => {
+    const d = DOORS[id];
+    const b = document.createElement('button');
+    b.className = `door ${d.fixed ? 'fixed' : id}`;
+    b.dataset.door = id;
+    b.innerHTML = '<span class="key"></span><span class="icon"></span><strong></strong><span class="line"></span>';
+    b.querySelector('.key').textContent = String(i + 1);
+    b.querySelector('.icon').textContent = d.icon;
+    b.querySelector('strong').textContent = d.name;
+    b.querySelector('.line').textContent = d.line;
+    b.addEventListener('click', () => chooseDoor(id));
+    box.appendChild(b);
+  });
+  showScreen('doors');
+  if (!touch.enabled) box.querySelector('.door').focus();
+}
+
+function chooseDoor(id) {
+  if (!cardsArmed() || game.state !== 'doors') return;
+  const d = DOORS[id];
+  game.door = id;
+  sound.play('click');
+  startWave(game.wave + 1);
+  // Break Room: a heart back on entering (never above max).
+  if (d.heal && player.hp < stats.maxHp) {
+    player.hp = Math.min(stats.maxHp, player.hp + d.heal);
+    floatText(player.x, player.y - 24, `+${d.heal} ♥ Break Room`, '#ff6b81', 13, 1.4);
+  }
 }
 
 const KIND_LABEL = { combo: 'Collected Works', cursed: 'Banned', master: 'Masterwork' };
@@ -403,7 +483,7 @@ function renderCards(choices) {
       if (u.kind === 'combo') toast(`📚 ${u.name} added to your Collected Works`);
       else if (u.kind === 'master') toast(`🏆 Masterwork: ${u.name}`);
       else if (mw) toast(`🏆 ${u.name} mastered! ${mw.name} will be offered next`);
-      startWave(game.wave + 1);
+      afterPick();
     });
     wrap.appendChild(b);
     // Banish: remove a normal perk from this run's pool, and deal a replacement.
@@ -2027,7 +2107,7 @@ function drawStick() {
 // ======================================================================
 // DOM screens, settings, leaderboard
 // ======================================================================
-const SCREENS = ['title', 'howto', 'settings', 'leaderboard', 'upgrade', 'pause', 'gameover', 'codex', 'story', 'shop'];
+const SCREENS = ['title', 'howto', 'settings', 'leaderboard', 'upgrade', 'doors', 'pause', 'gameover', 'codex', 'story', 'shop'];
 let settingsReturn = 'title', shopReturn = 'title', currentScreen = 'title';
 function showScreen(id) {
   for (const s of SCREENS) $('#' + s).hidden = s !== id;
@@ -2127,7 +2207,7 @@ function bankRun() {
   game.banked = res;
   return res;
 }
-const inRun = () => ['playing', 'paused', 'upgrade', 'waveclear', 'dying'].includes(game.state);
+const inRun = () => ['playing', 'paused', 'upgrade', 'doors', 'waveclear', 'dying'].includes(game.state);
 
 // ---- Progress tools (Settings): reset for a fresh start; debug helpers with ?debug=1 ----
 let resetArmedUntil = 0;
@@ -2355,6 +2435,6 @@ if (DEBUG) {
     god: () => { player.hp = 999; stats.maxHp = 999; },
     grant: (id) => { const u = UPGRADES.find((x) => x.id === id); game.owned[id] = (game.owned[id] || 0) + 1; u.apply(stats, player); },
     showCards: (ids) => renderCards(ids.map(byId)),
-    showUpgrades, setRenews: (n) => { game.renews = n; }, die: () => { player.hp = 1; player.inv = 0; hurtPlayer(player.x + 1, player.y); },
+    showUpgrades, showDoors, get door() { return game.door; }, setRenews: (n) => { game.renews = n; }, die: () => { player.hp = 1; player.inv = 0; hurtPlayer(player.x + 1, player.y); },
   };
 }

@@ -200,6 +200,36 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     record(area, 'room clear offers 4 cards', hand.state === 'upgrade' && hand.cards.length === 4 && /Room 1\/10/.test(hand.title), `${hand.cards.length} cards · ${hand.title}`);
     const vw = await page.evaluate(() => innerWidth);
     record(area, '4 cards fit on screen', hand.cards.every((c) => c.l >= -1 && c.r <= vw + 1));
+    // Doors (v1.7.0): after the perk pick, choose the next room from 2 doors
+    await page.locator('#cards .card').first().click(); await page.waitForTimeout(900);
+    const doorScreen = () => page.evaluate((LUMSRC) => {
+      const lum = eval(LUMSRC);
+      const s = document.getElementById('doors'), vw = innerWidth, vh = innerHeight;
+      const ds = [...s.querySelectorAll('.door')].map((b) => { const r = b.getBoundingClientRect(); return { id: b.dataset.door, ok: r.left >= -1 && r.right <= vw + 1 && r.top >= -1 && r.bottom <= vh + 1, hit: (() => { const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return h === b || b.contains(h); })() }; });
+      return { state: __overdue.game.state, visible: !s.hidden, ds, noScroll: s.scrollHeight <= s.clientHeight + 1,
+        lum: lum(getComputedStyle(s.querySelector('.door strong')).color), lineLum: lum(getComputedStyle(s.querySelector('.door .line')).color), title: document.getElementById('doorsTitle').textContent };
+    }, `(${LUM})`);
+    const dr = await doorScreen();
+    await shot(page, `${name}-doors`);
+    record(area, 'door screen shows 2 different doors after room 1', dr.state === 'doors' && dr.visible && dr.ds.length === 2 && dr.ds[0].id !== dr.ds[1].id, `${dr.state} · ${dr.ds.map((d) => d.id).join(' + ')}`);
+    record(area, 'doors fit on screen, nothing covers them, no scrolling', dr.ds.every((d) => d.ok && d.hit) && dr.noScroll, JSON.stringify(dr.ds.map((d) => [d.ok, d.hit])) + ` noScroll ${dr.noScroll}`);
+    record(area, 'door text readable', dr.lum > 0.5 && dr.lineLum > 0.5, `title ${dr.lum.toFixed(2)} · line ${dr.lineLum.toFixed(2)}`);
+    await page.waitForTimeout(100);
+    // Rare Books: more elites in the next room; Break Room: heals 1 when damaged (forced offers keep this deterministic)
+    const base = await page.evaluate(() => { const O = __overdue; O.stats.maxHp = 5; O.player.hp = 2; O.showDoors(['rare', 'rest']); return { elite: 0 }; });
+    await page.waitForTimeout(700);
+    await page.locator('#doorCards .door[data-door=rare]').click(); await page.waitForTimeout(400);
+    const rare = await page.evaluate(() => ({ state: __overdue.game.state, door: __overdue.game.door, elite: __overdue.game.diff.eliteChance, hp: __overdue.player.hp, sub: __overdue.game.bannerSub }));
+    record(area, 'Rare Books raises the next room\'s elite share, no heal', rare.state === 'playing' && rare.door === 'rare' && rare.elite >= 0.5 && rare.hp === 2 && /Rare Books/.test(rare.sub), JSON.stringify(rare));
+    await page.evaluate(() => { const O = __overdue; O.player.hp = 2; O.showDoors(['rest', 'mystery']); });
+    await page.waitForTimeout(700);
+    await page.keyboard.press('Digit1'); await page.waitForTimeout(400);
+    const rest = await page.evaluate(() => ({ state: __overdue.game.state, door: __overdue.game.door, hp: __overdue.player.hp, elite: __overdue.game.diff.eliteChance }));
+    record(area, 'Break Room (key 1) heals 1 heart and keeps the fight normal', rest.state === 'playing' && rest.door === 'rest' && rest.hp === 3 && rest.elite < 0.5, JSON.stringify(rest));
+    await page.evaluate(() => { __overdue.player.hp = 5; __overdue.showDoors(['rest']); });
+    await page.waitForTimeout(700);
+    await page.locator('#doorCards .door').click(); await page.waitForTimeout(300);
+    record(area, 'Break Room never heals above max', await page.evaluate(() => __overdue.player.hp === 5));
     await page.evaluate(() => { __overdue.startWave(5); __overdue.god(); }); await page.waitForTimeout(1200);
     await shot(page, `${name}-12-elite-room`);
     // Watch for 3s and collect every enemy that appears (auto-fire can kill the first ones before a single snapshot).
@@ -230,6 +260,11 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     const reset = await page.evaluate(() => ({ ...__overdue.progress, saved: JSON.parse(localStorage.getItem('overdue.progress.v1')) }));
     record(area, 'reset progress needs 2 taps and clears progress', afterOne === 2 && reset.fines === 0 && reset.unlocked === 1 && !Object.keys(reset.reno).length && reset.saved.fines === 0,
       `after 1 tap: wing ${afterOne} open · after 2: ${reset.fines} fines, wing ${reset.unlocked}`);
+    // Endless stays as it was: no door screen, the next wave just starts
+    await page.evaluate(() => { __overdue.startRun('endless'); __overdue.god(); }); await page.waitForTimeout(1500);
+    await clearRoom(); await page.waitForTimeout(2600);
+    await page.locator('#cards .card').first().click(); await page.waitForTimeout(500);
+    record(area, 'endless shows no door screen', await page.evaluate(() => __overdue.game.mode === 'endless' && __overdue.game.state === 'playing' && __overdue.game.wave === 2 && document.getElementById('doors').hidden && __overdue.game.door === null));
   } catch (e) {
     record(area, 'flow completed', false, e.message.split('\n')[0]);
   }
