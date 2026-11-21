@@ -197,13 +197,18 @@ test('every stackable perk tops out at 3/3 and leads to exactly one Masterwork',
   }
 });
 
-test('perk cards preview exact before → after numbers', async () => {
-  const { byId, baseStats, previewChange } = await load('upgrades');
+test('perk cards preview changes in plain player terms', async () => {
+  const { byId, baseStats, previewChange, pips, UPGRADES } = await load('upgrades');
   const s = baseStats();
-  assert.deepEqual(previewChange(byId('extendedloan'), s, { hp: 4 }), ['Max hearts 5 → 6', 'Hearts now 4/5 → 6/6']);
+  assert.deepEqual(previewChange(byId('extendedloan'), s, { hp: 4 }), ['Max hearts 5 → 6', 'Hearts 4/5 → 6/6']);
   assert.equal(s.maxHp, 5, 'preview must not mutate real stats');
-  assert.deepEqual(previewChange(byId('dewey'), s, { hp: 5 }), ['Homing turn 0.0 rad/s → 2.4 rad/s', 'Homing reach 0px → 240px']);
+  assert.deepEqual(previewChange(byId('dewey'), s, { hp: 5 }), ['Homing none → gentle']);
   byId('dewey').apply(s);
-  assert.ok(previewChange(byId('dewey'), s, { hp: 5 }).includes('Homing reach 240px → 320px'), 'level 2 reaches further');
-  assert.deepEqual(previewChange(byId('graceperiod'), s, { hp: 3 }), ['Invulnerability 0.8s → 1.1s', 'Hearts 3 → 4']);
+  assert.deepEqual(previewChange(byId('dewey'), s, { hp: 5 }), ['Homing gentle → strong']);
+  assert.deepEqual(previewChange(byId('hardcover'), s, { hp: 5 }), ['Damage ×1 → ×1.5']);
+  assert.deepEqual(previewChange(byId('graceperiod'), s, { hp: 3 }), ['Safe time after a hit 0.8s → 1.1s', 'Hearts 3 → 4']);
+  assert.equal(pips(2, 3), '●●○');
+  // No internal units anywhere in any preview
+  const st = baseStats();
+  for (const u of UPGRADES) for (const line of previewChange(u, st, { hp: 3 })) assert.ok(!/px|rad\b|rad\/s/.test(line), `${u.id}: ${line}`);
 });

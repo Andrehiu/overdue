@@ -166,3 +166,4 @@ body.portrait .card .kind { flex-basis: 100%; order: -1; }
 .card .preview { font-size: .75em; color: var(--teal); font-variant-numeric: tabular-nums; }
 .card .preview:empty { display: none; }
 body.portrait .card .preview { flex-basis: 100%; }
+.card .lvl { font-size: .9em; letter-spacing: .12em; }

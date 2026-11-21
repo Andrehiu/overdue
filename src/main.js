@@ -5,7 +5,7 @@ import { createBackend } from './backend.js';
 import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
-import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, previewChange } from './upgrades.js';
+import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, previewChange, pips } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect } from './util.js';
 import { SoundEngine } from './audio.js';
 
@@ -318,7 +318,7 @@ function renderCards(choices) {
     b.querySelector('.lvl').textContent = u.kind === 'combo'
       ? `Unlocked by ${u.requires.map((r) => byId(r).name).join(' + ')}`
       : u.kind === 'master' ? `${byId(u.requires[0]).name} mastered`
-        : u.max > 1 ? `Level ${lvl} / ${u.max}${mw ? ` · unlocks ${mw.name}` : ''}` : 'One-time';
+        : u.max > 1 ? `${pips(lvl, u.max)}${mw ? `  Unlocks ${mw.name}` : ''}` : 'One-time';
     if (mw) b.classList.add('finale');
     b.addEventListener('click', () => {
       game.owned[u.id] = lvl;

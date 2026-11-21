@@ -87,39 +87,50 @@ export const UPGRADES = [
   master('interlibrary', { id: 'm_interdim', icon: '🌌', name: 'Interdimensional Loan', desc: 'Books that come back through a wall home in and hit twice as hard.', apply: (s) => { s.wrapHoming = true; } }),
 ];
 
-// What a card changes, as "label: before → after" lines (shown on perk cards).
+// What a card changes, in player words: multipliers, plain-word tiers, counts and seconds
+// (no internal units like px or rad/s).
+const BASE = baseStats();
+const times = (k) => (v) => `×${+(v / BASE[k]).toFixed(2)}`;
+const secs = (v) => `${+v.toFixed(1)}s`;
+const tier = (cuts, words) => (v) => words[cuts.findIndex((c) => v <= c) === -1 ? words.length - 1 : cuts.findIndex((c) => v <= c)];
 const PREVIEW = [
   ['maxHp', 'Max hearts', (v) => v],
-  ['damage', 'Damage', (v) => `${Math.round(v * 100)}%`],
-  ['fireRate', 'Throws/sec', (v) => v.toFixed(1)],
+  ['damage', 'Damage', times('damage')],
+  ['fireRate', 'Throw speed', times('fireRate')],
   ['projectiles', 'Books per throw', (v) => v],
   ['bounces', 'Bounces', (v) => v],
-  ['pierce', 'Pierce', (v) => (v >= 99 ? '∞' : v)],
-  ['homing', 'Homing turn', (v) => `${v.toFixed(1)} rad/s`],
-  ['homingRange', 'Homing reach', (v) => `${v}px`],
+  ['pierce', 'Enemies pierced', (v) => (v >= 99 ? 'all' : v)],
+  ['homing', 'Homing', tier([0, 2.4, 4.8, 7.2], ['none', 'gentle', 'strong', 'relentless', 'perfect'])],
   ['critChance', 'Crit chance', (v) => `${Math.round(v * 100)}%`],
-  ['critMult', 'Crit damage', (v) => `${v}×`],
-  ['speed', 'Move speed', (v) => Math.round(v)],
-  ['dashCd', 'Dash cooldown', (v) => `${v.toFixed(2)}s`],
+  ['critMult', 'Crit damage', (v) => `×${v}`],
+  ['speed', 'Move speed', times('speed')],
+  ['dashCd', 'Dash recharge', secs],
   ['dashCharges', 'Dash charges', (v) => v],
-  ['shhhCd', 'SHHH! cooldown', (v) => `${v.toFixed(1)}s`],
-  ['shhhRadius', 'SHHH! reach', (v) => `${Math.round(v)}px`],
+  ['shhhCd', 'SHHH! recharge', secs],
+  ['shhhRadius', 'SHHH! size', times('shhhRadius')],
   ['orbiters', 'Orbiting books', (v) => v],
-  ['iframes', 'Invulnerability', (v) => `${v.toFixed(1)}s`],
-  ['shelfBurst', 'Burst radius', (v) => `${v}px`],
-  ['nook', 'Nook throw bonus', (v) => `+${Math.round(v * 100)}%`],
-  ['wraps', 'Wall wraps', (v) => v],
-  ['scoreMult', 'Score', (v) => `${Math.round(v * 100)}%`],
+  ['iframes', 'Safe time after a hit', secs],
+  ['shelfBurst', 'Burst size', tier([0, 55, 70, 85], ['none', 'small', 'medium', 'large', 'huge'])],
+  ['nook', 'Throw speed near shelves', (v) => `+${Math.round(v * 100)}%`],
+  ['wraps', 'Trips through the walls', (v) => v],
+  ['scoreMult', 'Score', (v) => `×${v}`],
 ];
 export function previewChange(u, stats, player) {
   const s = { ...stats }, p = player ? { ...player } : null;
   u.apply(s, p);
   const lines = [];
-  for (const [k, label, fmt] of PREVIEW) if (s[k] !== stats[k]) lines.push(`${label} ${fmt(stats[k])} → ${fmt(s[k])}`);
+  for (const [k, label, fmt] of PREVIEW) {
+    if (s[k] === stats[k]) continue;
+    const from = fmt(stats[k]), to = fmt(s[k]);
+    if (from !== to) lines.push(`${label} ${from} → ${to}`);
+  }
   if (p && player && p.hp !== player.hp && s.maxHp === stats.maxHp) lines.push(`Hearts ${player.hp} → ${p.hp}`);
-  if (p && player && s.maxHp !== stats.maxHp) lines.push(`Hearts now ${player.hp}/${stats.maxHp} → ${p.hp}/${s.maxHp}`);
+  if (p && player && s.maxHp !== stats.maxHp) lines.push(`Hearts ${player.hp}/${stats.maxHp} → ${p.hp}/${s.maxHp}`);
   return lines;
 }
+
+/** Level pips for a card: ●●○ */
+export const pips = (lvl, max) => '●'.repeat(lvl) + '○'.repeat(Math.max(0, max - lvl));
 
 export const byId = (id) => UPGRADES.find((u) => u.id === id);
 
