@@ -39,7 +39,7 @@ const master = (perkId, o) => ({ kind: 'master', max: 1, weight: 0, requires: [p
 export const UPGRADES = [
   // ---- core (rebalanced: no single card should carry a run) ----
   perk({ id: 'hardcover', icon: '📕', name: 'Hardcover Edition', desc: '+50% book damage', max: 3, weight: 9, apply: (s) => { s.damage += 0.5; } }),
-  perk({ id: 'speedreader', icon: '⚡', name: 'Speed Reader', desc: '+20% throw rate', max: 3, weight: 9, apply: (s) => { s.fireRate *= 1.2; } }),
+  perk({ id: 'speedreader', icon: '⚡️', name: 'Speed Reader', desc: '+20% throw rate', max: 3, weight: 9, apply: (s) => { s.fireRate *= 1.2; } }),
   perk({ id: 'trilogy', icon: '📚', name: 'Trilogy Box Set', desc: '+1 book per throw', max: 3, weight: 6, apply: (s) => { s.projectiles += 1; s.spread = Math.max(0.14, s.spread * 0.9); } }),
   perk({ id: 'bookmark', icon: '🔖', name: 'Bouncy Bookmark', desc: 'Books ricochet off shelves & walls (+1 bounce)', max: 3, apply: (s) => { s.bounces += 1; } }),
   perk({ id: 'plottwist', icon: '🌀', name: 'Plot Twist', desc: 'Books pierce through +1 enemy', max: 3, apply: (s) => { s.pierce += 1; } }),
@@ -76,7 +76,7 @@ export const UPGRADES = [
   master('bookmark', { id: 'm_infinite', icon: '♾️', name: 'Infinite Bookmark', desc: '+3 bounces, and books speed up 15% with every bounce.', apply: (s) => { s.bounces += 3; s.bounceAccel = 0.15; } }),
   master('plottwist', { id: 'm_twist', icon: '🎬', name: 'Twist Ending', desc: 'Books pierce through everything.', apply: (s) => { s.pierce = 99; } }),
   master('dewey', { id: 'm_congress', icon: '🏛', name: 'Library of Congress', desc: 'Near-perfect homing, and books fly twice as far.', apply: (s) => { s.homing = Math.max(s.homing, 14); s.homingRange = Math.max(s.homingRange, 420); s.bookLife *= 2; } }),
-  master('coffee', { id: 'm_caffeine', icon: '⚡', name: 'Caffeine Overdose', desc: 'Two dash charges.', apply: (s) => { s.dashCharges = 2; } }),
+  master('coffee', { id: 'm_caffeine', icon: '⚡️', name: 'Caffeine Overdose', desc: 'Two dash charges.', apply: (s) => { s.dashCharges = 2; } }),
   master('extendedloan', { id: 'm_lifetime', icon: '💳', name: 'Lifetime Membership', desc: 'Heal 1 heart every time you clear a wave.', apply: (s) => { s.regenPerWave = 1; } }),
   master('quietplease', { id: 'm_silence', icon: '🔇', name: 'Absolute Silence', desc: 'SHHH! freezes every enemy in the library for 2.5s.', apply: (s) => { s.shhhGlobal = true; } }),
   master('footnotes', { id: 'm_biblio', icon: '📑', name: 'Bibliography', desc: 'Critical hits deal 5× damage instead of 2.5×.', apply: (s) => { s.critMult = 5; } }),

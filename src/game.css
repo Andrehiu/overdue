@@ -171,14 +171,14 @@ body.portrait .card .preview { flex-basis: 100%; }
 /* =====================================================================
    Perk cards as library catalogue index cards
    ===================================================================== */
-:root {
-  --paper: #efe4c8; --paper-shade: #e2d4b0; --ink: #2b2118; --ink-blue: #1d3b5a; --ink-red: #8f1d24;
+.cards {
+  --paper: #efe4c8; --paper-shade: #e2d4b0; --card-ink: #2b2118; --ink-blue: #1d3b5a; --ink-red: #8f1d24;
   --rule: rgba(60, 100, 150, .22); --margin: rgba(200, 60, 60, .45); --gold-ink: #a8790b;
   --type: "Courier New", Courier, "Nimbus Mono PS", ui-monospace, monospace;
 }
 .card-wrap { position: relative; display: flex; flex-direction: column; align-items: center; gap: .35em; }
 .cards .card {
-  position: relative; color: var(--ink); font-family: var(--type); text-align: left; align-items: flex-start;
+  position: relative; color: var(--card-ink); font-family: var(--type); text-align: left; align-items: flex-start;
   border: none; border-radius: 3px; padding: 1.1em 1em 1.6em 2.4em; width: 13em; min-height: 13em;
   background:
     linear-gradient(to right, transparent 1.75em, var(--margin) 1.75em, var(--margin) calc(1.75em + 1px), transparent calc(1.75em + 1px)),
@@ -197,7 +197,7 @@ body.portrait .card .preview { flex-basis: 100%; }
 .cards .card .gain { color: var(--ink-blue); font-size: .9em; font-weight: bold; line-height: 1.4; }
 .cards .card .hint { font-size: .75em; color: #5b3d00; background: rgba(201, 162, 39, .22); border-radius: 3px; padding: .15em .4em; }
 .cards .card .hint:empty { display: none; }
-.cards .card .lvl { color: var(--ink); opacity: .8; margin-top: auto; font-size: .85em; letter-spacing: .1em; }
+.cards .card .lvl { color: var(--card-ink); opacity: .8; margin-top: auto; font-size: .85em; letter-spacing: .1em; }
 .cards .card.finale .lvl { color: #0f5d52; opacity: 1; }
 .cards .card .key { position: absolute; top: .35em; left: .55em; color: var(--margin); font-size: .8em; }
 
@@ -258,3 +258,15 @@ body.portrait .cards .card { width: 100%; min-height: 0; padding: .9em 1em 1.4em
 body.portrait .cards .card .gain, body.portrait .cards .card .hint { flex-basis: 100%; }
 .cards .card .key { top: auto; bottom: .35em; left: .6em; }
 body.touch .cards .card .key { display: none; }
+
+/* ---- art director fixes ---- */
+/* equal-height cards with a fixed Banish slot so rows line up */
+.cards { align-items: stretch; }
+.card-wrap .card { flex: 1 1 auto; }
+.card-wrap .banish, .card-wrap .banish-slot { min-height: 1.9em; }
+.banish-slot { visibility: hidden; display: block; }
+/* Masterwork stamp sits inside the foil edge */
+.cards .card.master .stamp { top: 1.1em; right: 1.1em; }
+/* phones: punch hole in the left margin; cards in thumb reach */
+body.portrait .cards .card::after { left: .85em; top: 50%; bottom: auto; margin-left: 0; margin-top: -.35em; }
+body.portrait #upgrade { justify-content: flex-end; padding-bottom: 3em; }

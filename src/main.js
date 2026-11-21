@@ -248,7 +248,7 @@ function startRun() {
 function clearWorld() {
   for (const arr of [enemies, books, hazards, rings, telegraphs, pickups, particles, texts, flashes]) arr.length = 0;
   spawnQueue = [];
-  game.boss = null; game.bannerT = 0;
+  game.boss = null; game.bannerT = 0; bannerQueue.length = 0;
 }
 
 function startWave(n) {
@@ -268,7 +268,12 @@ function startWave(n) {
   showScreen(null);
 }
 
-function banner(text, sub = '') { game.banner = text; game.bannerSub = sub; game.bannerT = 2.4; }
+// One big banner at a time: later ones wait their turn instead of stacking.
+const bannerQueue = [];
+function banner(text, sub = '') {
+  if (game.bannerT > 0.5 && game.banner !== text) { if (bannerQueue.length < 3) bannerQueue.push([text, sub]); return; }
+  game.banner = text; game.bannerSub = sub; game.bannerT = 2.4;
+}
 
 function waveCleared() {
   const bonus = Math.round((250 * game.wave + (game.noHitWave ? 500 : 0)) * stats.scoreMult);
@@ -374,6 +379,8 @@ function renderCards(choices) {
         cardsArmedAt = performance.now() + 150;
       });
       wrap.appendChild(x);
+    } else {
+      const slot = document.createElement('span'); slot.className = 'banish-slot'; slot.setAttribute('aria-hidden', 'true'); wrap.appendChild(slot);
     }
     box.appendChild(wrap);
   });
@@ -548,7 +555,7 @@ function addLight(x, y, r, life, color = null, big = false) {
   flashes.push({ x, y, r, life, max: life, color });
 }
 function floatText(x, y, text, color = '#fff', size = 14, life = 0.8) {
-  texts.push({ x: clamp(x, 70, W - 70), y: Math.max(y, 78), text, color, size, life, max: life, vy: -40 });
+  texts.push({ x: clamp(x, 70, W - 70), y: Math.max(y, game.boss && PORTRAIT ? 120 : 78), text, color, size, life, max: life, vy: -40 });
 }
 function particle(p) { if (particles.length < 450) particles.push(p); }
 function burst(x, y, n, colors, speed = 160, life = 0.6, shape = 'sq') {
@@ -578,6 +585,7 @@ function step(dt) {
   game.trauma = Math.max(0, game.trauma - dt * 1.5);
   game.flash = Math.max(0, game.flash - dt * 2.5);
   game.bannerT = Math.max(0, game.bannerT - dt);
+  if (game.bannerT <= 0 && bannerQueue.length) { const [t, sb] = bannerQueue.shift(); banner(t, sb); }
 
   if (game.state === 'playing') updateSpawning(sdt);
   if (game.state !== 'dying') updatePlayer(sdt);
@@ -966,7 +974,17 @@ function damageEnemy(e, dmg, kx, ky, crit) {
   e.vx += kx * kbScale; e.vy += ky * kbScale;
   const shown = Number.isInteger(dmg) ? dmg : dmg.toFixed(1);
   // Damage numbers: crits and boss hits always; routine hits only while the screen is calm.
-  if (crit || e.type === 'boss' || texts.length < 8) floatText(e.x + (Math.random() - 0.5) * 10, e.y - e.r, crit ? `${shown}!` : `${shown}`, crit ? '#ffd54a' : '#e8e0cc', crit ? 18 : 11, crit ? 0.7 : 0.5);
+  // Rapid hits on one target merge into a single climbing number instead of a smear.
+  const prev = e.dmgText;
+  if (prev && prev.life > prev.max - 0.25 && texts.includes(prev)) {
+    prev.sum += dmg; prev.crit = prev.crit || crit;
+    const tot = Number.isInteger(prev.sum) ? prev.sum : prev.sum.toFixed(1);
+    prev.text = prev.crit ? `${tot}!` : `${tot}`; prev.life = prev.max; prev.x = clamp(e.x, 70, W - 70);
+    if (crit) { prev.color = '#ffd54a'; prev.size = 18; }
+  } else if (crit || e.type === 'boss' || texts.length < 8) {
+    floatText(e.x + (Math.random() - 0.5) * 10, e.y - e.r, crit ? `${shown}!` : `${shown}`, crit ? '#ffd54a' : '#e8e0cc', crit ? 18 : 11, crit ? 0.7 : 0.5);
+    e.dmgText = texts[texts.length - 1]; e.dmgText.sum = dmg; e.dmgText.crit = crit;
+  }
   sound.play(crit ? 'crit' : 'hit', e.type === 'boss' ? 0.6 : 1);
   if (e.type === 'boss') game.freeze = Math.max(game.freeze, 0.012);
   if (e.hp <= 0) killEnemy(e);
@@ -1237,18 +1255,21 @@ function buildBackground() {
     g.shadowColor = 'rgba(0,0,0,0.75)'; g.shadowBlur = 16; g.shadowOffsetX = 5; g.shadowOffsetY = 9;
     g.fillStyle = '#4a2f18'; g.fillRect(s.x, s.y, s.w, s.h);
     g.restore();
+    g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(s.x + 6, s.y + 6, s.w, s.h);  // contact shadow
     g.fillStyle = '#5b3a1e'; g.fillRect(s.x, s.y, s.w, s.h);
     g.fillStyle = '#86592f'; g.fillRect(s.x, s.y, s.w, 3);                 // lit top edge
-    g.fillStyle = '#2e1c0d'; g.fillRect(s.x, s.y + s.h - 4, s.w, 4);        // front face in shadow
-    g.fillStyle = '#1c1108'; g.fillRect(s.x + 3, s.y + 3, s.w - 6, s.h - 7); // inside of the case
+    g.fillStyle = '#1c1008'; g.fillRect(s.x, s.y + s.h - 7, s.w, 7);        // front face in shadow
+    g.fillStyle = 'rgba(255,220,170,0.12)'; g.fillRect(s.x, s.y + s.h - 7, s.w, 1);
+    g.fillStyle = '#140b05'; g.fillRect(s.x + 3, s.y + 3, s.w - 6, s.h - 10); // inside of the case
     let p = 4;
-    const lenAxis = horiz ? s.w : s.h;
-    const across = (horiz ? s.h : s.w) - 7;
-    // bookend at the start
-    g.fillStyle = '#3d3d44';
-    if (horiz) g.fillRect(s.x + 3, s.y + 4, 2, across - 1); else g.fillRect(s.x + 4, s.y + 3, across - 1, 2);
-    p += 3;
-    while (p < lenAxis - 8) {
+    const lenAxis = horiz ? s.w : s.h - 7;
+    const across = horiz ? s.h - 10 : s.w - 6;
+    // bookends at both ends
+    g.fillStyle = '#8a6a3a';
+    if (horiz) { g.fillRect(s.x + 3, s.y + 3, 4, across); g.fillRect(s.x + s.w - 7, s.y + 3, 4, across); }
+    else { g.fillRect(s.x + 3, s.y + 3, across, 4); g.fillRect(s.x + 3, s.y + lenAxis - 4, across, 4); }
+    p += 4;
+    while (p < lenAxis - 10) {
       const thick = r.int(4, 8);
       if (r.chance(0.07)) { p += r.int(3, 6); continue; } // gap where a book is checked out
       const depth = across - r.int(0, 5);
@@ -1366,7 +1387,7 @@ function render() {
     ctx.globalAlpha = clamp(t.life / t.max * 1.5, 0, 1);
     ctx.font = `bold ${t.size}px ui-monospace, Menlo, Consolas, monospace`;
     ctx.textAlign = 'center';
-    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.strokeText(t.text, t.x, t.y);
+    ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.strokeText(t.text, t.x, t.y);
     ctx.fillStyle = t.color; ctx.fillText(t.text, t.x, t.y);
   }
   ctx.globalAlpha = 1;
@@ -1402,8 +1423,10 @@ function drawPlayer() {
   if (p.amnesty) { ctx.strokeStyle = 'rgba(155,231,220,0.55)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 6, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
   if (p.nookOn) { ctx.strokeStyle = 'rgba(123,216,143,0.6)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 9 + Math.sin(game.time * 8) * 1.5, 0, TAU); ctx.stroke(); }
   // Ground ring: always find yourself, even in a crowded fight
-  ctx.strokeStyle = 'rgba(155,231,220,0.45)'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.ellipse(p.x, p.y + 9, 15, 6, 0, 0, TAU); ctx.stroke();
+  const gs = touch.enabled ? 1.3 : 1;
+  ctx.beginPath(); ctx.ellipse(p.x, p.y + 9 * gs, 17 * gs, 7 * gs, 0, 0, TAU);
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,213,74,0.55)'; ctx.lineWidth = 2; ctx.stroke();
   ctx.save(); ctx.translate(p.x, p.y + Math.sin(p.walk) * 1.2); ctx.rotate(p.aim);
   if (touch.enabled) ctx.scale(1.3, 1.3);
   ctx.fillStyle = OUTLINE;
@@ -1530,17 +1553,22 @@ function drawBoss(e, look, white) {
     ctx.fillStyle = white ? '#fff' : e.cover || '#3b1d8f'; ctx.beginPath(); ctx.roundRect(0, -34, 47, 68, 6); ctx.fill();
     ctx.fillStyle = '#d4a72c';
     for (const cy of [-34, 34]) { ctx.beginPath(); ctx.moveTo(47, cy); ctx.lineTo(39, cy); ctx.lineTo(47, cy - Math.sign(cy) * 8); ctx.fill(); }
-    ctx.fillStyle = '#f3ead2'; ctx.fillRect(6, -30, 36, 60);
+    ctx.fillStyle = '#f3ead2'; ctx.fillRect(8, -26, 31, 52);
     ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
-    for (let y = -24; y < 26; y += 6) { ctx.beginPath(); ctx.moveTo(11, y); ctx.lineTo(37, y); ctx.stroke(); }
+    for (let y = -20; y < 22; y += 6) { ctx.beginPath(); ctx.moveTo(12, y); ctx.lineTo(35, y); ctx.stroke(); }
     ctx.restore();
   }
   // Spine with the author's name in gold
   ctx.fillStyle = e.spineCol || '#2a0f66'; ctx.fillRect(-6, -37, 12, 74);
-  ctx.save(); ctx.rotate(-Math.PI / 2);
-  ctx.fillStyle = '#e8c35a'; ctx.font = 'bold 7px ui-monospace, Menlo, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(short(e.name.toUpperCase(), 13), 0, 0.5);
-  ctx.textBaseline = 'alphabetic'; ctx.restore();
+  // Foil name plate under the tome
+  const label = short(e.name.toUpperCase(), 16);
+  ctx.font = 'bold 9px ui-monospace, Menlo, monospace';
+  const pw = Math.max(48, ctx.measureText(label).width + 14);
+  ctx.fillStyle = OUTLINE; ctx.beginPath(); ctx.roundRect(-pw / 2 - 1.5, 38.5, pw + 3, 17, 4); ctx.fill();
+  ctx.fillStyle = e.spineCol || '#2a0f66'; ctx.beginPath(); ctx.roundRect(-pw / 2, 40, pw, 14, 3); ctx.fill();
+  ctx.strokeStyle = '#d4a72c'; ctx.lineWidth = 1; ctx.strokeRect(-pw / 2 + 2.5, 42.5, pw - 5, 9);
+  ctx.fillStyle = '#e8c35a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, 0, 47.5);
+  ctx.textBaseline = 'alphabetic';
   // The eye, set into the spine
   ctx.fillStyle = '#120a06'; ctx.beginPath(); ctx.ellipse(0, 0, 18.5, 13.5, 0, 0, TAU); ctx.fill();
   ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(0, 0, 17, 12, 0, 0, TAU); ctx.fill();
@@ -1608,7 +1636,7 @@ function heartPath(g, x, y, s) {
 const FONT = (px, w = 'bold') => `${w} ${px}px ui-monospace, Menlo, Consolas, monospace`;
 function txt(t, x, y, px, color, align = 'left') {
   ctx.font = FONT(px); ctx.textAlign = align;
-  ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.strokeText(t, x, y);
+  ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.strokeText(t, x, y);
   ctx.fillStyle = color; ctx.fillText(t, x, y);
 }
 
@@ -1668,6 +1696,7 @@ function drawHUD() {
   if (game.bannerT > 0) {
     const a = clamp(Math.min(game.bannerT, 2.4 - game.bannerT) * 3, 0, 1);
     const slide = (1 - a) * 30;
+    ctx.globalAlpha = a * 0.6; ctx.fillStyle = '#000'; ctx.fillRect(0, H / 2 - 92, W, game.bannerSub ? 84 : 60);
     ctx.globalAlpha = a;
     txt(game.banner, W / 2 + slide, H / 2 - 50, 44, '#fff3c4', 'center');
     if (game.bannerSub) txt(game.bannerSub, W / 2 - slide, H / 2 - 22, 16, '#d6c8ff', 'center');
