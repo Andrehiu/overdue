@@ -9,7 +9,8 @@
     "test": "node --test test/*.test.js && node scripts/codemap.mjs --check",
     "codemap": "node scripts/codemap.mjs",
     "build": "node scripts/build.mjs",
-    "qa": "node scripts/qa/run.mjs"
+    "qa": "node scripts/qa/run.mjs",
+    "balance": "node scripts/balance.mjs"
   },
   "devDependencies": {
     "esbuild": "0.24.2",

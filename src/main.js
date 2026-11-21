@@ -825,7 +825,10 @@ function step(dt) {
   actions.dash = actions.shhh = false;
 }
 
+// Balance bot (debug only): when set, the bot's move vector replaces the keyboard/touch stick and the player auto-aims like on touch.
+let botInput = null, botDrive = false;
 function moveInput() {
+  if (botInput) return botInput;
   let x = 0, y = 0;
   if (keys.has('KeyA') || keys.has('ArrowLeft')) x -= 1;
   if (keys.has('KeyD') || keys.has('ArrowRight')) x += 1;
@@ -856,7 +859,7 @@ function updatePlayer(dt) {
   let firing = false;
   if (pad.connected && (pad.ax || pad.ay)) { p.aim = Math.atan2(pad.ay, pad.ax); firing = pad.fire; }
   else if (touch.aimId !== null) { p.aim = Math.atan2(touch.ay - p.y, touch.ax - p.x); firing = true; }
-  else if (touch.enabled || (pad.connected && !mouse.seen)) {
+  else if (touch.enabled || botInput || (pad.connected && !mouse.seen)) {
     const t = nearestEnemy(p.x, p.y, PORTRAIT ? 600 : 460);
     if (t) { p.aim = Math.atan2(t.y - p.y, t.x - p.x); firing = true; }
   } else {
@@ -2381,6 +2384,7 @@ const STEP = 1 / 120;
 let last = performance.now(), acc = 0, fps = 60;
 function frame(now) {
   requestAnimationFrame(frame);
+  if (botDrive) { last = now; return; } // balance bot steps the simulation itself, faster than real time
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   fps = lerp(fps, 1 / Math.max(dt, 1e-3), 0.05);
@@ -2435,6 +2439,14 @@ if (DEBUG) {
     god: () => { player.hp = 999; stats.maxHp = 999; },
     grant: (id) => { const u = UPGRADES.find((x) => x.id === id); game.owned[id] = (game.owned[id] || 0) + 1; u.apply(stats, player); },
     showCards: (ids) => renderCards(ids.map(byId)),
-    showUpgrades, showDoors, get door() { return game.door; }, setRenews: (n) => { game.renews = n; }, die: () => { player.hp = 1; player.inv = 0; hurtPlayer(player.x + 1, player.y); },
+    showUpgrades, showDoors, get door() { return game.door; },
+    // ---- balance bot (scripts/balance.mjs): drives the sim headless, faster than real time ----
+    actions, hazards, STEP, get W() { return W; }, get H() { return H; }, isSolid: (x, y) => isSolidPx(arena.solid, x, y),
+    get choices() { return currentChoices; }, get doors() { return currentDoors; },
+    setBotInput: (mv) => { botInput = mv; }, drive: (on) => { botDrive = !!on; if (!on) botInput = null; },
+    stepN: (n) => { for (let i = 0; i < n; i++) step(STEP); },
+    pickCard: (i) => { cardsArmedAt = 0; document.querySelectorAll('#cards .card')[i]?.click(); },
+    pickDoor: (id) => { cardsArmedAt = 0; chooseDoor(id); },
+    setProgress: (raw) => { progress = normalizeProgress(raw); saveProgress(); }, setRenews: (n) => { game.renews = n; }, die: () => { player.hp = 1; player.inv = 0; hurtPlayer(player.x + 1, player.y); },
   };
 }
