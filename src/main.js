@@ -296,7 +296,7 @@ function startWave(n) {
   if (isStory()) {
     const kind = game.diff.kind;
     banner(`ROOM ${n}/${ROOMS_PER_WING}`, kind === 'boss' ? 'A rogue author approaches…' : kind === 'elite' ? '★ Elite room: they fight back' : wingDef().name);
-  } else banner(`WAVE ${n}`, n % 5 === 0 ? 'A rogue author approaches…' : `“${short(game.ammo.title, 40)}” is loaded`);
+  } else banner(`WAVE ${n}`, n % 5 === 0 ? 'A rogue author approaches…' : '');
   sound.setIntensity(1); sound.setMuffled(false);
   game.state = 'playing';
   showScreen(null);
@@ -1125,7 +1125,6 @@ function killEnemy(e) {
   addLight(e.x, e.y, e.r * 5, 0.35, colors[0]);
   sound.play('kill', 1 + Math.min(game.combo, 20) * 0.03);
   if (game.combo > 0 && game.combo % 10 === 0) floatText(player.x, player.y - 34, `${game.combo} COMBO!`, '#ffd54a', 18, 1.1);
-  else if (Math.random() < 0.18 && game.ammo) floatText(e.x, e.y - 18, `“${short(game.ammo.title, 22)}”`, '#e8d9b0', 10, 1);
   if (e.type === 'coin') { game.fines += 1; floatText(e.x, e.y - 12, '+1 🪙', '#ffd54a', 12, 0.7); }
   // From wing 4, elites burst into a ring of pages as they go down: don't stand on them.
   if (e.elite && game.diff && game.diff.deathBurst && game.state === 'playing') radial(e.x, e.y, game.diff.deathBurst, 120, Math.random() * TAU);
@@ -1899,12 +1898,6 @@ function drawHUD() {
     cooldown(30, H - 30, dashLabel, kDash, '#9be7dc', dashReady ? 0 : player.dashCd);
     cooldown(80, H - 30, 'SHHH', kShhh, '#b48cff', player.shhhT);
     if (player.rapidT > 0) cooldown(130, H - 30, '☕x2', player.rapidT / 6, '#c69c6d');
-  }
-  // Ammo ticker
-  if (game.ammo && !game.boss) {
-    ctx.globalAlpha = 0.85;
-    txt(`📖 “${short(game.ammo.title, 44)}”${game.ammo.author ? ' — ' + short(game.ammo.author, 20) : ''}`, W / 2, touch.enabled && PORTRAIT ? 104 : H - 14, 11, '#e8d9b0', 'center');
-    ctx.globalAlpha = 1;
   }
   // Boss bar
   if (game.boss) {
