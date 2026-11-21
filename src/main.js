@@ -5,7 +5,7 @@ import { createBackend } from './backend.js';
 import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
-import { baseStats, rollUpgrades, UPGRADES } from './upgrades.js';
+import { baseStats, rollUpgrades, UPGRADES, byId } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect } from './util.js';
 import { SoundEngine } from './audio.js';
 
@@ -237,7 +237,7 @@ function startRun() {
   applyLayout();
   game.seed = (Math.random() * 1e9) | 0;
   rng = new Rng(game.seed);
-  Object.assign(game, { wave: 0, score: 0, kills: 0, combo: 0, comboT: 0, bestCombo: 0, playTime: 0, owned: {},
+  Object.assign(game, { wave: 0, score: 0, kills: 0, combo: 0, comboT: 0, bestCombo: 0, playTime: 0, owned: {}, renews: 0,
     freeze: 0, timeScale: 1, trauma: 0, flash: 0, boss: null });
   stats = baseStats();
   player = makePlayer();
@@ -270,7 +270,7 @@ function startWave(n) {
 function banner(text, sub = '') { game.banner = text; game.bannerSub = sub; game.bannerT = 2.4; }
 
 function waveCleared() {
-  const bonus = 250 * game.wave + (game.noHitWave ? 500 : 0);
+  const bonus = Math.round((250 * game.wave + (game.noHitWave ? 500 : 0)) * stats.scoreMult);
   game.score += bonus;
   banner('SHELF CLEARED!', `+${bonus.toLocaleString()} ${game.noHitWave ? '(flawless bonus!)' : ''}`);
   sound.play('wave');
@@ -286,31 +286,52 @@ function showUpgrades() {
   game.state = 'upgrade';
   game.bannerT = 0; texts.length = 0;
   sound.setMuffled(true);
-  const choices = rollUpgrades(rng, game.owned, 3);
+  const choices = rollUpgrades(rng, game.owned, 3, { lights: settings.lights });
   if (!choices.length) return startWave(game.wave + 1);
+  $('#upgradeTitle').textContent = `Wave ${game.wave} cleared — choose a perk`;
+  renderCards(choices);
+  showScreen('upgrade');
+  $('#cards button').focus();
+}
+
+const KIND_LABEL = { combo: 'Collected Works', cursed: 'Cursed book' };
+function renderCards(choices) {
   const box = $('#cards');
   box.textContent = '';
-  $('#upgradeTitle').textContent = `Wave ${game.wave} cleared — choose a perk`;
   choices.forEach((u, i) => {
     const b = document.createElement('button');
-    b.className = 'card';
+    b.className = `card ${u.kind}`;
     const lvl = (game.owned[u.id] || 0) + 1;
-    b.innerHTML = `<span class="key">${i + 1}</span><span class="icon"></span><strong></strong><span class="desc"></span><span class="lvl"></span>`;
+    b.innerHTML = '<span class="key"></span><span class="icon"></span><span class="kind"></span><strong></strong><span class="desc"></span><span class="lvl"></span>';
+    b.querySelector('.key').textContent = String(i + 1);
     b.querySelector('.icon').textContent = u.icon;
+    b.querySelector('.kind').textContent = KIND_LABEL[u.kind] || '';
     b.querySelector('strong').textContent = u.name;
     b.querySelector('.desc').textContent = u.desc;
-    b.querySelector('.lvl').textContent = `Level ${lvl} / ${u.max}`;
+    b.querySelector('.lvl').textContent = u.kind === 'combo'
+      ? `Unlocked by ${u.requires.map((r) => byId(r).name).join(' + ')}`
+      : u.max > 1 ? `Level ${lvl} / ${u.max}` : 'One-time';
     b.addEventListener('click', () => {
       game.owned[u.id] = lvl;
       u.apply(stats, player);
       sound.play('upgrade');
+      if (u.kind === 'combo') toast(`📚 ${u.name} added to your Collected Works`);
       startWave(game.wave + 1);
     });
     box.appendChild(b);
   });
-  showScreen('upgrade');
-  box.querySelector('button').focus();
+  const renew = $('#btnRenew');
+  renew.hidden = !(game.renews > 0);
+  renew.textContent = `↻ Renew (${game.renews || 0})`;
 }
+
+$('#btnRenew').addEventListener('click', () => {
+  if (!(game.renews > 0) || game.state !== 'upgrade') return;
+  game.renews--;
+  sound.play('pickup');
+  renderCards(rollUpgrades(rng, game.owned, 3, { lights: settings.lights }));
+  $('#cards button').focus();
+});
 
 function pause() {
   if (game.state !== 'playing') return;
@@ -355,7 +376,7 @@ function makeEnemy(type, x, y, extra = {}) {
   const d = DEF[type];
   const hpScale = 1 + Math.max(0, game.wave - 1) * 0.08;
   const hp = Math.max(1, Math.round(d.hp * (d.hp > 1 ? hpScale : 1)));
-  const e = { type, x, y, vx: 0, vy: 0, r: d.r, hp, maxHp: hp, speed: d.speed * (1 + Math.min(0.35, game.wave * 0.015)),
+  const e = { type, x, y, vx: 0, vy: 0, r: d.r, hp, maxHp: hp, speed: d.speed * (1 + Math.min(0.35, game.wave * 0.015)) * stats.enemySpeedMult,
     score: d.score, t: Math.random() * 10, stun: 0, flash: 0, dead: false, leader: null, atkT: 1.5 + Math.random() * 1.5, orbitHit: 0, ...extra };
   enemies.push(e);
   return e;
@@ -519,7 +540,7 @@ function updatePlayer(dt) {
       const a = t ? Math.atan2(p.y - t.y, p.x - t.x) : p.aim + Math.PI;
       p.dx = Math.cos(a); p.dy = Math.sin(a);
     } else { p.dx = Math.cos(p.aim); p.dy = Math.sin(p.aim); } // mouse: dash where you aim
-    p.dashT = 0.17; p.dashCd = stats.dashCd;
+    p.dashT = 0.17; p.dashCd = stats.dashCd; p.dashHits = new Set();
     sound.play('dash');
     burst(p.x, p.y, 8, ['#9be7dc', '#fff'], 90, 0.3);
   }
@@ -529,6 +550,13 @@ function updatePlayer(dt) {
     p.dashT -= dt;
     p.vx = p.dx * stats.speed * 3.3; p.vy = p.dy * stats.speed * 3.3;
     p.trail.push({ x: p.x, y: p.y, a: p.aim, life: 0.25 });
+    if (stats.dashDamage) {
+      for (const e of enemies) {
+        if (e.dead || p.dashHits.has(e) || Math.hypot(e.x - p.x, e.y - p.y) > e.r + p.r + 6) continue;
+        p.dashHits.add(e);
+        damageEnemy(e, stats.damage * stats.dashDamage, p.dx * 260, p.dy * 260, true);
+      }
+    }
   } else {
     const k = 1 - Math.exp(-dt * 14);
     p.vx = lerp(p.vx, mv.x * stats.speed, k);
@@ -540,7 +568,8 @@ function updatePlayer(dt) {
   for (let i = p.trail.length - 1; i >= 0; i--) if ((p.trail[i].life -= dt) <= 0) p.trail.splice(i, 1);
 
   p.fireT -= dt;
-  const rate = stats.fireRate * (p.rapidT > 0 ? 2 : 1);
+  p.nookOn = stats.nook > 0 && nextToShelf(p);
+  const rate = stats.fireRate * (p.rapidT > 0 ? 2 : 1) * (p.nookOn ? 1 + stats.nook : 1);
   if (firing && p.fireT <= 0) { p.fireT = 1 / rate; fire(); }
 }
 
@@ -556,16 +585,43 @@ function collideWorld(o, r) {
   if (o.y > H - r) { o.y = H - r; hit = { nx: 0, ny: -1 }; }
   return hit;
 }
+function spawnBook(x, y, a, extra = {}) {
+  const book = game.ammo || pickBook();
+  books.push({ x, y, vx: Math.cos(a) * stats.projSpeed, vy: Math.sin(a) * stats.projSpeed,
+    r: 6, life: 1.3, rot: a, spin: (Math.random() < 0.5 ? -1 : 1) * 14, bounces: stats.bounces, pierce: stats.pierce,
+    wraps: stats.wraps, child: false, hit: new Set(), color: bookColor(book.title), title: book.title, ...extra });
+}
+
 function fire() {
   const p = player, n = stats.projectiles;
-  const book = game.ammo || pickBook();
   for (let i = 0; i < n; i++) {
     const a = p.aim + (i - (n - 1) / 2) * stats.spread + (Math.random() - 0.5) * 0.04;
-    books.push({ x: p.x + Math.cos(a) * 14, y: p.y + Math.sin(a) * 14, vx: Math.cos(a) * stats.projSpeed, vy: Math.sin(a) * stats.projSpeed,
-      r: 6, life: 1.3, rot: a, spin: (Math.random() < 0.5 ? -1 : 1) * 14, bounces: stats.bounces, pierce: stats.pierce,
-      hit: new Set(), color: bookColor(book.title), title: book.title });
+    spawnBook(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a);
   }
   sound.play('throw');
+}
+
+/** Spine Breaker / Annotated Edition / Collapsing Stacks: damage everything in a radius. */
+function inkBurst(x, y, radius, dmg, color = '#e8d9b0') {
+  for (const e of enemies) {
+    if (e.dead) continue;
+    const d = Math.hypot(e.x - x, e.y - y);
+    if (d < radius + e.r) damageEnemy(e, dmg, ((e.x - x) / (d || 1)) * 120, ((e.y - y) / (d || 1)) * 120, false);
+  }
+  burst(x, y, 14, [color, '#fff', '#3a2a1a'], 160, 0.4);
+  pages(x, y, 3);
+  rings.push({ x, y, r: 4, max: radius, speed: radius * 6, friendly: true, life: 1 });
+  addLight(x, y, radius * 1.6, 0.25, color);
+  sound.play('hit', 0.7);
+}
+
+/** Reading Nook: is a shelf (not the outer wall) within reach of the player? */
+function nextToShelf(p) {
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * TAU, x = p.x + Math.cos(a) * (p.r + 16), y = p.y + Math.sin(a) * (p.r + 16);
+    if (x > 0 && y > 0 && x < W && y < H && isSolidPx(arena.solid, x, y)) return true;
+  }
+  return false;
 }
 
 function doShhh() {
@@ -586,6 +642,12 @@ function doShhh() {
   for (let i = hazards.length - 1; i >= 0; i--) {
     const h = hazards[i];
     if (Math.hypot(h.x - p.x, h.y - p.y) < R) { burst(h.x, h.y, 4, ['#ff6b6b', '#fff'], 80, 0.3); hazards.splice(i, 1); }
+  }
+  if (stats.shhhVolley) {
+    for (let k = 0; k < stats.shhhVolley; k++) {
+      const a = (k / stats.shhhVolley) * TAU + game.time;
+      spawnBook(p.x, p.y, a, { pierce: stats.pierce + 2, color: '#b48cff' });
+    }
   }
   floatText(p.x, p.y - 26, 'SHHH!', '#9be7dc', 22, 1);
   sound.play('shhh');
@@ -750,7 +812,8 @@ function damageEnemy(e, dmg, kx, ky, crit) {
   e.flash = 0.09;
   const kbScale = e.type === 'boss' ? 0.05 : e.type === 'golem' ? 0.3 : 1;
   e.vx += kx * kbScale; e.vy += ky * kbScale;
-  floatText(e.x + (Math.random() - 0.5) * 10, e.y - e.r, crit ? `${dmg}!` : `${dmg}`, crit ? '#ffd54a' : '#fff', crit ? 18 : 12, 0.6);
+  const shown = Number.isInteger(dmg) ? dmg : dmg.toFixed(1);
+  floatText(e.x + (Math.random() - 0.5) * 10, e.y - e.r, crit ? `${shown}!` : `${shown}`, crit ? '#ffd54a' : '#fff', crit ? 18 : 12, 0.6);
   sound.play(crit ? 'crit' : 'hit', e.type === 'boss' ? 0.6 : 1);
   if (e.type === 'boss') game.freeze = Math.max(game.freeze, 0.012);
   if (e.hp <= 0) killEnemy(e);
@@ -762,7 +825,7 @@ function killEnemy(e) {
   game.combo++;
   game.comboT = 2.5;
   game.bestCombo = Math.max(game.bestCombo, game.combo);
-  const gained = Math.round(e.score * comboMult());
+  const gained = Math.round(e.score * comboMult() * stats.scoreMult);
   game.score += gained;
   const colors = { bunny: ['#c9c2b6', '#8d867a'], notice: ['#f4efe1', '#e74c3c'], patron: ['#ff9f43', '#ffd8a8'], worm: ['#7bd88f', '#3c8d50'],
     golem: ['#d4a017', '#8a6d1a'], coin: ['#ffd54a'], boss: ['#6c3cff', '#b48cff', '#fff'] }[e.type];
@@ -782,7 +845,8 @@ function killEnemy(e) {
     shake(1); game.flash = 0.6;
     sound.play('explode'); sound.setIntensity(1);
     hazards.length = 0;
-    banner('AUTHOR DEFEATED', `${e.name} has been… shelved.`);
+    banner('AUTHOR DEFEATED', `${e.name} has been… shelved. +1 Renew`);
+    game.renews = (game.renews || 0) + 1;
     pickups.push({ type: 'heart', x: e.x, y: e.y, t: 0, life: 20 });
   }
   // Drops
@@ -829,9 +893,15 @@ function updateBooks(dt) {
         b.vx = Math.cos(na) * s; b.vy = Math.sin(na) * s;
       }
     }
-    const ox = b.x, oy = b.y;
+    let ox = b.x, oy = b.y;
     b.x += b.vx * dt; b.y += b.vy * dt;
     let remove = b.life <= 0;
+    // Interlibrary Loan: leave through one wall, come back through the opposite one.
+    if (b.wraps > 0 && (b.x < 0 || b.y < 0 || b.x >= W || b.y >= H)) {
+      b.x = (b.x + W) % W; b.y = (b.y + H) % H; ox = b.x; oy = b.y;
+      b.wraps--; b.life = Math.max(b.life, 0.9); b.hit.clear();
+      burst(b.x, b.y, 6, ['#9be7dc', '#fff'], 90, 0.3);
+    }
     if (isSolidPx(arena.solid, b.x, b.y)) {
       if (b.bounces > 0) {
         b.bounces--;
@@ -840,8 +910,16 @@ function updateBooks(dt) {
         if (isSolidPx(arena.solid, ox, b.y)) b.vy = -b.vy;
         if (!isSolidPx(arena.solid, b.x, oy) && !isSolidPx(arena.solid, ox, b.y)) { b.vx = -b.vx; b.vy = -b.vy; }
         b.x = ox; b.y = oy;
+        if (stats.retarget) {
+          const t = nearestEnemy(b.x, b.y, 700);
+          if (t) { const sp = Math.hypot(b.vx, b.vy), a = Math.atan2(t.y - b.y, t.x - b.x); b.vx = Math.cos(a) * sp; b.vy = Math.sin(a) * sp; b.hit.clear(); }
+        }
+        if (stats.bounceBurst) inkBurst(b.x, b.y, stats.shelfBurst || 50, stats.damage, '#ffb86b');
         sound.play('ping');
-      } else { remove = true; pages(b.x, b.y, 2); }
+      } else {
+        remove = true; pages(b.x, b.y, 2);
+        if (stats.shelfBurst) inkBurst(ox, oy, stats.shelfBurst, stats.damage, '#ffb86b');
+      }
     }
     if (!remove) {
       for (const e of enemies) {
@@ -850,11 +928,19 @@ function updateBooks(dt) {
         if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 < rr * rr) {
           b.hit.add(e);
           const crit = Math.random() < stats.critChance;
-          const dmg = crit ? Math.ceil(stats.damage * 2.5) : stats.damage;
+          const dmg = crit ? stats.damage * 2.5 : stats.damage;
           const s = Math.hypot(b.vx, b.vy) || 1;
           damageEnemy(e, dmg, (b.vx / s) * 160, (b.vy / s) * 160, crit);
           burst(b.x, b.y, 5, [b.color, '#fff'], 120, 0.3);
-          if (b.pierce > 0) b.pierce--; else { remove = true; break; }
+          if (crit && stats.critBurst) inkBurst(e.x, e.y, stats.critBurst, stats.damage, '#7a5cff');
+          if (b.pierce > 0) {
+            b.pierce--;
+            // Unreliable Narrator: the story forks.
+            if (stats.splitOnPierce && !b.child) {
+              const a = Math.atan2(b.vy, b.vx);
+              for (const off of [-0.45, 0.45]) spawnBook(b.x, b.y, a + off, { child: true, pierce: 0, bounces: 0, life: 0.8, hit: new Set(b.hit), color: b.color, title: b.title });
+            }
+          } else { remove = true; break; }
         }
       }
     }
@@ -1041,7 +1127,7 @@ function renderLights() {
   const L = (x, y, r, a = 1) => { lctx.globalAlpha = clamp(a, 0, 1); lctx.drawImage(lightSprite, (x - r) * LS, (y - r) * LS, r * 2 * LS, r * 2 * LS); };
   for (const [x, y] of LAMPS) L(x, y, 170 + Math.sin(game.time * 3 + x) * 4, 0.8);
   L(W / 2, H / 2, 200, 0.35);
-  if (game.state !== 'gameover' && !(game.state === 'dying' && game.deathT < 1.2)) L(player.x, player.y, 230, 1);
+  if (game.state !== 'gameover' && !(game.state === 'dying' && game.deathT < 1.2)) L(player.x, player.y, 230 * stats.lanternScale, 1);
   for (const b of books) L(b.x, b.y, 55, 0.7);
   for (const h of hazards) L(h.x, h.y, 30, 0.5);
   for (const e of enemies) if (e.type === 'boss') L(e.x, e.y, 160, 0.7); else if (e.type === 'golem') L(e.x, e.y, 60, 0.4);
@@ -1123,6 +1209,7 @@ function drawPlayer() {
   }
   ctx.globalAlpha = p.inv > 0 && Math.floor(game.time * 18) % 2 ? 0.35 : 1;
   ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(p.x + 3, p.y + 10, 12, 5, 0, 0, TAU); ctx.fill();
+  if (p.nookOn) { ctx.strokeStyle = 'rgba(123,216,143,0.6)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 9 + Math.sin(game.time * 8) * 1.5, 0, TAU); ctx.stroke(); }
   ctx.save(); ctx.translate(p.x, p.y + Math.sin(p.walk) * 1.2); ctx.rotate(p.aim);
   if (touch.enabled) ctx.scale(1.3, 1.3);
   // Cardigan body
@@ -1542,6 +1629,8 @@ if (DEBUG) {
   window.__overdue = {
     game, get player() { return player; }, get stats() { return stats; }, enemies, get content() { return content; },
     startRun, startWave, killAll: () => { for (const e of [...enemies]) killEnemy(e); spawnQueue.length = 0; telegraphs.length = 0; },
-    god: () => { player.hp = 999; stats.maxHp = 999; }, die: () => { player.hp = 1; player.inv = 0; hurtPlayer(player.x + 1, player.y); },
+    god: () => { player.hp = 999; stats.maxHp = 999; },
+    grant: (id) => { const u = UPGRADES.find((x) => x.id === id); game.owned[id] = (game.owned[id] || 0) + 1; u.apply(stats, player); },
+    showUpgrades, setRenews: (n) => { game.renews = n; }, die: () => { player.hp = 1; player.inv = 0; hurtPlayer(player.x + 1, player.y); },
   };
 }

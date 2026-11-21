@@ -133,3 +133,12 @@ body.portrait h2 { font-size: 1.6em; }
 /* Even two-column layouts (How to play, Game over) */
 .cols > * { flex: 1 1 18em; max-width: 26em; min-width: 0; }
 .bestiary { max-width: none; }
+
+/* Perk kinds */
+.card .kind { font-size: .7em; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); min-height: 1em; }
+.card.combo { border-color: var(--accent); background: linear-gradient(160deg, rgba(255,213,74,.28), rgba(16,10,30,.92)); box-shadow: 0 0 1.2em rgba(255,213,74,.25); }
+.card.combo .kind { color: var(--accent); }
+.card.cursed { border-color: #ff6b81; background: linear-gradient(160deg, rgba(255,60,90,.22), rgba(16,10,30,.92)); }
+.card.cursed .kind { color: #ff6b81; }
+.renew { margin-top: .4em; border-color: var(--teal); color: var(--teal); }
+body.portrait .card .kind { flex-basis: 100%; order: -1; }

@@ -136,3 +136,42 @@ test('catalogue has books and authors for every title', async () => {
     assert.ok(authors.has(b.author), `unknown author: ${b.author}`);
   }
 });
+
+test('combo cards unlock from their two perks and always take the first slot', async () => {
+  const { rollUpgrades, UPGRADES, byId, unlockedCombos } = await load('upgrades');
+  const { Rng } = await load('util');
+  for (const c of UPGRADES.filter((u) => u.kind === 'combo')) {
+    assert.equal(c.requires.length, 2, c.id);
+    for (const r of c.requires) assert.ok(byId(r) && byId(r).kind !== 'combo', `${c.id} requires unknown ${r}`);
+    assert.deepEqual(unlockedCombos({ [c.requires[0]]: 1 }).map((u) => u.id).includes(c.id), false, 'needs both');
+  }
+  const owned = { bookmark: 1, dewey: 1 };
+  for (let seed = 1; seed < 30; seed++) {
+    const picks = rollUpgrades(new Rng(seed), owned, 3);
+    assert.equal(picks[0].id, 'cyoa');
+    assert.equal(new Set(picks.map((p) => p.id)).size, 3);
+    assert.ok(picks.slice(1).every((p) => p.kind !== 'combo'));
+  }
+  assert.ok(!rollUpgrades(new Rng(1), { ...owned, cyoa: 1 }, 3).some((p) => p.id === 'cyoa'), 'taken combos disappear');
+});
+
+test('cursed books are one-time, and Lights Out needs lighting on', async () => {
+  const { rollUpgrades, UPGRADES } = await load('upgrades');
+  const { Rng } = await load('util');
+  for (const u of UPGRADES.filter((x) => x.kind === 'cursed')) assert.equal(u.max, 1);
+  let seenWithLights = false;
+  for (let seed = 1; seed < 400; seed++) {
+    assert.ok(!rollUpgrades(new Rng(seed), {}, 3, { lights: false }).some((p) => p.id === 'lightsout'));
+    if (rollUpgrades(new Rng(seed), {}, 3, { lights: true }).some((p) => p.id === 'lightsout')) seenWithLights = true;
+  }
+  assert.ok(seenWithLights);
+});
+
+test('rebalance: no single core perk more than doubles output at level 1', async () => {
+  const { byId, baseStats } = await load('upgrades');
+  const s = baseStats();
+  byId('hardcover').apply(s); assert.equal(s.damage, 1.5);
+  byId('trilogy').apply(s); assert.equal(s.projectiles, 2);
+  const c = baseStats();
+  byId('bannedbook').apply(c, { hp: 5 }); assert.equal(c.damage, 2); assert.equal(c.maxHp, 4);
+});

@@ -25,7 +25,11 @@ Or open the GitHub Pages site once it's enabled (see **Deploy**).
 ## What's inside
 
 - **Enemies:** Dust Bunny, Overdue Notice, Loud Patron, Bookworm and Late Fee Golem, plus a three-phase **Rogue Author** boss every 5th wave.
-- **Perks:** 12 stackable perks between waves (ricochet, pierce, homing, multishot, orbiting audiobooks, crits…).
+- **Perks between waves:**
+  - **15 core perks**, including shelf-play perks: Spine Breaker makes books burst on shelves, Reading Nook speeds up throwing next to a shelf, and Interlibrary Loan sends books back through the opposite wall.
+  - **3 cursed books**: big upsides with a real cost.
+  - **6 Collected Works combos** that unlock when you own both of their perks, for example Bouncy Bookmark + Dewey = *Choose Your Own Adventure*, where ricochets turn toward the nearest enemy.
+  - **Renew**: beating a boss earns a free reroll of the perk choices.
 - **Scoring:** a combo multiplier up to ×4 and a flawless-wave bonus.
 - **Layouts:** a new mirror-symmetric library each wave. The arena is tall on phones held upright and wide everywhere else.
 - **Pathfinding:** enemies route around the shelves using a shared Dijkstra flow field.
