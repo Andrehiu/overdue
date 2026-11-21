@@ -2,6 +2,7 @@
 // Engine: fixed-timestep loop, flow-field AI, dynamic lighting, procedural audio, roguelite perks.
 import { W, H, CELL, COLS, ROWS, SAFE, PORTRAIT, setGrid, gridForAspect, generateArena, isSolidPx, cellOf, edgeCells, idx } from './arena.js';
 import { createBackend } from './backend.js';
+import { BUILD, versionLabel, fetchLatestBuild } from './version.js';
 import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
@@ -1900,6 +1901,26 @@ function frame(now) {
 }
 
 applyLayout(true);
+// ---- Version label + "update available" ----
+document.querySelectorAll('.version-label').forEach((el) => { el.textContent = versionLabel(); });
+let updateOffered = false;
+async function checkForUpdate() {
+  if (updateOffered || BUILD.commit === 'local') return;
+  const live = await fetchLatestBuild();
+  if (!live || live.commit === BUILD.commit) return;
+  updateOffered = true;
+  const bar = $('#updateBar');
+  bar.textContent = `🔄 New version v${live.version} (${live.commit}) — tap to update`;
+  bar.hidden = false;
+}
+$('#updateBar').addEventListener('click', () => {
+  // Never yank a run out from under the player: only reload outside of play.
+  if (game.state === 'playing' || game.state === 'waveclear' || game.state === 'dying') { toast('Finish or pause this shift first'); return; }
+  location.reload();
+});
+setTimeout(checkForUpdate, 2500);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
+setInterval(() => { if (game.state === 'title' || game.state === 'gameover' || game.state === 'paused') checkForUpdate(); }, 10 * 60 * 1000);
 // iPhones have no Fullscreen API: hide the button rather than show one that does nothing.
 if (!document.fullscreenEnabled) document.querySelectorAll('.fs-only').forEach((el) => el.remove());
 updateSourceBadge();

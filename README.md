@@ -74,6 +74,13 @@ Add `?debug=1` to the URL for an FPS counter and test hooks (`window.__overdue`)
 - **GitHub Pages:** go to Settings → Pages → Source and choose **GitHub Actions**. Every push to `main` then publishes the game through `.github/workflows/pages.yml`.
 - **Anywhere else:** upload `index.html` and `src/`, or the single file from `npm run build`.
 
+## Versions and updates
+
+- **Version label:** the title screen and Settings show which build is running, e.g. `v1.1.0 · afd3fcb · 21 Nov 2026`. That's the version from `package.json`, the exact git commit and the build date, stamped in automatically when the game is built.
+- **Updates:** every push to `main` deploys a new build. If a newer build is live, players see a **"🔄 New version available, tap to update"** button. It never interrupts a run in progress.
+- **Releases:** to mark a notable release, bump `"version"` in `package.json` (e.g. 1.1.0 → 1.2.0). Small fixes don't need a bump, because the commit code changes on every deploy anyway.
+- **What gets deployed:** the live site is a single bundled page (`npm run build`), so a phone can never end up with a mix of old and new code from caching.
+
 ## History
 
 This game started life inside a university web-dev assignment, an Express and MongoDB "Meme Library" app, where the books came from the database. This repo is the standalone version.

@@ -282,3 +282,10 @@ body.portrait #upgrade > :last-child { margin-bottom: 0; }
 @media (max-height: 640px) { .logo { font-size: 3.4em; } .blurb { display: none; } .menu { gap: .4em; } .menu button { padding: .45em 1.2em; } }
 /* Fullscreen button only where it can work: hidden when launched from the Home Screen */
 @media (display-mode: standalone), (display-mode: fullscreen) { .fs-only { display: none !important; } }
+
+/* Version label + update bar */
+.version-label { font-size: .7em; letter-spacing: .06em; opacity: .7; font-variant-numeric: tabular-nums; }
+#updateBar { position: absolute; left: 50%; top: calc(.8em + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 20;
+  background: var(--teal); color: #08221f; border-color: var(--teal); font-weight: bold; font-size: .85em; white-space: nowrap;
+  box-shadow: 0 .4em 1.2em rgba(0, 0, 0, .5); }
+body.in-game #updateBar { opacity: .85; font-size: .7em; }

@@ -20,8 +20,17 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      # One self-contained page (no half-updated module caching) + version.json for "update available"
+      - name: Build
+        run: npm run build
       - name: Collect site files
-        run: mkdir _site && cp -r index.html src icons manifest.webmanifest _site/
+        run: mkdir _site && cp dist/overdue.html _site/index.html && cp dist/version.json _site/ && cp -r icons manifest.webmanifest _site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

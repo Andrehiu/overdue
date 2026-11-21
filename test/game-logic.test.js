@@ -239,7 +239,7 @@ test('home-screen app: manifest icons exist and the Pages deploy ships them', as
   const html = readFileSync(new URL('index.html', root), 'utf8');
   for (const ref of ['manifest.webmanifest', 'icons/apple-touch-icon.png', 'icons/favicon-32.png']) assert.ok(html.includes(ref) && existsSync(new URL(ref, root)), ref);
   const pages = readFileSync(new URL('.github/workflows/pages.yml', root), 'utf8');
-  assert.ok(pages.includes('icons') && pages.includes('manifest.webmanifest'), 'Pages deploy copies icons + manifest');
+  assert.ok(pages.includes('icons') && pages.includes('manifest.webmanifest') && pages.includes('version.json'), 'Pages deploy copies icons, manifest and version.json');
 });
 
 test('arena shape fits the screen: phones, iPads, laptops, desktops', async () => {
@@ -258,4 +258,10 @@ test('arena shape fits the screen: phones, iPads, laptops, desktops', async () =
       }
     }
   } finally { A.setOrientation(false); }
+});
+
+test('version label shows version, commit and date; dev builds say so', async () => {
+  const { versionLabel } = await load('version');
+  assert.equal(versionLabel({ version: '1.1.0', commit: 'afd3fcb', built: '2026-11-21T03:00:00Z' }), 'v1.1.0 · afd3fcb · 21 Nov 2026');
+  assert.equal(versionLabel({ version: 'dev', commit: 'local', built: '' }), 'dev build (not deployed)');
 });
