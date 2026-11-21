@@ -228,3 +228,16 @@ test('cards say just the gain, hint at combos, and Banish keeps perks out of the
   const banned = new Set(['hardcover', 'speedreader']);
   for (let seed = 1; seed < 200; seed++) assert.ok(!rollUpgrades(new Rng(seed), {}, 3, { banned }).some((u) => banned.has(u.id)));
 });
+
+test('home-screen app: manifest icons exist and the Pages deploy ships them', async () => {
+  const { readFileSync, existsSync } = await import('node:fs');
+  const root = new URL('../', import.meta.url);
+  const manifest = JSON.parse(readFileSync(new URL('manifest.webmanifest', root), 'utf8'));
+  assert.equal(manifest.display, 'standalone');
+  for (const icon of manifest.icons) assert.ok(existsSync(new URL(icon.src, root)), `missing ${icon.src}`);
+  assert.ok(manifest.icons.some((i) => i.purpose === 'maskable'));
+  const html = readFileSync(new URL('index.html', root), 'utf8');
+  for (const ref of ['manifest.webmanifest', 'icons/apple-touch-icon.png', 'icons/favicon-32.png']) assert.ok(html.includes(ref) && existsSync(new URL(ref, root)), ref);
+  const pages = readFileSync(new URL('.github/workflows/pages.yml', root), 'utf8');
+  assert.ok(pages.includes('icons') && pages.includes('manifest.webmanifest'), 'Pages deploy copies icons + manifest');
+});

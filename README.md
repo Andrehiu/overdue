@@ -10,7 +10,7 @@ A free arcade roguelite for phone and desktop. It's fully static: no server, no 
 npm run dev      # http://localhost:5173  (zero-dependency static server)
 ```
 
-Or open the GitHub Pages site once it's enabled (see **Deploy**).
+Or play online at **https://andrehiu.github.io/overdue/**. On a phone, use **Share → Add to Home Screen** (iPhone, Safari) or **⋮ → Add to Home screen** (Android, Chrome). It installs with its own icon and opens full-screen like an app.
 
 | | Keyboard / mouse | Gamepad | Touch |
 |---|---|---|---|
