@@ -106,6 +106,7 @@ export class SoundEngine {
       case 'shoot': this.tone({ type: 'square', f: 240 * r, f2: 180, dur: 0.05, vol: 0.05 }); break;
       case 'boss': this.tone({ type: 'sawtooth', f: 70, f2: 45, dur: 1.4, vol: 0.4, attack: 0.1 }); this.tone({ type: 'sawtooth', f: 105, f2: 66, dur: 1.4, vol: 0.3, attack: 0.1, detune: 12 }); this.noise({ dur: 1.4, vol: 0.25, f: 400, f2: 100, attack: 0.2 }); break;
       case 'death': this.tone({ type: 'triangle', f: 440, f2: 55, dur: 1.4, vol: 0.4 }); this.noise({ dur: 1.2, vol: 0.3, f: 1200, f2: 60 }); break;
+      case 'ready': this.tone({ type: 'sine', f: 880, dur: 0.12, vol: 0.09 }); this.tone({ type: 'sine', f: 1320, dur: 0.18, vol: 0.08, at: 0.07 }); break;
       case 'ping': this.tone({ type: 'sine', f: 1200 * r, dur: 0.05, vol: 0.05 }); break;
       case 'click': this.tone({ type: 'square', f: 900, dur: 0.03, vol: 0.05 }); break;
     }

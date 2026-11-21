@@ -16,7 +16,7 @@ Or open the GitHub Pages site once it's enabled (see **Deploy**).
 |---|---|---|---|
 | Move | WASD / arrows | Left stick | Drag anywhere |
 | Throw books | Aim + hold click | Right stick / RT | Automatic (2nd finger aims) |
-| Dash (invulnerable) | Space / Shift | A / RB | DASH |
+| Dash (invulnerable) | Space / Shift | A / RB | DASH (shows a countdown while recharging) |
 | SHHH! shockwave | E / Q / right-click | B / LB | SHHH |
 | Pause | P / Esc | Start | ❚❚ |
 
@@ -30,6 +30,7 @@ Or open the GitHub Pages site once it's enabled (see **Deploy**).
   - **3 cursed books**: big upsides with a real cost.
   - **6 Collected Works combos** that unlock when you own both of their perks, for example Bouncy Bookmark + Dewey = *Choose Your Own Adventure*, where ricochets turn toward the nearest enemy.
   - **Renew**: beating a boss earns a free reroll of the perk choices.
+  - **Masterworks**: every perk tops out at 3/3. Taking it to 3/3 unlocks its Masterwork, a one-time card with outsized power. For example Hardcover leads to Leather-Bound Tome (every 5th throw is a giant tome that pierces everything) and Quiet Please leads to Absolute Silence (SHHH! freezes the whole library).
 - **Scoring:** a combo multiplier up to ×4 and a flawless-wave bonus.
 - **Layouts:** a new mirror-symmetric library each wave. The arena is tall on phones held upright and wide everywhere else.
 - **Pathfinding:** enemies route around the shelves using a shared Dijkstra flow field.

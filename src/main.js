@@ -5,7 +5,7 @@ import { createBackend } from './backend.js';
 import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
-import { baseStats, rollUpgrades, UPGRADES, byId } from './upgrades.js';
+import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect } from './util.js';
 import { SoundEngine } from './audio.js';
 
@@ -216,7 +216,7 @@ let spawnQueue = [];
 const enemies = [], books = [], hazards = [], rings = [], particles = [], texts = [], pickups = [], telegraphs = [], flashes = [];
 
 function makePlayer() {
-  return { x: W / 2, y: H / 2, vx: 0, vy: 0, r: 11, hp: 5, aim: 0, fireT: 0, dashT: 0, dashCd: 0, dx: 1, dy: 0,
+  return { x: W / 2, y: H / 2, vx: 0, vy: 0, r: 11, hp: 5, aim: 0, fireT: 0, dashT: 0, dashCd: 0, dashStock: 1, throws: 0, streak: 0, amnesty: false, dx: 1, dy: 0,
     inv: 0, shhhT: 0, rapidT: 0, walk: 0, trail: [] };
 }
 
@@ -261,6 +261,7 @@ function startWave(n) {
   spawnQueue = composeWave(n, rng).spawns;
   game.waveT = 0; game.noHitWave = true; game.boss = null;
   game.ammo = pickBook(); game.ammoT = 0;
+  player.dashStock = stats.dashCharges; player.dashCd = 0; player.amnesty = stats.amnesty;
   banner(`WAVE ${n}`, n % 5 === 0 ? 'A rogue author approaches…' : `“${short(game.ammo.title, 40)}” is loaded`);
   sound.setIntensity(1); sound.setMuffled(false);
   game.state = 'playing';
@@ -273,6 +274,10 @@ function waveCleared() {
   const bonus = Math.round((250 * game.wave + (game.noHitWave ? 500 : 0)) * stats.scoreMult);
   game.score += bonus;
   banner('SHELF CLEARED!', `+${bonus.toLocaleString()} ${game.noHitWave ? '(flawless bonus!)' : ''}`);
+  if (stats.regenPerWave && player.hp < stats.maxHp) {
+    player.hp = Math.min(stats.maxHp, player.hp + stats.regenPerWave);
+    floatText(player.x, player.y - 24, '+1 ♥ Lifetime Membership', '#ff6b81', 13, 1.4);
+  }
   sound.play('wave');
   for (const h of hazards) burst(h.x, h.y, 3, ['#ff6b6b', '#fff'], 60, 0.3);
   hazards.length = 0; rings.length = 0;
@@ -294,7 +299,7 @@ function showUpgrades() {
   $('#cards button').focus();
 }
 
-const KIND_LABEL = { combo: 'Collected Works', cursed: 'Cursed book' };
+const KIND_LABEL = { combo: 'Collected Works', cursed: 'Cursed book', master: 'Masterwork' };
 function renderCards(choices) {
   const box = $('#cards');
   box.textContent = '';
@@ -308,14 +313,19 @@ function renderCards(choices) {
     b.querySelector('.kind').textContent = KIND_LABEL[u.kind] || '';
     b.querySelector('strong').textContent = u.name;
     b.querySelector('.desc').textContent = u.desc;
+    const mw = u.kind === 'perk' && lvl === u.max ? masterworkFor(u.id) : null;
     b.querySelector('.lvl').textContent = u.kind === 'combo'
       ? `Unlocked by ${u.requires.map((r) => byId(r).name).join(' + ')}`
-      : u.max > 1 ? `Level ${lvl} / ${u.max}` : 'One-time';
+      : u.kind === 'master' ? `${byId(u.requires[0]).name} mastered`
+        : u.max > 1 ? `Level ${lvl} / ${u.max}${mw ? ` · unlocks ${mw.name}` : ''}` : 'One-time';
+    if (mw) b.classList.add('finale');
     b.addEventListener('click', () => {
       game.owned[u.id] = lvl;
       u.apply(stats, player);
       sound.play('upgrade');
       if (u.kind === 'combo') toast(`📚 ${u.name} added to your Collected Works`);
+      else if (u.kind === 'master') toast(`🏆 Masterwork: ${u.name}`);
+      else if (mw) toast(`🏆 ${u.name} mastered! ${mw.name} will be offered next`);
       startWave(game.wave + 1);
     });
     box.appendChild(b);
@@ -526,11 +536,17 @@ function updatePlayer(dt) {
   if (game.state !== 'playing') firing = false;
 
   p.inv = Math.max(0, p.inv - dt);
-  p.dashCd = Math.max(0, p.dashCd - dt);
+  // Dash charges recharge one at a time (Caffeine Overdose gives 2).
+  if (p.dashStock < stats.dashCharges) {
+    p.dashCd -= dt;
+    if (p.dashCd <= 0) { p.dashStock++; p.dashCd = p.dashStock < stats.dashCharges ? stats.dashCd : 0; abilityReady('dash'); }
+  } else p.dashCd = 0;
+  const shhhWasCooling = p.shhhT > 0;
   p.shhhT = Math.max(0, p.shhhT - dt);
+  if (shhhWasCooling && p.shhhT <= 0) abilityReady('shhh');
   p.rapidT = Math.max(0, p.rapidT - dt);
 
-  if (actions.dash && p.dashCd <= 0 && game.state !== 'dying') {
+  if (actions.dash && p.dashStock > 0 && game.state !== 'dying') {
     const l = Math.hypot(mv.x, mv.y);
     if (l) { p.dx = mv.x / l; p.dy = mv.y / l; }
     else if (p.lastMoveT > 0) { p.dx = p.lastDx; p.dy = p.lastDy; } // thumb just lifted to tap DASH
@@ -540,7 +556,8 @@ function updatePlayer(dt) {
       const a = t ? Math.atan2(p.y - t.y, p.x - t.x) : p.aim + Math.PI;
       p.dx = Math.cos(a); p.dy = Math.sin(a);
     } else { p.dx = Math.cos(p.aim); p.dy = Math.sin(p.aim); } // mouse: dash where you aim
-    p.dashT = 0.17; p.dashCd = stats.dashCd; p.dashHits = new Set();
+    p.dashT = 0.17; p.dashHits = new Set();
+    p.dashStock--; if (p.dashCd <= 0) p.dashCd = stats.dashCd;
     sound.play('dash');
     burst(p.x, p.y, 8, ['#9be7dc', '#fff'], 90, 0.3);
   }
@@ -569,7 +586,9 @@ function updatePlayer(dt) {
 
   p.fireT -= dt;
   p.nookOn = stats.nook > 0 && nextToShelf(p);
-  const rate = stats.fireRate * (p.rapidT > 0 ? 2 : 1) * (p.nookOn ? 1 + stats.nook : 1);
+  p.streak = firing ? p.streak + dt : 0;
+  p.inZone = stats.zone && p.streak > 2;
+  const rate = stats.fireRate * (p.rapidT > 0 ? 2 : 1) * (p.nookOn ? 1 + stats.nook : 1) * (p.inZone ? 2 : 1);
   if (firing && p.fireT <= 0) { p.fireT = 1 / rate; fire(); }
 }
 
@@ -588,17 +607,38 @@ function collideWorld(o, r) {
 function spawnBook(x, y, a, extra = {}) {
   const book = game.ammo || pickBook();
   books.push({ x, y, vx: Math.cos(a) * stats.projSpeed, vy: Math.sin(a) * stats.projSpeed,
-    r: 6, life: 1.3, rot: a, spin: (Math.random() < 0.5 ? -1 : 1) * 14, bounces: stats.bounces, pierce: stats.pierce,
+    r: 6, life: stats.bookLife, rot: a, dmgMult: 1, scale: 1, spin: (Math.random() < 0.5 ? -1 : 1) * 14, bounces: stats.bounces, pierce: stats.pierce,
     wraps: stats.wraps, child: false, hit: new Set(), color: bookColor(book.title), title: book.title, ...extra });
 }
 
 function fire() {
   const p = player, n = stats.projectiles;
+  p.throws++;
   for (let i = 0; i < n; i++) {
     const a = p.aim + (i - (n - 1) / 2) * stats.spread + (Math.random() - 0.5) * 0.04;
     spawnBook(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a);
   }
+  // Leather-Bound Tome: a giant book every Nth throw
+  if (stats.tomeEvery && p.throws % stats.tomeEvery === 0) {
+    spawnBook(p.x, p.y, p.aim, { r: 15, scale: 2.4, dmgMult: 5, pierce: 99, bounces: 0, color: '#c9a227', tome: true });
+    shake(0.15); sound.play('explode');
+  }
+  // Complete Saga: a fan of 7 every Nth throw
+  if (stats.sagaEvery && p.throws % stats.sagaEvery === 0) {
+    for (let i = 0; i < 7; i++) spawnBook(p.x, p.y, p.aim + (i - 3) * 0.16, { color: '#7bd88f' });
+  }
   sound.play('throw');
+}
+
+/** Feedback the moment an ability is usable again. */
+function abilityReady(kind) {
+  const btn = kind === 'dash' ? btnDash : btnShhh;
+  btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop');
+  if (kind === 'shhh' && game.state === 'playing') {
+    sound.play('ready');
+    buzz(15);
+    rings.push({ x: player.x, y: player.y, r: player.r + 4, max: player.r + 30, speed: 90, friendly: true, life: 1, color: '180,140,255' });
+  }
 }
 
 /** Spine Breaker / Annotated Edition / Collapsing Stacks: damage everything in a radius. */
@@ -638,6 +678,12 @@ function doShhh() {
       e.stun = e.type === 'boss' ? 0.4 : 1.5;
       damageEnemy(e, 1, 0, 0, false);
     }
+  }
+  if (stats.shhhGlobal) {
+    for (const e of enemies) e.stun = Math.max(e.stun, e.type === 'boss' ? 1 : 2.5);
+    addLight(W / 2, H / 2, Math.max(W, H), 0.6, '#b48cff');
+    banner('ABSOLUTE SILENCE', '');
+    game.bannerT = 1.2;
   }
   for (let i = hazards.length - 1; i >= 0; i--) {
     const h = hazards[i];
@@ -866,6 +912,13 @@ function buzz(pattern) {
 function hurtPlayer(sx, sy) {
   const p = player;
   if (p.inv > 0 || p.dashT > 0 || game.state !== 'playing') return;
+  if (p.hp <= 1 && p.amnesty) {
+    p.amnesty = false; p.inv = 1.6;
+    floatText(p.x, p.y - 28, 'AMNESTY!', '#9be7dc', 20, 1.4);
+    burst(p.x, p.y, 30, ['#9be7dc', '#fff'], 240, 0.7); shake(0.5); buzz([30, 30, 30]); sound.play('upgrade');
+    rings.push({ x: p.x, y: p.y, r: 10, max: 120, speed: 500, friendly: true, life: 1 });
+    return;
+  }
   p.hp -= 1;
   buzz(p.hp <= 0 ? [60, 40, 120] : 35);
   p.inv = stats.iframes;
@@ -884,11 +937,12 @@ function updateBooks(dt) {
     const b = books[i];
     b.life -= dt;
     b.rot += b.spin * dt;
-    if (stats.homing > 0) {
-      const t = nearestEnemy(b.x, b.y, 240);
+    const homing = b.homingBoost ? Math.max(stats.homing, 8) : stats.homing;
+    if (homing > 0) {
+      const t = nearestEnemy(b.x, b.y, homing > 10 ? 420 : 240);
       if (t) {
         const cur = Math.atan2(b.vy, b.vx), want = Math.atan2(t.y - b.y, t.x - b.x);
-        const na = cur + clamp(angleDiff(cur, want), -stats.homing * dt, stats.homing * dt);
+        const na = cur + clamp(angleDiff(cur, want), -homing * dt, homing * dt);
         const s = Math.hypot(b.vx, b.vy);
         b.vx = Math.cos(na) * s; b.vy = Math.sin(na) * s;
       }
@@ -900,11 +954,13 @@ function updateBooks(dt) {
     if (b.wraps > 0 && (b.x < 0 || b.y < 0 || b.x >= W || b.y >= H)) {
       b.x = (b.x + W) % W; b.y = (b.y + H) % H; ox = b.x; oy = b.y;
       b.wraps--; b.life = Math.max(b.life, 0.9); b.hit.clear();
+      if (stats.wrapHoming) { b.homingBoost = true; b.dmgMult = Math.min(4, b.dmgMult * 2); b.color = '#9be7dc'; }
       burst(b.x, b.y, 6, ['#9be7dc', '#fff'], 90, 0.3);
     }
     if (isSolidPx(arena.solid, b.x, b.y)) {
       if (b.bounces > 0) {
         b.bounces--;
+        if (stats.bounceAccel) { b.vx *= 1 + stats.bounceAccel; b.vy *= 1 + stats.bounceAccel; }
         // Reflect on the axis whose crossing put us into the wall.
         if (isSolidPx(arena.solid, b.x, oy)) b.vx = -b.vx;
         if (isSolidPx(arena.solid, ox, b.y)) b.vy = -b.vy;
@@ -914,11 +970,11 @@ function updateBooks(dt) {
           const t = nearestEnemy(b.x, b.y, 700);
           if (t) { const sp = Math.hypot(b.vx, b.vy), a = Math.atan2(t.y - b.y, t.x - b.x); b.vx = Math.cos(a) * sp; b.vy = Math.sin(a) * sp; b.hit.clear(); }
         }
-        if (stats.bounceBurst) inkBurst(b.x, b.y, stats.shelfBurst || 50, stats.damage, '#ffb86b');
+        if (stats.bounceBurst) inkBurst(b.x, b.y, stats.shelfBurst || 50, stats.damage * stats.burstMult, '#ffb86b');
         sound.play('ping');
       } else {
         remove = true; pages(b.x, b.y, 2);
-        if (stats.shelfBurst) inkBurst(ox, oy, stats.shelfBurst, stats.damage, '#ffb86b');
+        if (stats.shelfBurst) inkBurst(ox, oy, stats.shelfBurst, stats.damage * stats.burstMult, '#ffb86b');
       }
     }
     if (!remove) {
@@ -928,7 +984,8 @@ function updateBooks(dt) {
         if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 < rr * rr) {
           b.hit.add(e);
           const crit = Math.random() < stats.critChance;
-          const dmg = crit ? stats.damage * 2.5 : stats.damage;
+          const base = stats.damage * b.dmgMult * (stats.nookDamage && player.nookOn ? 2 : 1);
+          const dmg = crit ? base * stats.critMult : base;
           const s = Math.hypot(b.vx, b.vy) || 1;
           damageEnemy(e, dmg, (b.vx / s) * 160, (b.vy / s) * 160, crit);
           burst(b.x, b.y, 5, [b.color, '#fff'], 120, 0.3);
@@ -952,7 +1009,8 @@ function orbiterPositions() {
   const n = stats.orbiters, out = [];
   for (let i = 0; i < n; i++) {
     const a = game.time * 3.2 + (i / n) * TAU;
-    out.push({ x: player.x + Math.cos(a) * 48, y: player.y + Math.sin(a) * 48, a });
+    const rad = 48 + (stats.orbitPulse ? 30 * (0.5 + 0.5 * Math.sin(game.time * 2.2)) : 0);
+    out.push({ x: player.x + Math.cos(a) * rad, y: player.y + Math.sin(a) * rad, a });
   }
   return out;
 }
@@ -1162,7 +1220,7 @@ function render() {
   for (const k of pickups) drawPickup(k);
   for (const e of enemies) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(e.x + 3, e.y + e.r * 0.8, e.r * 0.9, e.r * 0.4, 0, 0, TAU); ctx.fill(); }
   for (let i = enemies.length - 1; i >= 0; i--) drawEnemy(enemies[i]);
-  for (const b of books) drawBook(b.x, b.y, b.rot, b.color, 1);
+  for (const b of books) drawBook(b.x, b.y, b.rot, b.color, b.scale || 1);
   if (game.state !== 'title' && game.state !== 'gameover' && !(game.state === 'dying' && game.deathT < 1.5)) {
     for (const o of orbiterPositions()) drawBook(o.x, o.y, o.a * 2, '#b48cff', 1.1);
     drawPlayer();
@@ -1209,6 +1267,8 @@ function drawPlayer() {
   }
   ctx.globalAlpha = p.inv > 0 && Math.floor(game.time * 18) % 2 ? 0.35 : 1;
   ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(p.x + 3, p.y + 10, 12, 5, 0, 0, TAU); ctx.fill();
+  if (p.inZone) { ctx.fillStyle = 'rgba(255,140,60,0.25)'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 12 + Math.sin(game.time * 20) * 2, 0, TAU); ctx.fill(); }
+  if (p.amnesty) { ctx.strokeStyle = 'rgba(155,231,220,0.55)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 6, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
   if (p.nookOn) { ctx.strokeStyle = 'rgba(123,216,143,0.6)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 9 + Math.sin(game.time * 8) * 1.5, 0, TAU); ctx.stroke(); }
   ctx.save(); ctx.translate(p.x, p.y + Math.sin(p.walk) * 1.2); ctx.rotate(p.aim);
   if (touch.enabled) ctx.scale(1.3, 1.3);
@@ -1349,7 +1409,7 @@ function drawHazard(h) {
 }
 
 function drawRing(g) {
-  ctx.strokeStyle = g.friendly ? `rgba(155,231,220,${g.life})` : `rgba(255,159,67,${0.4 + g.life * 0.6})`;
+  ctx.strokeStyle = g.friendly ? `rgba(${g.color || '155,231,220'},${g.life})` : `rgba(255,159,67,${0.4 + g.life * 0.6})`;
   ctx.lineWidth = g.friendly ? 6 * g.life + 1 : g.width;
   ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, TAU); ctx.stroke();
   if (!g.friendly) { ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2; ctx.stroke(); }
@@ -1410,14 +1470,17 @@ function drawHUD() {
   txt(`WAVE ${game.wave}`, W / 2, 26, 18, '#e8d9b0', 'center');
   if (game.state === 'playing' && !game.boss) txt(`${left} disturbance${left === 1 ? '' : 's'} left`, W / 2, 44, 11, 'rgba(232,217,176,0.8)', 'center');
   // Cooldowns
-  const kDash = clamp(1 - player.dashCd / stats.dashCd, 0, 1), kShhh = clamp(1 - player.shhhT / stats.shhhCd, 0, 1);
+  const dashReady = player.dashStock > 0;
+  const kDash = dashReady ? 1 : clamp(1 - player.dashCd / stats.dashCd, 0, 1), kShhh = clamp(1 - player.shhhT / stats.shhhCd, 0, 1);
+  const dashLabel = stats.dashCharges > 1 ? `DASH×${player.dashStock}` : 'DASH';
   if (touch.enabled) {
-    // On touch the on-screen buttons show their own cooldown rings.
-    btnDash.style.setProperty('--k', kDash.toFixed(3)); btnShhh.style.setProperty('--k', kShhh.toFixed(3));
+    // On touch the on-screen buttons show their own cooldown rings + countdown.
+    setTouchButton(btnDash, kDash, dashReady ? 0 : player.dashCd, dashLabel);
+    setTouchButton(btnShhh, kShhh, player.shhhT, 'SHHH');
     if (player.rapidT > 0) cooldown(30, H - 30, '☕x2', player.rapidT / 6, '#c69c6d');
   } else {
-    cooldown(30, H - 30, 'DASH', kDash, '#9be7dc');
-    cooldown(80, H - 30, 'SHHH', kShhh, '#b48cff');
+    cooldown(30, H - 30, dashLabel, kDash, '#9be7dc', dashReady ? 0 : player.dashCd);
+    cooldown(80, H - 30, 'SHHH', kShhh, '#b48cff', player.shhhT);
     if (player.rapidT > 0) cooldown(130, H - 30, '☕x2', player.rapidT / 6, '#c69c6d');
   }
   // Ammo ticker
@@ -1446,12 +1509,33 @@ function drawHUD() {
   if (DEBUG) txt(`fps ${fps.toFixed(0)}  e${enemies.length} p${particles.length} seed ${game.seed}`, 10, H - 60, 11, '#0f0');
 }
 
-function cooldown(x, y, label, k, color) {
+function cooldown(x, y, label, k, color, secs = 0) {
   k = clamp(k, 0, 1);
-  ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.arc(x, y, 18, 0, TAU); ctx.fill();
-  ctx.strokeStyle = k >= 1 ? color : 'rgba(255,255,255,0.3)'; ctx.lineWidth = 4;
+  const ready = k >= 1;
+  if (ready) { ctx.globalAlpha = 0.35 + 0.15 * Math.sin(game.time * 5); ctx.drawImage(glowSprite(color), x - 30, y - 30, 60, 60); ctx.globalAlpha = 1; }
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.arc(x, y, 18, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(x, y, 16, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = ready ? color : 'rgba(255,255,255,0.45)';
   ctx.beginPath(); ctx.arc(x, y, 16, -Math.PI / 2, -Math.PI / 2 + TAU * k); ctx.stroke();
-  ctx.font = FONT(9); ctx.textAlign = 'center'; ctx.fillStyle = k >= 1 ? '#fff' : '#999'; ctx.fillText(label, x, y + 3);
+  ctx.textAlign = 'center';
+  if (!ready && secs > 0) {
+    ctx.font = FONT(12); ctx.fillStyle = '#ddd'; ctx.fillText(secs < 1 ? secs.toFixed(1) : String(Math.ceil(secs)), x, y + 4);
+    ctx.font = FONT(7); ctx.fillStyle = '#888'; ctx.fillText(label, x, y + 31);
+  } else { ctx.font = FONT(label.length > 5 ? 7 : 9); ctx.fillStyle = '#fff'; ctx.fillText(label, x, y + 3); }
+}
+
+/** Touch buttons: ring fills as it recharges, a countdown shows, and it lights up when ready. */
+const btnCache = new WeakMap();
+function setTouchButton(btn, k, secs, label) {
+  const ready = k >= 1;
+  const text = ready ? '' : secs < 1 ? secs.toFixed(1) : String(Math.ceil(secs));
+  const key = `${ready}|${text}|${label}|${k.toFixed(2)}`;
+  if (btnCache.get(btn) === key) return;
+  btnCache.set(btn, key);
+  btn.style.setProperty('--k', k.toFixed(3));
+  btn.classList.toggle('cooling', !ready);
+  btn.querySelector('.cd').textContent = text;
+  btn.querySelector('.lbl').textContent = label;
 }
 
 function drawCrosshair() {

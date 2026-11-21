@@ -175,3 +175,24 @@ test('rebalance: no single core perk more than doubles output at level 1', async
   const c = baseStats();
   byId('bannedbook').apply(c, { hp: 5 }); assert.equal(c.damage, 2); assert.equal(c.maxHp, 4);
 });
+
+test('every stackable perk tops out at 3/3 and leads to exactly one Masterwork', async () => {
+  const { UPGRADES, masterworkFor, unlockedMasterworks, rollUpgrades, baseStats } = await load('upgrades');
+  const { Rng } = await load('util');
+  const perks = UPGRADES.filter((u) => u.kind === 'perk');
+  for (const p of perks) {
+    assert.equal(p.max, 3, p.id);
+    const mw = masterworkFor(p.id);
+    assert.ok(mw, `${p.id} has no Masterwork`);
+    assert.equal(UPGRADES.filter((u) => u.kind === 'master' && u.requires[0] === p.id).length, 1);
+    assert.ok(!unlockedMasterworks({ [p.id]: 2 }).includes(mw), 'locked below 3/3');
+    assert.ok(unlockedMasterworks({ [p.id]: 3 }).includes(mw), 'unlocked at 3/3');
+    assert.equal(rollUpgrades(new Rng(7), { [p.id]: 3 }, 3)[0].id, mw.id, 'offered first');
+    assert.ok(!rollUpgrades(new Rng(7), { [p.id]: 3, [mw.id]: 1 }, 3).some((u) => u.id === mw.id), 'gone once taken');
+    // Applying the whole chain never produces NaN stats
+    const s = baseStats(), pl = { hp: 5 };
+    for (let i = 0; i < 3; i++) p.apply(s, pl);
+    mw.apply(s, pl);
+    for (const [k, v] of Object.entries(s)) if (typeof v === 'number') assert.ok(Number.isFinite(v), `${mw.id} broke ${k}`);
+  }
+});

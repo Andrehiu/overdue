@@ -128,7 +128,6 @@ body.touch .touch-only { display: inline; }
 body.touch .no-touch { display: none; }
 body.portrait h2 { font-size: 1.6em; }
 /* cooldown ring on touch buttons: --k goes 0 → 1 as the ability recharges */
-#btnDash, #btnShhh { --k: 1; background-image: conic-gradient(rgba(255,255,255,.28) calc(var(--k) * 360deg), transparent 0); }
 
 /* Even two-column layouts (How to play, Game over) */
 .cols > * { flex: 1 1 18em; max-width: 26em; min-width: 0; }
@@ -142,3 +141,25 @@ body.portrait h2 { font-size: 1.6em; }
 .card.cursed .kind { color: #ff6b81; }
 .renew { margin-top: .4em; border-color: var(--teal); color: var(--teal); }
 body.portrait .card .kind { flex-basis: 100%; order: -1; }
+
+/* ---------- Ability buttons: recharge ring, countdown, ready glow ---------- */
+#btnDash { --c: var(--teal); }
+#btnShhh { --c: var(--violet); }
+#btnDash, #btnShhh { --k: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .1em; overflow: visible;
+  transition: filter .2s, opacity .2s, box-shadow .2s; box-shadow: 0 0 1.2em color-mix(in srgb, var(--c) 55%, transparent); }
+#btnDash::before, #btnShhh::before { content: ""; position: absolute; inset: -4px; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(var(--c) calc(var(--k) * 360deg), rgba(255,255,255,.12) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px)); }
+#touchUI .cd { font-size: 1.5em; font-weight: bold; line-height: 1; font-variant-numeric: tabular-nums; }
+#touchUI .cd:empty { display: none; }
+#touchUI button.cooling { filter: grayscale(.85) brightness(.75); box-shadow: none; }
+#touchUI button.cooling .lbl { font-size: .7em; opacity: .8; }
+#touchUI button.pop { animation: ready-pop .35s ease-out; }
+@keyframes ready-pop { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { #touchUI button.pop { animation: none; } }
+
+/* Masterwork cards + "this level unlocks a Masterwork" hint */
+.card.master { border-color: #9be7dc; background: linear-gradient(160deg, rgba(155,231,220,.25), rgba(108,60,255,.25) 60%, rgba(16,10,30,.92)); box-shadow: 0 0 1.4em rgba(155,231,220,.3); }
+.card.master .kind { color: var(--teal); }
+.card.finale .lvl { color: var(--teal); }
