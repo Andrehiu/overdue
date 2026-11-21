@@ -56,7 +56,7 @@ npm run build   # dist/overdue.html (single file) + dist/version.json; this is e
 7. Players see the new version on next open; the title screen shows `v<version> · <commit>`.
 
 ## Product rules (owner decisions, don't change without asking)
-- **Phone first.** Portrait iPhone is the main target; iPad and desktop must also fill the screen.
+- **Phone first, landscape only** (since v1.4.0): iPhone landscape is the main target; iPad and desktop must also fill the screen. In portrait, touch devices show a rotate overlay.
 - **Keep the dynamic lighting** (dark room, lamp pools, lantern) as it is.
 - **Auto-aim deliberately ignores line of sight.** Firing into shelves is a feature (and feeds Spine Breaker).
 - **Perk cards speak plainly:** "just the gain" (e.g. "+50% damage"). Never show internal units (px, rad/s).

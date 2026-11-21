@@ -15,7 +15,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 | Version | What | Status |
 |---|---|---|
 | 1.3.1 | **Stuck fix:** shelf gaps ≥ 60 px, player 18 px wide against shelves (22 vs enemies), corner assist | Shipped 2026-11-21, owner play-testing (checklist below). Handoff: `docs/handoffs/1.3.1-stuck-fix.md` |
-| 1.4.0 | **Landscape only:** "rotate your phone" screen in portrait, manifest `orientation: landscape`, update CLAUDE.md / README / QA devices | Next |
+| 1.4.0 | **Landscape only:** "rotate your phone" screen in portrait, manifest `orientation: landscape`, update CLAUDE.md / README / QA devices | Done on branch `claude/landscape-only`, awaiting owner review (not shipped) |
 | 1.5.0 | **Bigger map:** ~40×24 cells (1.7× floor), camera follows the player with a dead zone; light layer screen-sized (same look; owner OK needed since CLAUDE.md says keep lighting); auto-aim only on screen; spawns just off-screen; edge arrows for off-screen enemies; perf budget must hold. Build behind `?bigmap=1` first | After 1.4.0, only if the game still feels cramped after 1.3.1 |
 
 ### 1.3.1 phone checklist (wing 1, rooms 1–10)
