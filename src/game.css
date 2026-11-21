@@ -369,3 +369,16 @@ body.portrait .reach-row { grid-template-columns: 1fr; }
 #gameover .menu.row { position: sticky; bottom: 0; padding: .5em 0 calc(.5em + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(to bottom, transparent, rgba(5, 3, 12, .92) 35%); width: 100%; justify-content: center; }
 #goBuild { justify-content: flex-start; padding-left: 0; }
+
+/* Rotate overlay (v1.4.0): touch devices in portrait. Tokens scoped to the component. */
+#rotate {
+  --rot-bg: #0d0818; --rot-fg: #f4ecd8; --rot-accent: #ffb347;
+  position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: .8em; padding: 2em; text-align: center; background: var(--rot-bg); color: var(--rot-fg);
+}
+#rotate[hidden] { display: none; }
+#rotate svg { width: 6em; height: 6em; fill: none; stroke: var(--rot-accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; animation: rot-turn 2.4s ease-in-out infinite; }
+#rotate h2 { margin: 0; font-size: 1.5em; }
+#rotate p { margin: 0; font-size: 1.1em; opacity: .85; }
+@keyframes rot-turn { 0%, 20% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+@media (prefers-reduced-motion: reduce) { #rotate svg { animation: none; } }

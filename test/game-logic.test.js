@@ -244,8 +244,9 @@ test('home-screen app: manifest icons exist and the Pages deploy ships them', as
 
 test('arena shape fits the screen: phones, iPads, laptops, desktops', async () => {
   const A = await load('arena');
-  const cases = [[390 / 844, 18, 32], [1920 / 1080, 32, 18], [1180 / 820, 28, 20], [2.4, 32, 18], [0.3, 18, 32]];
+  const cases = [[1920 / 1080, 32, 18], [1180 / 820, 28, 20], [2.4, 32, 18]];
   for (const [aspect, c, r] of cases) assert.deepEqual(A.gridForAspect(aspect), [c, r], `aspect ${aspect}`);
+  for (let a = 0.3; a <= 3; a += 0.01) { const [c, r] = A.gridForAspect(a); assert.ok(r <= c, `landscape only: aspect ${a.toFixed(2)} gave ${c}x${r}`); }
   try {
     for (const aspect of [0.46, 0.69, 0.75, 1.0, 1.33, 1.42, 1.6, 1.78, 2.2]) {
       const [cols, rows] = A.gridForAspect(aspect);

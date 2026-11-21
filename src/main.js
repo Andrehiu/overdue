@@ -79,9 +79,19 @@ function resize() {
   canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
   viewScale = cw / W;
 }
+/** Touch devices held in portrait get a full-screen "turn your phone" overlay (desktop never does). */
+function updateRotateOverlay(canPause = false) {
+  const need = touch.enabled && isPortraitScreen();
+  const was = document.body.classList.contains('rotate-needed');
+  document.body.classList.toggle('rotate-needed', need);
+  $('#rotate').hidden = !need;
+  // Pause a run in progress; no auto-resume on rotating back, so the player isn't hit while turning the phone.
+  if (canPause && need && !was && game.state === 'playing') pause();
+}
 addEventListener('resize', () => {
   // Re-shape the arena on rotation only while no run is in progress.
   if (game.state === 'title' || game.state === 'gameover') applyLayout(); else resize();
+  updateRotateOverlay(true);
 });
 
 // ======================================================================
@@ -164,6 +174,7 @@ function enableTouch() {
   if (touch.enabled) return;
   touch.enabled = true;
   document.body.classList.add('touch');
+  updateRotateOverlay();
 }
 // Show touch controls from the first touch anywhere on the page (e.g. tapping "Start shift").
 addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') enableTouch(); }, { capture: true });
@@ -2139,7 +2150,7 @@ async function toggleFullscreen() {
     if (document.fullscreenElement) await document.exitFullscreen();
     else {
       await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
-      try { await screen.orientation.lock(isPortraitScreen() ? 'portrait' : 'landscape'); } catch { /* unsupported */ }
+      try { await screen.orientation.lock('landscape'); } catch { /* unsupported */ }
     }
   } catch { toast('Fullscreen isn\u2019t available here'); }
 }

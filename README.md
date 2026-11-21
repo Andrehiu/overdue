@@ -10,6 +10,8 @@ A free arcade roguelite for phone and desktop. It's fully static: no server, no 
 npm run dev      # http://localhost:5173  (zero-dependency static server)
 ```
 
+**Landscape only:** the game plays in landscape on phones and tablets. Held in portrait, touch devices show a "rotate your device" screen (a run in progress is paused). Desktop browsers letterbox the arena.
+
 Or play online at **https://andrehiu.github.io/overdue/**. On a phone, use **Share → Add to Home Screen** (iPhone, Safari) or **⋮ → Add to Home screen** (Android, Chrome). It installs with its own icon and opens full-screen like an app.
 
 | | Keyboard / mouse | Gamepad | Touch |

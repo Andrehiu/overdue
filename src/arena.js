@@ -27,11 +27,11 @@ export function setOrientation(portrait) { setGrid(portrait ? 18 : 32, portrait 
 
 /**
  * Pick an arena shape that matches the screen, so there are no big black bars:
- * 16:9 desktop -> 32x18, iPad landscape -> 28x20, iPad portrait -> 20x28, phone portrait -> 18x32.
+ * 16:9 desktop -> 32x18, iPad landscape -> 28x20. Narrower screens get the 4:3 shape (letterboxed).
  * Keeps roughly the same number of cells (same amount of room to play) and an even column count.
  */
 export function gridForAspect(aspect) {
-  const a = clamp(aspect || 16 / 9, 18 / 32, 32 / 18);
+  const a = clamp(aspect || 16 / 9, 4 / 3, 32 / 18); // landscape only since v1.4.0: never a portrait grid
   let rows = Math.round(Math.sqrt(576 / a));
   let cols = Math.round((rows * a) / 2) * 2;
   cols = clamp(cols, 18, 32); rows = clamp(rows, 18, 32);

@@ -17,8 +17,9 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 | Version | What | Status |
 |---|---|---|
 | 1.3.1 | **Stuck fix:** shelf gaps ≥ 60 px, player 18 px wide against shelves (22 vs enemies), corner assist | Shipped 2026-11-21; owner playtest: no longer cramped. Handoff: `docs/handoffs/1.3.1-stuck-fix.md` |
-| 1.4.0 | **Landscape only:** "rotate your phone" screen in portrait, manifest `orientation: landscape`, update CLAUDE.md / README / QA devices | In progress: coder session "Overdue · v1.4.0 landscape only", branch `claude/landscape-only`. Handoff: `docs/handoffs/1.4.0-landscape-only.md` |
-| 1.3.2 | **Smaller patron shout:** Loud Patron ring reach 280 → 196 px | Ready to ship (planner one-liner) |
+| 1.3.2 | **Smaller patron shout:** Loud Patron ring reach 280 → 196 px | Planner one-liner; ships together with 1.4.0 |
+| 1.4.0 | **Landscape only:** "rotate your phone" screen in portrait, manifest `orientation: landscape`, update CLAUDE.md / README / QA devices | Built by coder session "Overdue · v1.4.0 landscape only" (branch `claude/landscape-only`), reviewed and merged with 1.3.2 by the planner; awaiting ship. Handoff: `docs/handoffs/1.4.0-landscape-only.md` |
+| 1.5.0 | **Build strip:** owned perks as chips with short names, combo partner glows, tap a chip for details | In progress: coder session "Overdue · v1.5.0 build strip". Handoff: `docs/handoffs/1.5.0-build-strip.md` |
 | — | **Bigger map (parked):** ~40×24 cells (1.7× floor), camera follows the player with a dead zone; light layer screen-sized (same look; owner OK needed since CLAUDE.md says keep lighting); auto-aim only on screen; spawns just off-screen; edge arrows for off-screen enemies; perf budget must hold. Build behind `?bigmap=1` first | Parked: 1.3.1 fixed the cramped feeling. Revisit only if it comes back |
 
 ### 1.3.1 phone checklist (wing 1, rooms 1–10)

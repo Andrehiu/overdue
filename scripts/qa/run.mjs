@@ -54,7 +54,6 @@ const server = createServer(async (req, res) => {
 const URL0 = `http://localhost:${server.address().port}/?debug=1`;
 
 const TARGETS = [
-  ['iphone', devices['iPhone 13']],
   ['iphone-landscape', devices['iPhone 13 landscape']],
   ['ipad-landscape', devices['iPad Pro 11 landscape']],
   ['desktop', { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 }],
@@ -208,10 +207,48 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
   await ctx.close();
 }
 
+// ---------------------------------------------------------------- 3b. portrait phone: rotate overlay (landscape-only since v1.4.0)
+if (want('screens')) {
+  const area = 'screens/iphone-rotate';
+  const ctx = await browser.newContext(devices['iPhone 13']);
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  try {
+    await page.goto(URL0); await page.waitForTimeout(700);
+    await shot(page, 'iphone-rotate-overlay');
+    const ov = await page.evaluate(() => {
+      const o = document.getElementById('rotate'), r = o.getBoundingClientRect(), t = document.querySelector('.logo').getBoundingClientRect();
+      const mid = document.elementFromPoint(innerWidth / 2, t.top + t.height / 2);
+      return { visible: !o.hidden && r.width >= innerWidth - 1 && r.height >= innerHeight - 1, covers: o.contains(mid), text: o.textContent };
+    });
+    record(area, 'rotate overlay visible and covers the title', ov.visible && ov.covers && /landscape/.test(ov.text) && /sideways/.test(ov.text));
+    // Start a run in landscape, then rotate to portrait
+    await page.setViewportSize({ width: 844, height: 390 }); await page.waitForTimeout(500);
+    record(area, 'overlay hidden in landscape', await page.evaluate(() => document.getElementById('rotate').hidden));
+    await page.tap('[data-act=play]'); await page.evaluate(() => __overdue.god()); await page.waitForTimeout(1500);
+    record(area, 'run started in landscape', await page.evaluate(() => __overdue.game.state === 'playing'));
+    await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(500);
+    const portrait = await page.evaluate(() => ({ shown: !document.getElementById('rotate').hidden, state: __overdue.game.state }));
+    record(area, 'rotating to portrait shows overlay and pauses', portrait.shown && portrait.state === 'paused', JSON.stringify(portrait));
+    await page.setViewportSize({ width: 844, height: 390 }); await page.waitForTimeout(600);
+    await shot(page, 'iphone-rotate-back');
+    const back = await page.evaluate(() => {
+      const st = document.getElementById('stage').getBoundingClientRect();
+      return { hidden: document.getElementById('rotate').hidden, pause: !document.getElementById('pause').hidden, state: __overdue.game.state, fill: (st.width * st.height) / (innerWidth * innerHeight) };
+    });
+    record(area, 'rotating back hides overlay, shows pause screen, no auto-resume', back.hidden && back.pause && back.state === 'paused', JSON.stringify(back));
+    record(area, 'arena fills screen after rotating back', back.fill >= 0.75, `${Math.round(back.fill * 100)}% of screen`);
+  } catch (e) { record(area, 'flow completed', false, e.message.split('\n')[0]); }
+  record(area, 'no page/console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
 // ---------------------------------------------------------------- 4. performance budget
 // Late-game boss with a stacked build: this once ran at 0.4x game speed (chained hit-stop) and ~40fps.
 if (want('perf')) {
-  const ctx = await browser.newContext(devices['iPhone 13']);
+  const ctx = await browser.newContext(devices['iPhone 13 landscape']);
   const page = await ctx.newPage();
   await page.goto(URL0); await page.waitForTimeout(500);
   await page.tap('[data-act=play]'); await page.waitForTimeout(300);
