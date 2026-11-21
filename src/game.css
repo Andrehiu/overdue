@@ -420,7 +420,7 @@ body.portrait .reach-row { grid-template-columns: 1fr; }
   .shop-list .icon { font-size: 1.25em; }
   .toggles { gap: .15em; }
   #settings .progress-tools { margin-top: .2em; }
-  #settings .progress-tools p { display: none; }
+  #settings .progress-tools p { font-size: .75em; margin: 0; line-height: 1.25; }
   #settings .version-label { margin: 0; }
   .screen > .menu.row:last-child { margin-top: 0; padding-top: .3em; }
   #title { gap: .3em; }

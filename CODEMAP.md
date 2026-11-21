@@ -44,7 +44,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/waves.js` | 59 | Budget-based wave composer. Pure + seeded => every run with the same seed plays the same waves. |
 | `test/game-logic.test.js` | 417 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
 | `test/story-meta.test.js` | 130 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
-| `scripts/qa/run.mjs` | 396 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
+| `scripts/qa/run.mjs` | 407 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 43 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
 | `scripts/codemap.mjs` | 112 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
@@ -158,7 +158,7 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 
 ## scripts/qa/run.mjs
 
-results:23 · record:24 · want:28 · sh:31 · TYPES:46 · TARGETS:56 · shot:63 · md:383
+results:23 · record:24 · want:28 · sh:31 · TYPES:46 · TARGETS:56 · shot:63 · md:394
 
 ## scripts/build.mjs
 
