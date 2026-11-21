@@ -21,7 +21,8 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | A menu / screen | `index.html` `<section id=…>` + `main.js` `SCREENS`, the `data-act` click handler, `render*()` for that screen · CSS in `src/game.css` (scope tokens to the component) |
 | HUD | `main.js` `drawHUD()` |
 | Saved data | `main.js` keys `overdue.*.v1` · progression in `src/meta.js` `normalizeProgress()` (never reshape without a migration) |
-| Debug / test hooks | `main.js` `window.__overdue` (bottom) · used by `scripts/qa/run.mjs` |
+| Debug / test hooks | `main.js` `window.__overdue` (bottom) · used by `scripts/qa/run.mjs` and the balance bot |
+| Balance bot (story playtests) | `npm run balance` · `scripts/balance.mjs` (runner + report), `balance-bot.mjs` (plays a run in the page), `balance-lib.mjs` (door policy, perks, steering, report maths) |
 | QA checks | `scripts/qa/run.mjs` (screens per device, perf, privacy) |
 
 ## Files
@@ -35,7 +36,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/catalogue.js` | 140 | Built-in book catalogue: the titles you throw and the authors bosses are named after. |
 | `src/doors.js` | 61 | Story doors: after most rooms you pick the next room from 2 doors. Pure module (no DOM) so it is unit-tested. |
 | `src/flowfield.js` | 102 | Dijkstra flow field: one search from the player gives every enemy a path around the shelves. |
-| `src/main.js` | 2441 | OVERDUE! — Night Shift at the Meme Library |
+| `src/main.js` | 2453 | OVERDUE! — Night Shift at the Meme Library |
 | `src/meta.js` | 99 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
 | `src/palette.js` | 52 | Projectile colours. Pure module (no DOM), unit-tested. |
 | `src/story.js` | 113 | Story mode: ten handmade library wings, unlocked in order. Pure module (no DOM) so it is unit-tested. |
@@ -43,13 +44,14 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/util.js` | 110 | Small, dependency-free helpers shared by the game and its unit tests. |
 | `src/version.js` | 22 | Which build of the game is running. The build script injects the real values |
 | `src/waves.js` | 59 | Budget-based wave composer. Pure + seeded => every run with the same seed plays the same waves. |
+| `test/balance.test.js` | 81 | Balance bot (v1.7.1 tooling): pure helpers only, no browser. See scripts/balance-lib.mjs. |
 | `test/doors.test.js` | 100 | Story doors (v1.7.0): pure rules, no DOM. |
 | `test/game-logic.test.js` | 503 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
 | `test/story-meta.test.js` | 170 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
 | `scripts/qa/run.mjs` | 467 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 43 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
-| `scripts/codemap.mjs` | 112 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
+| `scripts/codemap.mjs` | 113 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
 
 ## index.html
 
@@ -88,10 +90,10 @@ NEIGH:4 · canStep:44 · computeFlowField:54 · lineOfSight:91
 - **Run / wave flow** (251–680): keepAwake:255 · startRun:261 · clearWorld:282 · startWave:288 · bannerQueue:311 · banner:312 · waveCleared:317 · resolveMystery:346 · showUpgrades:359 · afterPick:375 · nextRoom:380 · currentDoors:389 · showDoors:390 · chooseDoor:418 · KIND_LABEL:431 · codex:435 · saveCodex:436 · cardsArmed:440 · currentChoices:442 · rollOpts:443 · renderCards:445 · renderBuild:525 · pop:556 · closeBuildPop:557 · openBuildPop:561 · renderReach:611 · renderCodex:629 · pause:653 · resume:663 · die:670
 - **Spawning** (681–763): DEF:684 · hpScaleNow:695 · makeEnemy:696 · spawnPoint:715 · updateSpawning:725 · materialise:743
 - **Effects helpers** (764–792): shake:767 · addLight:770 · floatText:774 · particle:777 · burst:778 · pages:786
-- **Update** (793–1486): step:796 · moveInput:828 · nearestEnemy:840 · updatePlayer:850 · collideWorld:931 · spawnBook:944 · fire:959 · abilityReady:980 · inkBurst:991 · nextToShelf:1005 · doShhh:1013 · updateFlow:1050 · seek:1061 · updateEnemies:1073 · bossAI:1162 · shootHazard:1215 · fan:1220 · radial:1221 · damageEnemy:1223 · killEnemy:1252 · buzz:1293 · hurtPlayer:1298 · updateBooks:1332 · orbiterPositions:1405 · updateOrbiters:1414 · updateHazards:1428 · updateRings:1441 · updatePickups:1454 · updateParticles:1471
-- **Rendering** (1487–2106): BOOK_PALETTE:1490 · buildBackground:1492 · lampPositions:1580 · lightSprite:1588 · glowCache:1594 · glowSprite:1595 · renderLights:1604 · render:1643 · drawThrownBook:1689 · drawBook:1722 · drawPlayer:1730 · rim:1773 · eyes:1778 · drawEliteHalo:1786 · drawEnemy:1801 · drawBoss:1879 · drawTelegraph:1913 · drawPickup:1921 · hazardSprite:1934 · drawHazards:1942 · drawRing:1959 · drawParticles:1966 · heartPath:1979 · FONT:1989 · txt:1990 · drawHUD:1996 · cooldown:2062 · btnCache:2078 · setTouchButton:2079 · drawCrosshair:2091 · drawStick:2100
-- **DOM screens, settings, leaderboard** (2107–2376): SCREENS:2110 · showScreen:2112 · renderFineBadges:2121 · renderShop:2126 · defaultWing:2160 · wingStatus:2164 · renderStory:2170 · bankRun:2203 · inRun:2210 · setSetting:2234 · toast:2248 · toggleFullscreen:2281 · loadLeaderboard:2291 · showGameOver:2314
-- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2377–2441): frame:2382 · checkForUpdate:2403
+- **Update** (793–1489): step:796 · moveInput:830 · nearestEnemy:843 · updatePlayer:853 · collideWorld:934 · spawnBook:947 · fire:962 · abilityReady:983 · inkBurst:994 · nextToShelf:1008 · doShhh:1016 · updateFlow:1053 · seek:1064 · updateEnemies:1076 · bossAI:1165 · shootHazard:1218 · fan:1223 · radial:1224 · damageEnemy:1226 · killEnemy:1255 · buzz:1296 · hurtPlayer:1301 · updateBooks:1335 · orbiterPositions:1408 · updateOrbiters:1417 · updateHazards:1431 · updateRings:1444 · updatePickups:1457 · updateParticles:1474
+- **Rendering** (1490–2109): BOOK_PALETTE:1493 · buildBackground:1495 · lampPositions:1583 · lightSprite:1591 · glowCache:1597 · glowSprite:1598 · renderLights:1607 · render:1646 · drawThrownBook:1692 · drawBook:1725 · drawPlayer:1733 · rim:1776 · eyes:1781 · drawEliteHalo:1789 · drawEnemy:1804 · drawBoss:1882 · drawTelegraph:1916 · drawPickup:1924 · hazardSprite:1937 · drawHazards:1945 · drawRing:1962 · drawParticles:1969 · heartPath:1982 · FONT:1992 · txt:1993 · drawHUD:1999 · cooldown:2065 · btnCache:2081 · setTouchButton:2082 · drawCrosshair:2094 · drawStick:2103
+- **DOM screens, settings, leaderboard** (2110–2379): SCREENS:2113 · showScreen:2115 · renderFineBadges:2124 · renderShop:2129 · defaultWing:2163 · wingStatus:2167 · renderStory:2173 · bankRun:2206 · inRun:2213 · setSetting:2237 · toast:2251 · toggleFullscreen:2284 · loadLeaderboard:2294 · showGameOver:2317
+- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2380–2453): frame:2385 · checkForUpdate:2407
 
 ## src/meta.js
 
@@ -120,6 +122,14 @@ versionLabel:7 · fetchLatestBuild:14
 ## src/waves.js
 
 ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:31
+
+## test/balance.test.js
+
+- 6: door policies: rare, rest, mixed; Mystery Shelf only as a last resort; fixed doors are taken
+- 21: perk priority: specials first, then damage / throw rate / hearts, cursed books last
+- 30: steering: runs from a threat, avoids shelves, holds or drifts to centre when nothing is near
+- 47: aggregation: clear rate, death rooms, hearts, fines, time, timeouts; errors are left out
+- 64: what-stands-out: biggest wing drop, best policy, death pile-up; report renders
 
 ## test/doors.test.js
 
@@ -190,4 +200,4 @@ types:9
 
 ## scripts/codemap.mjs
 
-TASKS:16 · files:32 · purpose:38 · mapFile:43 · generate:75
+TASKS:16 · files:33 · purpose:39 · mapFile:44 · generate:76

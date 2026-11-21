@@ -25,7 +25,8 @@ const TASKS = [
   ['A menu / screen', '`index.html` `<section id=…>` + `main.js` `SCREENS`, the `data-act` click handler, `render*()` for that screen · CSS in `src/game.css` (scope tokens to the component)'],
   ['HUD', '`main.js` `drawHUD()`'],
   ['Saved data', '`main.js` keys `overdue.*.v1` · progression in `src/meta.js` `normalizeProgress()` (never reshape without a migration)'],
-  ['Debug / test hooks', '`main.js` `window.__overdue` (bottom) · used by `scripts/qa/run.mjs`'],
+  ['Debug / test hooks', '`main.js` `window.__overdue` (bottom) · used by `scripts/qa/run.mjs` and the balance bot'],
+  ['Balance bot (story playtests)', '`npm run balance` · `scripts/balance.mjs` (runner + report), `balance-bot.mjs` (plays a run in the page), `balance-lib.mjs` (door policy, perks, steering, report maths)'],
   ['QA checks', '`scripts/qa/run.mjs` (screens per device, perf, privacy)'],
 ];
 
