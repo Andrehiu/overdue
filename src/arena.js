@@ -11,6 +11,8 @@ export let H = ROWS * CELL;
 /** Cells kept clear around the player's spawn point (inclusive bounds). */
 export let SAFE = { x0: 12, y0: 6, x1: 19, y1: 11 };
 export let PORTRAIT = false;
+/** Free cells required between any two shelves (and between a shelf and the walls). */
+export const AISLE = 2;
 
 /** Use an arena of `cols` x `rows` cells. Call only between runs. */
 export function setGrid(cols, rows) {
@@ -83,6 +85,7 @@ function overlapsSafe(x, y, w, h) {
 export function generateArena(seed, wave, shelvesPerHalf = null) {
   const rng = new Rng(hashString(`arena:${seed}:${wave}`));
   const perHalf = shelvesPerHalf ?? Math.min(2 + Math.floor((wave + 1) / 2), 6);
+  let best = null;
   for (let attempt = 0; attempt < 40; attempt++) {
     const solid = new Uint8Array(COLS * ROWS);
     const shelves = [];
@@ -94,10 +97,11 @@ export function generateArena(seed, wave, shelvesPerHalf = null) {
       const x = rng.int(2, (COLS >> 1) - 1 - w);
       const y = rng.int(2, ROWS - 2 - h);
       if (overlapsSafe(x, y, w, h)) continue;
-      // Keep a one-cell corridor around every shelf.
+      // Keep a two-cell (60 px) aisle around every shelf, corners included, so the 22 px player
+      // and the enemies chasing them never jam in a gap. Walls and the mirror seam also leave 2 cells.
       let blocked = false;
-      for (let yy = y - 1; yy <= y + h && !blocked; yy++)
-        for (let xx = x - 1; xx <= x + w; xx++)
+      for (let yy = y - AISLE; yy < y + h + AISLE && !blocked; yy++)
+        for (let xx = x - AISLE; xx < x + w + AISLE; xx++)
           if (solid[idx(xx, yy)]) { blocked = true; break; }
       if (blocked) continue;
       const mx = COLS - x - w; // mirrored x
@@ -106,12 +110,15 @@ export function generateArena(seed, wave, shelvesPerHalf = null) {
         shelves.push({ x: sx, y, w, h });
       }
     }
-    if (isConnected(solid)) {
+    if (isConnected(solid) && (!best || shelves.length > best.shelves.length)) {
       const rects = shelves.map((s) => ({ x: s.x * CELL, y: s.y * CELL, w: s.w * CELL, h: s.h * CELL }));
-      return { seed, wave, shelves, rects, solid };
+      best = { seed, wave, shelves, rects, solid };
     }
+    // Wide aisles can make a crowded request not fit; if so keep retrying for the fullest layout,
+    // and settle for fewer shelves rather than an empty room.
+    if (best && best.shelves.length >= perHalf * 2) break;
   }
-  return { seed, wave, shelves: [], rects: [], solid: new Uint8Array(COLS * ROWS) };
+  return best || { seed, wave, shelves: [], rects: [], solid: new Uint8Array(COLS * ROWS) };
 }
 
 /** Free cells on the outer ring, used as enemy entry points. */

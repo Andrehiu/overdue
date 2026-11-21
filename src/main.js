@@ -7,7 +7,7 @@ import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
 import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips } from './upgrades.js';
-import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect } from './util.js';
+import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist } from './util.js';
 import { PLAYER, bookLook } from './palette.js';
 import { SoundEngine } from './audio.js';
 import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, difficulty, composeRoom, layoutSeed, roomReward } from './story.js';
@@ -696,6 +696,7 @@ function nearestEnemy(x, y, maxD = Infinity) {
   return best;
 }
 
+const PLAYER_WALL_R = 9; // player radius vs shelves/walls; enemy hits still use p.r (11)
 function updatePlayer(dt) {
   const p = player;
   const mv = moveInput();
@@ -760,8 +761,12 @@ function updatePlayer(dt) {
     p.vx = lerp(p.vx, mv.x * stats.speed, k);
     p.vy = lerp(p.vy, mv.y * stats.speed, k);
   }
+  const px = p.x, py = p.y;
   p.x += p.vx * dt; p.y += p.vy * dt;
-  collideWorld(p, p.r);
+  // Against shelves and walls the player is a little slimmer than against enemies (9 vs 11 px),
+  // and slides around a shelf corner they only clip by a few px instead of snagging on it.
+  if (p.dashT <= 0) for (const rect of arena.rects) cornerAssist(p, { x: px, y: py }, PLAYER_WALL_R, rect, 8, 3);
+  collideWorld(p, PLAYER_WALL_R);
   p.walk += Math.hypot(p.vx, p.vy) * dt * 0.08;
   for (let i = p.trail.length - 1; i >= 0; i--) if ((p.trail[i].life -= dt) <= 0) p.trail.splice(i, 1);
 

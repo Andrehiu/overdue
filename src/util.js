@@ -74,3 +74,36 @@ export function pushCircleOutOfRect(obj, r, rect) {
   if (m === top) { obj.y = rect.y - r; return { nx: 0, ny: -1 }; }
   obj.y = rect.y + rect.h + r; return { nx: 0, ny: 1 };
 }
+
+/**
+ * Corner assist for the player. When a circle moving mostly along one axis is stopped by the corner of a
+ * rect that it overlaps by at most `maxSlip` px sideways, slide it sideways past the corner (instead of
+ * snagging). `obj` has been moved by (mx, my) this step; `before` is its position beforehand.
+ * `maxStep` caps how far one call slides it, so a long snag slides smoothly over a few steps.
+ * Returns true when it nudged `obj` (mutates obj.x / obj.y), else false. A head-on hit on a rect's face
+ * (overlap bigger than `maxSlip`) or a move that is not mostly along one axis is left alone.
+ */
+export function cornerAssist(obj, before, r, rect, maxSlip = 8, maxStep = maxSlip) {
+  const mx = obj.x - before.x, my = obj.y - before.y;
+  const ax = Math.abs(mx), ay = Math.abs(my);
+  if (ax < 1e-6 && ay < 1e-6) return false;
+  if (ax >= ay * 2) {
+    // Moving along x: would it hit the rect's left/right face? How far does the circle's y overlap the rect's top/bottom edge?
+    const hitsX = mx > 0 ? obj.x + r > rect.x && before.x + r <= rect.x + 1e-6 && obj.x < rect.x + rect.w
+                         : obj.x - r < rect.x + rect.w && before.x - r >= rect.x + rect.w - 1e-6 && obj.x > rect.x;
+    if (!hitsX) return false;
+    const overTop = obj.y + r - rect.y, overBottom = rect.y + rect.h - (obj.y - r);
+    if (overTop > 0 && overTop <= maxSlip) { obj.y -= Math.min(overTop, maxStep); return true; }   // clip the top corner: slide up
+    if (overBottom > 0 && overBottom <= maxSlip) { obj.y += Math.min(overBottom, maxStep); return true; } // clip the bottom corner: slide down
+    return false;
+  }
+  if (ay >= ax * 2) {
+    const hitsY = my > 0 ? obj.y + r > rect.y && before.y + r <= rect.y + 1e-6 && obj.y < rect.y + rect.h
+                         : obj.y - r < rect.y + rect.h && before.y - r >= rect.y + rect.h - 1e-6 && obj.y > rect.y;
+    if (!hitsY) return false;
+    const overLeft = obj.x + r - rect.x, overRight = rect.x + rect.w - (obj.x - r);
+    if (overLeft > 0 && overLeft <= maxSlip) { obj.x -= Math.min(overLeft, maxStep); return true; }
+    if (overRight > 0 && overRight <= maxSlip) { obj.x += Math.min(overRight, maxStep); return true; }
+  }
+  return false;
+}
