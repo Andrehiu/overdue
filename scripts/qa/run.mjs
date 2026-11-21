@@ -207,6 +207,40 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
   await ctx.close();
 }
 
+// ---------------------------------------------------------------- 3a. menu buttons are always on screen (v1.4.2)
+if (want('menus')) for (const [name, opts] of [...TARGETS, ['ipad-mini-landscape', { viewport: { width: 1133, height: 744 }, deviceScaleFactor: 1 }]]) {
+  const ctx = await browser.newContext(opts);
+  const page = await ctx.newPage();
+  const area = `menus/${name}`;
+  try {
+    await page.goto(URL0); await page.waitForTimeout(600);
+    const check = (id) => page.evaluate((id) => {
+      const s = document.getElementById(id);
+      const sel = id === 'title' ? '.menu button' : '.menu.row:last-child button';
+      const bad = [];
+      for (const b of s.querySelectorAll(sel)) {
+        if (!b.offsetParent || b.hidden) continue;
+        const r = b.getBoundingClientRect();
+        const inside = r.top >= -1 && r.left >= -1 && r.bottom <= innerHeight + 1 && r.right <= innerWidth + 1;
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        if (!inside || !(hit === b || b.contains(hit))) bad.push(`${b.textContent.trim().slice(0, 16)} (${inside ? 'covered' : 'off-screen by ' + Math.round(r.bottom - innerHeight) + 'px'})`);
+      }
+      return bad;
+    }, id);
+    record(area, 'title buttons on screen', !(await check('title')).length, (await check('title')).join(', '));
+    await page.evaluate(() => __overdue.setFines(1000));
+    for (const [id, act, back] of [['howto', 'howto', 'back'], ['settings', 'settings', 'back'], ['leaderboard', 'leaderboard', 'back'],
+      ['codex', 'codex', 'back'], ['story', 'story', 'back'], ['shop', 'shop', 'shopback']]) {
+      await page.click(`#title [data-act=${act}]`); await page.waitForTimeout(350);
+      if (id === 'codex' || id === 'shop') await shot(page, `${name}-menu-${id}`);
+      const bad = await check(id);
+      record(area, `${id}: bottom buttons on screen`, !bad.length, bad.join(', '));
+      await page.click(`#${id} [data-act=${back}]`); await page.waitForTimeout(250);
+    }
+  } catch (e) { record(area, 'menus flow completed', false, e.message.split('\n')[0]); }
+  await ctx.close();
+}
+
 // ---------------------------------------------------------------- 3b. portrait phone: rotate overlay (landscape-only since v1.4.0)
 if (want('screens')) {
   const area = 'screens/iphone-rotate';
