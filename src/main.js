@@ -1900,12 +1900,6 @@ function drawHUD() {
     cooldown(80, H - 30, 'SHHH', kShhh, '#b48cff', player.shhhT);
     if (player.rapidT > 0) cooldown(130, H - 30, '☕x2', player.rapidT / 6, '#c69c6d');
   }
-  // Ammo ticker
-  if (game.ammo && !game.boss) {
-    ctx.globalAlpha = 0.85;
-    txt(`📖 “${short(game.ammo.title, 44)}”${game.ammo.author ? ' — ' + short(game.ammo.author, 20) : ''}`, W / 2, touch.enabled && PORTRAIT ? 104 : H - 14, 11, '#e8d9b0', 'center');
-    ctx.globalAlpha = 1;
-  }
   // Boss bar
   if (game.boss) {
     const b = game.boss, bw = Math.min(460, W - 120), bx = (W - bw) / 2, by = PORTRAIT ? 86 : H - 34;
