@@ -34,16 +34,16 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/backend.js` | 84 | Score storage. The game is fully static, so there are two places a Hall of Fame can live: |
 | `src/catalogue.js` | 140 | Built-in book catalogue: the titles you throw and the authors bosses are named after. |
 | `src/flowfield.js` | 102 | Dijkstra flow field: one search from the player gives every enemy a path around the shelves. |
-| `src/main.js` | 2189 | OVERDUE! — Night Shift at the Meme Library |
+| `src/main.js` | 2195 | OVERDUE! — Night Shift at the Meme Library |
 | `src/meta.js` | 99 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
 | `src/story.js` | 97 | Story mode: ten handmade library wings, unlocked in order. Pure module (no DOM) so it is unit-tested. |
 | `src/upgrades.js` | 213 | Perks offered between waves. Pure data + a seeded roller (no DOM), so it is unit-tested. |
-| `src/util.js` | 77 | Small, dependency-free helpers shared by the game and its unit tests. |
+| `src/util.js` | 84 | Small, dependency-free helpers shared by the game and its unit tests. |
 | `src/version.js` | 22 | Which build of the game is running. The build script injects the real values |
 | `src/waves.js` | 59 | Budget-based wave composer. Pure + seeded => every run with the same seed plays the same waves. |
-| `test/game-logic.test.js` | 268 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
+| `test/game-logic.test.js` | 278 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
 | `test/story-meta.test.js` | 130 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
-| `scripts/qa/run.mjs` | 272 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
+| `scripts/qa/run.mjs` | 278 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 43 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
 | `scripts/codemap.mjs` | 112 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
@@ -82,9 +82,9 @@ NEIGH:4 · canStep:44 · computeFlowField:54 · lineOfSight:91
 - **Spawning** (509–591): DEF:512 · hpScaleNow:523 · makeEnemy:524 · spawnPoint:543 · updateSpawning:553 · materialise:571
 - **Effects helpers** (592–620): shake:595 · addLight:598 · floatText:602 · particle:605 · burst:606 · pages:614
 - **Update** (621–1307): step:624 · moveInput:656 · nearestEnemy:668 · updatePlayer:677 · collideWorld:754 · spawnBook:767 · fire:780 · abilityReady:800 · inkBurst:811 · nextToShelf:825 · doShhh:833 · updateFlow:870 · seek:881 · updateEnemies:893 · bossAI:982 · shootHazard:1035 · fan:1040 · radial:1041 · damageEnemy:1043 · killEnemy:1072 · buzz:1114 · hurtPlayer:1119 · updateBooks:1153 · orbiterPositions:1226 · updateOrbiters:1235 · updateHazards:1249 · updateRings:1262 · updatePickups:1275 · updateParticles:1292
-- **Rendering** (1308–1879): BOOK_PALETTE:1311 · buildBackground:1313 · lampPositions:1401 · lightSprite:1409 · glowCache:1415 · glowSprite:1416 · renderLights:1425 · render:1464 · drawBook:1509 · drawPlayer:1517 · rim:1560 · eyes:1565 · drawEliteHalo:1573 · drawEnemy:1588 · drawBoss:1666 · drawTelegraph:1700 · drawPickup:1708 · drawHazard:1719 · drawRing:1726 · drawParticles:1733 · heartPath:1746 · FONT:1756 · txt:1757 · drawHUD:1763 · cooldown:1835 · btnCache:1851 · setTouchButton:1852 · drawCrosshair:1864 · drawStick:1873
-- **DOM screens, settings, leaderboard** (1880–2125): SCREENS:1883 · showScreen:1885 · renderFineBadges:1893 · renderShop:1898 · defaultWing:1932 · wingStatus:1936 · renderStory:1942 · bankRun:1975 · inRun:1982 · setSetting:1984 · toast:1998 · toggleFullscreen:2031 · loadLeaderboard:2041 · showGameOver:2064
-- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2126–2189): frame:2131 · checkForUpdate:2152
+- **Rendering** (1308–1885): BOOK_PALETTE:1311 · buildBackground:1313 · lampPositions:1401 · lightSprite:1409 · glowCache:1415 · glowSprite:1416 · renderLights:1425 · render:1464 · drawBook:1509 · drawPlayer:1517 · rim:1560 · eyes:1565 · drawEliteHalo:1573 · drawEnemy:1588 · drawBoss:1666 · drawTelegraph:1700 · drawPickup:1708 · drawHazard:1720 · drawRing:1732 · drawParticles:1739 · heartPath:1752 · FONT:1762 · txt:1763 · drawHUD:1769 · cooldown:1841 · btnCache:1857 · setTouchButton:1858 · drawCrosshair:1870 · drawStick:1879
+- **DOM screens, settings, leaderboard** (1886–2131): SCREENS:1889 · showScreen:1891 · renderFineBadges:1899 · renderShop:1904 · defaultWing:1938 · wingStatus:1942 · renderStory:1948 · bankRun:1981 · inRun:1988 · setSetting:1990 · toast:2004 · toggleFullscreen:2037 · loadLeaderboard:2047 · showGameOver:2070
+- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2132–2195): frame:2137 · checkForUpdate:2158
 
 ## src/meta.js
 
@@ -100,7 +100,7 @@ baseStats:10 · perk:34 · cursed:35 · combo:36 · master:37 · UPGRADES:39 · 
 
 ## src/util.js
 
-clamp:3 · lerp:4 · angleDiff:7 · hashString:15 · mulberry32:25 · pushCircleOutOfRect:56
+clamp:3 · lerp:4 · angleDiff:7 · hashString:15 · SAFE_HUE:28 · bookHue:29 · mulberry32:32 · pushCircleOutOfRect:63
 
 ## src/version.js
 
@@ -131,6 +131,7 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 - 232: home-screen app: manifest icons exist and the Pages deploy ships them
 - 245: arena shape fits the screen: phones, iPads, laptops, desktops
 - 263: version label shows version, commit and date; dev builds say so
+- 269: thrown books never use the red/pink reserved for enemy pages
 
 ## test/story-meta.test.js
 
@@ -146,7 +147,7 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 
 ## scripts/qa/run.mjs
 
-results:23 · record:24 · want:28 · sh:31 · TYPES:46 · TARGETS:56 · shot:64 · md:259
+results:23 · record:24 · want:28 · sh:31 · TYPES:46 · TARGETS:56 · shot:64 · md:265
 
 ## scripts/build.mjs
 

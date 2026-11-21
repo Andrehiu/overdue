@@ -265,3 +265,13 @@ test('version label shows version, commit and date; dev builds say so', async ()
   assert.equal(versionLabel({ version: '1.1.0', commit: 'afd3fcb', built: '2026-11-21T03:00:00Z' }), 'v1.1.0 · afd3fcb · 21 Nov 2026');
   assert.equal(versionLabel({ version: 'dev', commit: 'local', built: '' }), 'dev build (not deployed)');
 });
+
+test('thrown books never use the red/pink reserved for enemy pages', async () => {
+  const { bookHue, SAFE_HUE } = await load('util');
+  const { CATALOGUE } = await load('catalogue');
+  for (const b of CATALOGUE.books) {
+    const h = bookHue(b.title);
+    assert.ok(h >= SAFE_HUE.from && h < SAFE_HUE.to, `${b.title}: hue ${h}`);
+  }
+  for (let i = 0; i < 2000; i++) { const h = bookHue(`random title ${i}`); assert.ok(h >= 40 && h < 290); }
+});

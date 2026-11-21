@@ -7,7 +7,7 @@ import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
 import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboHints, pips } from './upgrades.js';
-import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect } from './util.js';
+import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, bookHue } from './util.js';
 import { SoundEngine } from './audio.js';
 import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, difficulty, composeRoom, layoutSeed, roomReward } from './story.js';
 import { PROGRESS_KEY, RENOVATIONS, normalizeProgress, applyRenovations, runBonuses, recordRun, level, nextCost, canBuy, buy } from './meta.js';
@@ -48,7 +48,7 @@ const pickAuthor = () => {
   return (a && a.name) || 'The Anonymous Author';
 };
 const short = (s, n = 28) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
-const bookColor = (title) => `hsl(${hashString(title) % 360} 65% 55%)`;
+const bookColor = (title) => `hsl(${bookHue(title)} 65% 55%)`; // never red/pink: those mean enemy pages
 
 // ======================================================================
 // Canvas sizing (logical 960x540 or 540x960 on portrait phones, letterboxed, HiDPI aware)
@@ -1716,10 +1716,16 @@ function drawPickup(k) {
   }
 }
 
+/** Enemy pages: solid red with a dark outline and a pulsing hot rim, so they never read as your books. */
 function drawHazard(h) {
-  ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(h.rot);
-  ctx.fillStyle = '#ffdddd'; ctx.fillRect(-5, -6, 10, 12);
-  ctx.fillStyle = '#d63031'; ctx.fillRect(-4, -3, 8, 2); ctx.fillRect(-4, 1, 8, 2);
+  const pulse = 0.5 + 0.5 * Math.sin(game.time * 14 + h.rot);
+  ctx.save(); ctx.translate(h.x, h.y);
+  ctx.strokeStyle = `rgba(255,60,80,${0.35 + pulse * 0.4})`; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, 0, 9 + pulse * 1.5, 0, TAU); ctx.stroke();
+  ctx.rotate(h.rot);
+  ctx.fillStyle = OUTLINE; ctx.fillRect(-6.5, -7.5, 13, 15);
+  ctx.fillStyle = '#ff3b4e'; ctx.fillRect(-5, -6, 10, 12);
+  ctx.fillStyle = '#ffd0d5'; ctx.fillRect(-3, -3, 6, 1.6); ctx.fillRect(-3, 0.5, 6, 1.6);
   ctx.restore();
 }
 

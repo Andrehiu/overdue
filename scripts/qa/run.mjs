@@ -169,9 +169,15 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     record(area, 'room clear offers 4 cards', hand.state === 'upgrade' && hand.cards.length === 4 && /Room 1\/10/.test(hand.title), `${hand.cards.length} cards · ${hand.title}`);
     const vw = await page.evaluate(() => innerWidth);
     record(area, '4 cards fit on screen', hand.cards.every((c) => c.l >= -1 && c.r <= vw + 1));
-    await page.evaluate(() => { __overdue.startWave(5); __overdue.god(); }); await page.waitForTimeout(2600);
+    await page.evaluate(() => { __overdue.startWave(5); __overdue.god(); }); await page.waitForTimeout(1200);
     await shot(page, `${name}-12-elite-room`);
-    record(area, 'elite room spawns elites', await page.evaluate(() => __overdue.enemies.length > 0 && __overdue.enemies.filter((e) => e.type !== 'worm').every((e) => e.elite)));
+    // Watch for 3s and collect every enemy that appears (auto-fire can kill the first ones before a single snapshot).
+    const eliteRoom = await page.evaluate(async () => {
+      const seen = new Set(), t0 = performance.now();
+      await new Promise((res) => { const tick = () => { for (const e of __overdue.enemies) seen.add(e.type + (e.elite ? '★' : '')); if (performance.now() - t0 < 3000) requestAnimationFrame(tick); else res(); }; tick(); });
+      return { state: __overdue.game.state, room: __overdue.game.wave, types: [...seen] };
+    });
+    record(area, 'elite room spawns elites', eliteRoom.types.length > 0 && eliteRoom.types.filter((t) => !t.startsWith('worm')).every((t) => t.endsWith('★')), JSON.stringify(eliteRoom).slice(0, 200));
     await page.evaluate(() => { __overdue.startWave(10); __overdue.god(); }); await page.waitForTimeout(3600);
     record(area, 'room 10 boss spawns', await page.evaluate(() => __overdue.enemies.some((e) => e.type === 'boss')));
     await clearRoom(); await page.waitForTimeout(3400);
