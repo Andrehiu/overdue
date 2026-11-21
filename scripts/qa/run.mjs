@@ -184,6 +184,17 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     await shot(page, `${name}-13-wing-cleared`);
     const won = await page.evaluate(() => ({ title: document.querySelector('#goTitle').textContent, unlocked: __overdue.progress.unlocked, next: !document.querySelector('#btnNextWing').hidden }));
     record(area, 'clearing wing 1 unlocks wing 2', /cleared/i.test(won.title) && won.unlocked === 2 && won.next, JSON.stringify(won));
+
+    // Reset progress (Settings): needs two taps, then fines, Renovations and unlocks are gone
+    await tap('#gameover [data-act=menu]'); await page.waitForTimeout(250);
+    await tap('#title [data-act=settings]'); await page.waitForTimeout(250);
+    await tap('#btnResetProgress'); await page.waitForTimeout(150);
+    const afterOne = await page.evaluate(() => __overdue.progress.unlocked);
+    await tap('#btnResetProgress'); await page.waitForTimeout(200);
+    await shot(page, `${name}-14-settings-reset`);
+    const reset = await page.evaluate(() => ({ ...__overdue.progress, saved: JSON.parse(localStorage.getItem('overdue.progress.v1')) }));
+    record(area, 'reset progress needs 2 taps and clears progress', afterOne === 2 && reset.fines === 0 && reset.unlocked === 1 && !Object.keys(reset.reno).length && reset.saved.fines === 0,
+      `after 1 tap: wing ${afterOne} open · after 2: ${reset.fines} fines, wing ${reset.unlocked}`);
   } catch (e) {
     record(area, 'flow completed', false, e.message.split('\n')[0]);
   }

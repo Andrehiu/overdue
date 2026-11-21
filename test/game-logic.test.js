@@ -266,12 +266,14 @@ test('version label shows version, commit and date; dev builds say so', async ()
   assert.equal(versionLabel({ version: 'dev', commit: 'local', built: '' }), 'dev build (not deployed)');
 });
 
-test('thrown books never use the red/pink reserved for enemy pages', async () => {
-  const { bookHue, SAFE_HUE } = await load('util');
-  const { CATALOGUE } = await load('catalogue');
-  for (const b of CATALOGUE.books) {
-    const h = bookHue(b.title);
-    assert.ok(h >= SAFE_HUE.from && h < SAFE_HUE.to, `${b.title}: hue ${h}`);
-  }
-  for (let i = 0; i < 2000; i++) { const h = bookHue(`random title ${i}`); assert.ok(h >= 40 && h < 290); }
+test('everything the player throws stays out of the red/pink reserved for enemies', async () => {
+  const { PLAYER, ENEMY, isEnemyHue, hueOf } = await load('palette');
+  for (const [k, c] of Object.entries(PLAYER)) assert.ok(!isEnemyHue(c), `${k} ${c} (hue ${hueOf(c).toFixed(0)}) looks like an enemy colour`);
+  assert.ok(isEnemyHue(ENEMY.page));
+  assert.ok(isEnemyHue('#ff69b4') && isEnemyHue('#e84393'), 'pinks count as enemy colours');
+  // main.js must not hard-code projectile colours outside the palette
+  const { readFileSync } = await import('node:fs');
+  const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.ok(!/spawnBook\([^)]*color: '#/.test(main), 'spawnBook colours come from palette.js');
+  assert.ok(!/bookColor|bookHue/.test(main), 'no per-title book colours');
 });

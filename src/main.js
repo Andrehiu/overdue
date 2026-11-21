@@ -7,7 +7,8 @@ import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
 import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboHints, pips } from './upgrades.js';
-import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, bookHue } from './util.js';
+import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect } from './util.js';
+import { PLAYER } from './palette.js';
 import { SoundEngine } from './audio.js';
 import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, difficulty, composeRoom, layoutSeed, roomReward } from './story.js';
 import { PROGRESS_KEY, RENOVATIONS, normalizeProgress, applyRenovations, runBonuses, recordRun, level, nextCost, canBuy, buy } from './meta.js';
@@ -48,7 +49,6 @@ const pickAuthor = () => {
   return (a && a.name) || 'The Anonymous Author';
 };
 const short = (s, n = 28) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
-const bookColor = (title) => `hsl(${bookHue(title)} 65% 55%)`; // never red/pink: those mean enemy pages
 
 // ======================================================================
 // Canvas sizing (logical 960x540 or 540x960 on portrait phones, letterboxed, HiDPI aware)
@@ -774,7 +774,7 @@ function spawnBook(x, y, a, extra = {}) {
   const book = game.ammo || pickBook();
   books.push({ x, y, vx: Math.cos(a) * stats.projSpeed, vy: Math.sin(a) * stats.projSpeed,
     r: 6, life: stats.bookLife, rot: a, dmgMult: 1, scale: 1, spin: (Math.random() < 0.5 ? -1 : 1) * 14, bounces: stats.bounces, pierce: stats.pierce,
-    wraps: stats.wraps, child: false, hit: new Set(), color: bookColor(book.title), title: book.title, ...extra });
+    wraps: stats.wraps, child: false, hit: new Set(), color: PLAYER.book, title: book.title, ...extra });
 }
 
 function fire() {
@@ -786,12 +786,12 @@ function fire() {
   }
   // Leather-Bound Tome: a giant book every Nth throw
   if (stats.tomeEvery && p.throws % stats.tomeEvery === 0) {
-    spawnBook(p.x, p.y, p.aim, { r: 15, scale: 2.4, dmgMult: 5, pierce: 99, bounces: 0, color: '#c9a227', tome: true });
+    spawnBook(p.x, p.y, p.aim, { r: 15, scale: 2.4, dmgMult: 5, pierce: 99, bounces: 0, color: PLAYER.tome, tome: true });
     shake(0.15); sound.play('explode');
   }
   // Complete Saga: a fan of 7 every Nth throw
   if (stats.sagaEvery && p.throws % stats.sagaEvery === 0) {
-    for (let i = 0; i < 7; i++) spawnBook(p.x, p.y, p.aim + (i - 3) * 0.16, { color: '#7bd88f', bonus: true });
+    for (let i = 0; i < 7; i++) spawnBook(p.x, p.y, p.aim + (i - 3) * 0.16, { color: PLAYER.saga, bonus: true });
   }
   sound.play('throw');
 }
@@ -858,7 +858,7 @@ function doShhh() {
   if (stats.shhhVolley) {
     for (let k = 0; k < stats.shhhVolley; k++) {
       const a = (k / stats.shhhVolley) * TAU + game.time;
-      spawnBook(p.x, p.y, a, { pierce: stats.pierce + 2, color: '#b48cff', bonus: true });
+      spawnBook(p.x, p.y, a, { pierce: stats.pierce + 2, color: PLAYER.volley, bonus: true });
     }
   }
   floatText(p.x, p.y - 26, 'SHHH!', '#9be7dc', 22, 1);
@@ -1172,7 +1172,7 @@ function updateBooks(dt) {
     if (b.wraps > 0 && (b.x < 0 || b.y < 0 || b.x >= W || b.y >= H)) {
       b.x = (b.x + W) % W; b.y = (b.y + H) % H; ox = b.x; oy = b.y;
       b.wraps--; b.life = Math.max(b.life, 0.9); b.hit.clear();
-      if (stats.wrapHoming) { b.homingBoost = true; b.dmgMult = Math.min(4, b.dmgMult * 2); b.color = '#9be7dc'; }
+      if (stats.wrapHoming) { b.homingBoost = true; b.dmgMult = Math.min(4, b.dmgMult * 2); b.color = PLAYER.wrapped; }
       burst(b.x, b.y, 6, ['#9be7dc', '#fff'], 90, 0.3);
     }
     if (isSolidPx(arena.solid, b.x, b.y)) {
@@ -1477,7 +1477,7 @@ function render() {
   for (let i = enemies.length - 1; i >= 0; i--) drawEnemy(enemies[i]);
   for (const b of books) drawBook(b.x, b.y, b.rot, b.color, b.scale || 1);
   if (game.state !== 'title' && game.state !== 'gameover' && !(game.state === 'dying' && game.deathT < 1.5)) {
-    for (const o of orbiterPositions()) drawBook(o.x, o.y, o.a * 2, '#b48cff', 1.1);
+    for (const o of orbiterPositions()) drawBook(o.x, o.y, o.a * 2, PLAYER.orbit, 1.1);
     drawPlayer();
   }
   drawHazards();
@@ -1542,7 +1542,7 @@ function drawPlayer() {
   ctx.strokeStyle = '#13544c'; ctx.lineWidth = 2; ctx.stroke();
   // Arm + book in hand
   ctx.fillStyle = '#2bb3a3'; ctx.fillRect(4, 7, 9, 5);
-  ctx.fillStyle = game.ammo ? bookColor(game.ammo.title) : '#c0392b'; ctx.fillRect(11, 5, 7, 9);
+  ctx.fillStyle = PLAYER.book; ctx.fillRect(11, 5, 7, 9);
   // Head, bun, glasses
   ctx.fillStyle = '#4a2c1a'; ctx.beginPath(); ctx.arc(-6, 0, 5, 0, TAU); ctx.fill();
   ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(1, 0, 7, 0, TAU); ctx.fill();
@@ -2000,6 +2000,28 @@ function bankRun() {
   return res;
 }
 const inRun = () => ['playing', 'paused', 'upgrade', 'waveclear', 'dying'].includes(game.state);
+
+// ---- Progress tools (Settings): reset for a fresh start; debug helpers with ?debug=1 ----
+let resetArmedUntil = 0;
+const btnReset = $('#btnResetProgress');
+btnReset.addEventListener('click', () => {
+  if (game.state !== 'title' && game.state !== 'gameover') { toast('Finish or quit this shift first'); return; }
+  if (performance.now() > resetArmedUntil) {
+    // Two taps: the first one only arms it, so a stray tap can't wipe anything.
+    resetArmedUntil = performance.now() + 3000;
+    btnReset.textContent = 'Tap again to erase progress';
+    btnReset.classList.add('armed');
+    setTimeout(() => { if (performance.now() > resetArmedUntil) { btnReset.textContent = 'Reset progress'; btnReset.classList.remove('armed'); } }, 3100);
+    return;
+  }
+  resetArmedUntil = 0;
+  progress = normalizeProgress(null); saveProgress();
+  btnReset.textContent = 'Reset progress'; btnReset.classList.remove('armed');
+  renderFineBadges(); sound.play('click'); toast('Progress reset: 0 fines, wing 1, no Renovations');
+});
+document.body.classList.toggle('debug', DEBUG);
+$('#btnDebugFines').addEventListener('click', () => { progress = { ...progress, fines: progress.fines + 500 }; saveProgress(); renderFineBadges(); toast(`🪙 ${progress.fines} fines`); });
+$('#btnDebugUnlock').addEventListener('click', () => { progress = { ...progress, unlocked: WINGS.length }; saveProgress(); toast('All wings unlocked'); });
 
 function setSetting(k, v) {
   settings[k] = v;

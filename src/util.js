@@ -21,13 +21,6 @@ export function hashString(s) {
   return h >>> 0;
 }
 
-/**
- * Colour hue for a thrown book. Red, orange-red and pink are reserved for ENEMY pages, so your books are
- * always told apart at a glance: hues land in 40..290 (gold, green, teal, blue, violet), never 290..40.
- */
-export const SAFE_HUE = { from: 40, to: 290 };
-export const bookHue = (title) => SAFE_HUE.from + (hashString(title) % (SAFE_HUE.to - SAFE_HUE.from));
-
 /** mulberry32: tiny, fast, good-enough seeded PRNG returning [0, 1). */
 export function mulberry32(seed) {
   let a = seed >>> 0;

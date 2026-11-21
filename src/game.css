@@ -345,3 +345,11 @@ body.portrait .cards:has(> .card-wrap:nth-child(4)) .card { width: 100%; padding
 #gameover .menu.row { flex-wrap: wrap; }
 body.portrait #gameover .menu.row > .primary:not([hidden]) { flex-basis: 100%; }
 body.portrait #gameover .menu.row > .primary:not([hidden]) ~ .primary { flex-basis: auto; }
+
+/* Settings: progress tools (reset + debug helpers) */
+.progress-tools { --danger: #ff6b81; display: flex; flex-direction: column; align-items: center; gap: .3em; margin-top: .6em; }
+.progress-tools p { margin: 0; }
+.progress-tools .danger { border-color: rgba(255, 107, 129, .5); color: var(--danger); font-size: .85em; }
+.progress-tools .danger.armed { background: var(--danger); color: #2a0008; border-color: var(--danger); font-weight: bold; }
+.debug-only { display: none; }
+body.debug .debug-only { display: flex; }
