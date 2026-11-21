@@ -170,51 +170,119 @@ const SHAPE_GEN = {
       for (let i = 0, x = 2 + ox; x + s <= half - 1; i++, x += pitch) ((i + j) % 2 ? b : a).push({ x, y, w: s, h: s });
     return { cands: [...shuffled(rng, a), ...shuffled(rng, b)], target: s === 1 ? perHalf * 2 : perHalf + 1 };
   },
-  // Short bars of alternating direction on a loose lattice: corridors that turn.
+  // Maze: a lattice of 2x2 rooms separated by 1-cell wall lines. Random wall edges plus the posts that
+  // join them form real corridors, L/T joints and dead ends (all passages stay 2+ cells wide).
   maze(rng, perHalf) {
-    const half = COLS >> 1, cands = [];
-    for (let y = 2; y <= ROWS - 4; y += 5) for (let x = 2; x <= half - 4; x += 5) {
-      const horiz = ((x - 2) / 5 + (y - 2) / 5) % 2 === 0 ? rng.chance(0.75) : rng.chance(0.25);
-      const len = rng.int(3, 4);
-      const jx = rng.int(0, 1), jy = rng.int(0, 1);
-      cands.push(horiz ? { x: x + jx, y: y + 1 + jy, w: len, h: 1 } : { x: x + 1 + jx, y: y + jy, w: 1, h: len });
+    const half = COLS >> 1, bits = new Uint8Array(COLS * ROWS), at = (x, y) => y * COLS + x;
+    const xs = [], ys = [];
+    for (let x = 4; x <= half - 4; x += 3) xs.push(x);
+    for (let y = 4; y <= ROWS - 5; y += 3) ys.push(y);
+    const vEdge = new Set(), hEdge = new Set(); // keys "i,k": line i, room k
+    for (let i = 0; i < xs.length; i++) for (let k = 0; k <= ys.length; k++) if (rng.chance(0.58)) vEdge.add(`${i},${k}`);
+    for (let j = 0; j < ys.length; j++) for (let k = 0; k <= xs.length; k++) if (rng.chance(0.58)) hEdge.add(`${j},${k}`);
+    for (const key of vEdge) { const [i, k] = key.split(',').map(Number); for (let d = 0; d < 2; d++) bits[at(xs[i], 2 + 3 * k + d)] = 1; }
+    for (const key of hEdge) { const [j, k] = key.split(',').map(Number); for (let d = 0; d < 2; d++) bits[at(2 + 3 * k + d, ys[j])] = 1; }
+    for (let i = 0; i < xs.length; i++) for (let j = 0; j < ys.length; j++) { // posts where lines cross
+      if (vEdge.has(`${i},${j}`) || vEdge.has(`${i},${j + 1}`) || hEdge.has(`${j},${i}`) || hEdge.has(`${j},${i + 1}`)) bits[at(xs[i], ys[j])] = 1;
     }
-    return { cands: shuffled(rng, cands), target: perHalf + 1 };
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (x > half - 2 || (x >= SAFE.x0 && x <= SAFE.x1 && y >= SAFE.y0 && y <= SAFE.y1)) bits[at(x, y)] = 0;
+    const comps = [], seen = new Uint8Array(COLS * ROWS);
+    for (let s = 0; s < bits.length; s++) {
+      if (!bits[s] || seen[s]) continue;
+      const cells = [], stack = [s]; seen[s] = 1;
+      while (stack.length) {
+        const c = stack.pop(); cells.push(c);
+        const cx = c % COLS, cy = (c / COLS) | 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = cx + dx, ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) continue;
+          const n = at(nx, ny);
+          if (bits[n] && !seen[n]) { seen[n] = 1; stack.push(n); }
+        }
+      }
+      comps.push(rectsOf(cells));
+    }
+    // Each wall grows rect by rect (touching the previous ones) so a wall never closes off a pocket.
+    const cands = [];
+    for (const rects of shuffled(rng, comps)) {
+      const left = rects.slice(), order = [left.shift()];
+      while (left.length) {
+        const i = left.findIndex((r) => order.some((o) => r.x <= o.x + o.w && o.x <= r.x + r.w && r.y <= o.y + o.h && o.y <= r.y + r.h));
+        order.push(...left.splice(i < 0 ? 0 : i, 1));
+      }
+      for (const r of order) { const g = [r]; g.touch = true; cands.push(g); }
+    }
+    return { cands, target: Math.max(2, Math.ceil(cands.length * Math.min(1, perHalf / 7))) };
   },
-  // Reading room: a ring around the spawn rug with openings top, bottom and at the four corners,
-  // plus a few shelves outside it.
+  // Reading room: a closed ring around the spawn rug with an opening at the top, bottom, left and right
+  // (each 2 cells wide), plus a few shelves outside it.
   reading(rng, perHalf) {
     const half = COLS >> 1, xl = SAFE.x0 - 2, yt = SAFE.y0 - 2, yb = SAFE.y1 + 2;
+    const gy = (ROWS >> 1) - 1; // side opening rows gy, gy+1
     const ring = [
-      { x: xl, y: yt, w: half - 1 - xl, h: 1 },           // top bar
-      { x: xl, y: yb, w: half - 1 - xl, h: 1 },           // bottom bar
-      { x: xl, y: yt + 3, w: 1, h: yb - yt - 5 },         // side bar
+      [{ x: xl, y: yt, w: half - 1 - xl, h: 1 }, { x: xl, y: yt + 1, w: 1, h: gy - yt - 1 }],   // top bar + upper side bar (closed corner)
+      [{ x: xl, y: yb, w: half - 1 - xl, h: 1 }, { x: xl, y: gy + 2, w: 1, h: yb - gy - 2 }],   // bottom bar + lower side bar
     ];
     const out = [];
     for (let i = 0; i < 14; i++) {
       const horiz = rng.chance(0.4), w = horiz ? rng.int(3, 4) : 1, h = horiz ? 1 : rng.int(3, 5);
-      out.push({ x: rng.int(2, Math.max(2, xl - 2 - w)), y: rng.int(2, ROWS - 2 - h), w, h });
+      out.push([{ x: rng.int(2, Math.max(2, xl - 2 - w)), y: rng.int(2, ROWS - 2 - h), w, h }]);
     }
-    return { cands: [...ring, ...out], target: 3 + Math.max(0, perHalf - 2) };
+    return { cands: [...ring, ...out], target: 2 + Math.max(0, perHalf - 2) };
   },
-  // Two long shelf walls split the floor into a centre and two sides, joined by 2-3 wide gaps each.
+  // Two continuous shelf walls (edge to edge) split the floor into a centre and two sides,
+  // joined by 2-3 gaps of 2 cells each.
   bridge(rng, perHalf) {
     const half = COLS >> 1, wx = rng.int(4, 6), gaps = rng.int(2, 3), gw = 2;
-    const top = 2, bottom = ROWS - 2; // wall spans rows [top, bottom)
-    const room = bottom - top - gaps * gw, segs = gaps + 1;
+    const room = ROWS - gaps * gw, segs = gaps + 1;
     const cuts = Array.from({ length: segs }, (_, i) => Math.floor(room / segs) + (i < room % segs ? 1 : 0));
     if (rng.chance(0.5)) cuts.reverse();
     const wall = [];
-    let y = top;
+    let y = 0;
     for (const l of cuts) { wall.push({ x: wx, y, w: 1, h: l }); y += l + gw; }
     const extra = [];
     for (let i = 0; i < 12; i++) {
       const horiz = rng.chance(0.6), w = horiz ? rng.int(3, 5) : 1, h = horiz ? 1 : rng.int(2, 4);
-      extra.push({ x: rng.int(wx + 3, Math.max(wx + 3, half - 1 - w)), y: rng.int(2, ROWS - 2 - h), w, h });
+      extra.push([{ x: rng.int(wx + 3, Math.max(wx + 3, half - 1 - w)), y: rng.int(2, ROWS - 2 - h), w, h }]);
     }
-    return { cands: [...wall, ...extra], target: wall.length + Math.max(0, perHalf - 1) };
+    return { cands: [wall, ...extra], target: 1 + Math.max(0, perHalf - 1) };
   },
 };
+
+/** Greedy decomposition of a set of cell indices into touching rectangles. */
+function rectsOf(cells) {
+  const set = new Set(cells), done = new Set(), out = [];
+  const order = cells.slice().sort((a, b) => a - b);
+  for (const c of order) {
+    if (done.has(c)) continue;
+    const x = c % COLS, y = (c / COLS) | 0;
+    let w = 1;
+    while (set.has(y * COLS + x + w) && !done.has(y * COLS + x + w) && x + w < COLS) w++;
+    let h = 1;
+    const rowOk = (yy) => { for (let i = 0; i < w; i++) if (!set.has(yy * COLS + x + i) || done.has(yy * COLS + x + i)) return false; return true; };
+    while (y + h < ROWS && rowOk(y + h)) h++;
+    for (let yy = y; yy < y + h; yy++) for (let i = 0; i < w; i++) done.add(yy * COLS + x + i);
+    out.push({ x, y, w, h });
+  }
+  return out;
+}
+
+/**
+ * The passage rule: every free cell sits in a fully free 2x2 block, so there is no 1-cell-wide
+ * corridor, notch or pocket anywhere (the 22 px player and 44 px golems always fit through).
+ */
+export function isWide(solid) {
+  const free = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS && !solid[idx(x, y)];
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    if (solid[idx(x, y)]) continue;
+    let ok = false;
+    for (const [bx, by] of [[x - 1, y - 1], [x, y - 1], [x - 1, y], [x, y]]) {
+      if (free(bx, by) && free(bx + 1, by) && free(bx, by + 1) && free(bx + 1, by + 1)) { ok = true; break; }
+    }
+    if (!ok) return false;
+  }
+  return true;
+}
 
 function shapedArena(seed, wave, shelvesPerHalf, shape) {
   const gen = SHAPE_GEN[shape];
@@ -225,27 +293,34 @@ function shapedArena(seed, wave, shelvesPerHalf, shape) {
   const half = COLS >> 1;
   const solid = new Uint8Array(COLS * ROWS);
   const shelves = [];
-  const stamp = (x, y, w, h, v) => { for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) solid[idx(xx, yy)] = v; };
+  const stamp = (r, v) => {
+    for (const sx of [r.x, COLS - r.x - r.w]) for (let yy = r.y; yy < r.y + r.h; yy++) for (let xx = sx; xx < sx + r.w; xx++) solid[idx(xx, yy)] = v;
+  };
   let placed = 0;
-  for (const c of cands) {
+  for (const cand of cands) {
     if (placed >= target) break;
-    const { x, y, w, h } = c;
-    if (w < 1 || h < 1 || x < AISLE || y < AISLE || x + w > half - 1 || y + h > ROWS - AISLE || overlapsSafe(x, y, w, h)) continue;
-    let blocked = false;
-    for (let yy = y - AISLE; yy < y + h + AISLE && !blocked; yy++)
-      for (let xx = x - AISLE; xx < x + w + AISLE; xx++) if (solid[idx(xx, yy)]) { blocked = true; break; }
-    if (blocked) continue;
-    const mx = COLS - x - w;
-    stamp(x, y, w, h, 1); stamp(mx, y, w, h, 1);
-    if (!isConnected(solid)) { stamp(x, y, w, h, 0); stamp(mx, y, w, h, 0); continue; }
-    shelves.push({ x, y, w, h }, { x: mx, y, w, h });
+    // A candidate is one shelf, or a group of touching shelves forming one wall (L / T joints, corners).
+    const group = Array.isArray(cand) ? cand : [cand];
+    const pad = group.length === 1 && !group.touch; // a lone shelf keeps the old 2-cell margin from everything else
+    let ok = true;
+    for (const { x, y, w, h } of group) {
+      if (w < 1 || h < 1 || x < 0 || y < 0 || x + w > half || y + h > ROWS || overlapsSafe(x, y, w, h)) { ok = false; break; }
+      if (pad && (x < AISLE || y < AISLE || x + w > half - 1 || y + h > ROWS - AISLE)) { ok = false; break; }
+      const m = pad ? AISLE : 0;
+      for (let yy = Math.max(0, y - m); yy < Math.min(ROWS, y + h + m) && ok; yy++)
+        for (let xx = Math.max(0, x - m); xx < Math.min(COLS, x + w + m); xx++) if (solid[idx(xx, yy)]) { ok = false; break; }
+      if (!ok) break;
+    }
+    if (!ok) continue;
+    for (const r of group) stamp(r, 1);
+    if (!isConnected(solid) || !isWide(solid)) { for (const r of group) stamp(r, 0); continue; }
+    for (const r of group) shelves.push(r, { x: COLS - r.x - r.w, y: r.y, w: r.w, h: r.h });
     placed++;
   }
   if (!shelves.length) return null; // fall back to scatter rather than an empty room
   const rects = shelves.map((s) => ({ x: s.x * CELL, y: s.y * CELL, w: s.w * CELL, h: s.h * CELL }));
   return { seed, wave, shape, shelves, rects, solid };
 }
-
 
 /** Free cells on the outer ring, used as enemy entry points. */
 export function edgeCells(solid) {

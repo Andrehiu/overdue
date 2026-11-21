@@ -324,6 +324,8 @@ test('aisles are at least 2 cells (60 px) wide in every room, on every screen sh
     assert.ok(a.shelves.length > 0, `${label}: has shelves`);
     assert.ok(A.isConnected(a.solid), `${label}: connected`);
     for (let y = A.SAFE.y0; y <= A.SAFE.y1; y++) for (let x = A.SAFE.x0; x <= A.SAFE.x1; x++) assert.equal(a.solid[A.idx(x, y)], 0, `${label}: spawn zone clear`);
+    assert.ok(A.isWide(a.solid), `${label}: every free cell is in a free 2x2 block`);
+    if (a.shape !== 'scatter') return; // shaped rooms may have touching walls; the 2x2 rule above is what they must keep
     for (const s of a.shelves) { // walls
       assert.ok(s.x >= A.AISLE && s.y >= A.AISLE && A.COLS - (s.x + s.w) >= A.AISLE && A.ROWS - (s.y + s.h) >= A.AISLE, `${label}: wall aisle`);
     }
@@ -419,8 +421,9 @@ test('scatter layouts are byte-identical to the pre-shapes generator (endless st
   } finally { A.setOrientation(false); }
 });
 
-test('every room shape keeps the rules: connected, clear spawn, 2-cell aisles, open edges, denser = more shelf', async () => {
+test('every room shape keeps the rules: connected, clear spawn, no passage under 2 cells, open edges, denser = more shelf', async () => {
   const A = await load('arena');
+  const { computeFlowField } = await load('flowfield');
   const grids = [[32, 18], [28, 20], A.gridForAspect(4 / 3), A.gridForAspect(1.6)];
   try {
     for (const [cols, rows] of grids) {
@@ -435,8 +438,11 @@ test('every room shape keeps the rules: connected, clear spawn, 2-cell aisles, o
           if (shape !== 'scatter') assert.equal(a.shape, shape, `${label}: no fallback`);
           assert.ok(A.isConnected(a.solid), `${label}: connected`);
           for (let y = A.SAFE.y0; y <= A.SAFE.y1; y++) for (let x = A.SAFE.x0; x <= A.SAFE.x1; x++) assert.equal(a.solid[A.idx(x, y)], 0, `${label}: spawn clear`);
-          for (const s of a.shelves) assert.ok(s.x >= A.AISLE && s.y >= A.AISLE && cols - s.x - s.w >= A.AISLE && rows - s.y - s.h >= A.AISLE, `${label}: wall aisle`);
-          for (let i = 0; i < a.shelves.length; i++) for (let j = i + 1; j < a.shelves.length; j++) assert.ok(shelfGap(a.shelves[i], a.shelves[j]) >= A.AISLE, `${label}: shelves ${i}/${j} too close`);
+          assert.ok(A.isWide(a.solid), `${label}: no passage narrower than 2 cells`);
+          if (shape === 'scatter') for (let i = 0; i < a.shelves.length; i++) for (let j = i + 1; j < a.shelves.length; j++) assert.ok(shelfGap(a.shelves[i], a.shelves[j]) >= A.AISLE, `${label}: shelves ${i}/${j} too close`);
+          // The flow field (what enemies follow) must reach every free cell from the player's spawn.
+          const f = computeFlowField(a.solid, cols, rows, cols >> 1, rows >> 1);
+          for (let i = 0; i < a.solid.length; i++) if (!a.solid[i]) assert.ok(Number.isFinite(f.dist[i]), `${label}: flow field reaches cell ${i}`);
           const edge = A.edgeCells(a.solid);
           const sides = new Set(edge.map(([x, y]) => (y === 0 ? 't' : y === rows - 1 ? 'b' : x === 0 ? 'l' : 'r')));
           assert.ok(edge.length >= 12 && sides.size >= 3, `${label}: edge entry points`);
@@ -444,6 +450,33 @@ test('every room shape keeps the rules: connected, clear spawn, 2-cell aisles, o
           if (shape !== 'scatter') assert.ok(cells >= prevCells, `${label}: denser never has fewer shelf cells`);
           prevCells = cells;
         }
+      }
+    }
+  } finally { A.setOrientation(false); }
+});
+
+test('reading rooms have four openings and bridge walls are continuous but for 2-3 gaps', async () => {
+  const A = await load('arena');
+  try {
+    for (const [cols, rows] of [[32, 18], [28, 20], A.gridForAspect(4 / 3)]) {
+      A.setGrid(cols, rows);
+      for (let seed = 1; seed <= 10; seed++) {
+        const r = A.generateArena(seed * 31, 5, 3, 'reading');
+        // Walk outwards from the rug centre along the four axes: each must cross the ring through a gap.
+        const cx = cols >> 1, cy = rows >> 1;
+        const solidAt = (x, y) => r.solid[A.idx(x, y)] === 1;
+        let up = false, down = false, left = false, right = false;
+        for (const x of [cx - 1, cx]) { up = up || !solidAt(x, A.SAFE.y0 - 2); down = down || !solidAt(x, A.SAFE.y1 + 2); }
+        for (const y of [cy - 1, cy]) { left = left || !solidAt(A.SAFE.x0 - 2, y); right = right || !solidAt(A.SAFE.x1 + 2, y); }
+        assert.ok(up && down && left && right, `${cols}x${rows} seed ${seed}: openings top/bottom/left/right`);
+        // ...and the ring is otherwise closed: the corners are solid.
+        assert.ok(solidAt(A.SAFE.x0 - 2, A.SAFE.y0 - 2) && solidAt(A.SAFE.x1 + 2, A.SAFE.y1 + 2), 'closed corners');
+        const b = A.generateArena(seed * 31, 5, 3, 'bridge');
+        const wallX = b.shelves.filter((s) => s.w === 1 && s.h >= 3 && s.x < cols / 2 && s.y + s.h <= rows).map((s) => s.x);
+        const x = Math.min(...wallX);
+        let gaps = 0, run = false;
+        for (let y = 0; y < rows; y++) { const free = !b.solid[A.idx(x, y)]; if (free && !run) gaps++; run = free; }
+        assert.ok(gaps >= 2 && gaps <= 3, `${cols}x${rows} seed ${seed}: bridge wall has ${gaps} gaps`);
       }
     }
   } finally { A.setOrientation(false); }

@@ -29,7 +29,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | File | Lines | What it is |
 |---|---|---|
 | `index.html` | 195 | Page shell: menus and screens as `<section id>` |
-| `src/arena.js` | 257 | Procedural, mirrored library layouts on a grid. Pure module (no DOM) so it is unit-testable. |
+| `src/arena.js` | 332 | Procedural, mirrored library layouts on a grid. Pure module (no DOM) so it is unit-testable. |
 | `src/audio.js` | 166 | 100% procedural audio: every sound effect and the adaptive soundtrack are synthesised |
 | `src/backend.js` | 84 | Score storage. The game is fully static, so there are two places a Hall of Fame can live: |
 | `src/catalogue.js` | 140 | Built-in book catalogue: the titles you throw and the authors bosses are named after. |
@@ -42,7 +42,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/util.js` | 110 | Small, dependency-free helpers shared by the game and its unit tests. |
 | `src/version.js` | 22 | Which build of the game is running. The build script injects the real values |
 | `src/waves.js` | 59 | Budget-based wave composer. Pure + seeded => every run with the same seed plays the same waves. |
-| `test/game-logic.test.js` | 451 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
+| `test/game-logic.test.js` | 484 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
 | `test/story-meta.test.js` | 147 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
 | `scripts/qa/run.mjs` | 356 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 43 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
@@ -55,7 +55,7 @@ Screens: title:23 · howto:44 · settings:69 · leaderboard:90 · upgrade:96 · 
 
 ## src/arena.js
 
-SAFE:12 · setGrid:18 · setOrientation:26 · gridForAspect:33 · idx:41 · cellOf:43 · isSolidPx:48 · isConnected:54 · overlapsSafe:77 · generateArena:85 · scatterArena:94 · SHAPES:137 · shuffled:139 · SHAPE_GEN:145 · shapedArena:219 · edgeCells:251
+SAFE:12 · setGrid:18 · setOrientation:26 · gridForAspect:33 · idx:41 · cellOf:43 · isSolidPx:48 · isConnected:54 · overlapsSafe:77 · generateArena:85 · scatterArena:94 · SHAPES:137 · shuffled:139 · SHAPE_GEN:145 · rectsOf:253 · isWide:274 · shapedArena:287 · edgeCells:326
 
 ## src/audio.js
 
@@ -140,10 +140,11 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 - 282: combo partners and combos in reach explain what pairs with what
 - 300: perk art: each perk adds one trait, they stack, and normal books stay plain
 - 319: aisles are at least 2 cells (60 px) wide in every room, on every screen shape, and never empty
-- 345: cornerAssist slides the player around a clipped shelf corner, but not off a head-on face
-- 386: cornerAssist + wall collision lets a circle walk past a corner it clips
-- 399: scatter layouts are byte-identical to the pre-shapes generator (endless stays as it was)
-- 422: every room shape keeps the rules: connected, clear spawn, 2-cell aisles, open edges, denser = more shelf
+- 347: cornerAssist slides the player around a clipped shelf corner, but not off a head-on face
+- 388: cornerAssist + wall collision lets a circle walk past a corner it clips
+- 401: scatter layouts are byte-identical to the pre-shapes generator (endless stays as it was)
+- 424: every room shape keeps the rules: connected, clear spawn, no passage under 2 cells, open edges, denser = more shelf
+- 458: reading rooms have four openings and bridge walls are continuous but for 2-3 gaps
 
 ## test/story-meta.test.js
 
