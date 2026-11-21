@@ -432,3 +432,44 @@ body.portrait .reach-row { grid-template-columns: 1fr; }
   #shop > p.small { display: none; }
   .shop-list .reno { padding: .25em .5em; }
 }
+
+/* =====================================================================
+   Doors (v1.7.0): pick the next room. Library doors; tokens scoped to the component.
+   ===================================================================== */
+.doors {
+  --door-wood: #5a3417; --door-wood-hi: #7a4a24; --door-brass: #d4a72c; --door-ink: #f4ecd8; --door-glass: rgba(255, 236, 190, .14);
+  --door-sub: #f0d9a8; --door-glow: #ffd54a;
+  display: flex; gap: 1.4em; justify-content: center; align-items: stretch; flex-wrap: nowrap;
+}
+.doors .door {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: .35em;
+  width: 12.5em; min-height: 12em; padding: 1.3em .9em 1em; text-align: center; color: var(--door-ink);
+  border: none; border-radius: 6.5em 6.5em 4px 4px; cursor: pointer;
+  background:
+    linear-gradient(to bottom, var(--door-glass), transparent 55%),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, .12) 0, rgba(0, 0, 0, .12) 2px, transparent 2px, transparent 1.2em),
+    linear-gradient(170deg, var(--door-wood-hi), var(--door-wood));
+  box-shadow: 0 .5em 1.2em rgba(0, 0, 0, .6), inset 0 0 0 4px var(--door-brass), inset 0 0 0 6px rgba(0, 0, 0, .35);
+  transition: transform .12s ease-out, box-shadow .12s;
+}
+.doors .door:hover, .doors .door:focus-visible { transform: translateY(-3px); outline: none;
+  box-shadow: 0 .8em 1.6em rgba(0, 0, 0, .65), inset 0 0 0 4px var(--door-brass), inset 0 0 0 6px rgba(0, 0, 0, .35), 0 0 0 3px var(--door-glow); }
+.doors .door .icon { font-size: 2.4em; line-height: 1; margin-top: .25em; }
+.doors .door strong { color: var(--door-glow); font-size: 1.1em; line-height: 1.2; }
+.doors .door .line { color: var(--door-sub); font-size: .85em; line-height: 1.35; }
+.doors .door .key { position: absolute; top: .5em; left: 50%; transform: translateX(-50%); font-size: .7em; color: var(--door-sub); opacity: .8; }
+.doors .door.rare { --door-wood: #4a2a5e; --door-wood-hi: #6a3c86; }
+.doors .door.rest { --door-wood: #3c5a3a; --door-wood-hi: #55794f; }
+.doors .door.mystery { --door-wood: #1f3a5e; --door-wood-hi: #2f5486; }
+.doors .door.fixed { --door-wood: #5b1d28; --door-wood-hi: #7f2a38; }
+.doors.dealing .door { animation: deal .45s ease-out both; }
+.doors.dealing .door:nth-child(2) { animation-delay: .08s; }
+@media (prefers-reduced-motion: reduce) { .doors.dealing .door { animation: none; } }
+/* short stages (landscape phones): smaller doors, line below the name, no scrolling */
+@media (max-height: 640px) {
+  #doors { gap: .5em; }
+  .doors { gap: 1em; }
+  .doors .door { width: 11em; min-height: 0; padding: 1em .7em .8em; border-radius: 5.5em 5.5em 4px 4px; gap: .2em; }
+  .doors .door .icon { font-size: 2em; margin-top: .1em; }
+}
+body.portrait .doors { flex-direction: column; align-items: center; }

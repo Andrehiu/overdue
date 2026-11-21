@@ -144,3 +144,26 @@ test('every wing has room shapes; elite and boss rooms are open; shapes do not r
     }
   }
 });
+
+test('even the worst door route (cheapest door every time) still affords the cheapest Renovation by room 6', async () => {
+  const { roomReward } = await load('story');
+  const { DOORS, doorOffer, doorReward, POOL } = await load('doors');
+  const { RENOVATIONS } = await load('meta');
+  const cheapest = Math.min(...RENOVATIONS.map((x) => x.cost(0)));
+  for (const seed of [1, 7, 12345, 987654321]) {
+    let worst = 0, best = 0;
+    for (let r = 1; r <= 5; r++) {
+      // Rooms behind a 2-door choice: the unluckiest route takes the cheapest door of the whole pool every time
+      // (an actual offer only ever shows 2 of the 3), the luckiest the richest of this seed's real offers.
+      const offer = r === 1 ? [] : doorOffer(seed, 1, r - 1, { atFullHp: false });
+      const choosable = offer.length > 1;
+      worst += choosable ? Math.min(...POOL.map((id) => doorReward(1, r, id))) : roomReward(1, r);
+      best += choosable ? Math.max(...offer.map((id) => doorReward(1, r, id))) : roomReward(1, r);
+    }
+    assert.ok(worst >= cheapest, `seed ${seed}: worst route earned ${worst}, cheapest Renovation ${cheapest}`);
+    assert.ok(best >= worst);
+  }
+  // Break Room never pays less than 3 fines, in any wing.
+  for (let w = 1; w <= 10; w++) for (let r = 1; r <= 10; r++) assert.ok(doorReward(w, r, 'rest') >= Math.min(3, roomReward(w, r)));
+  assert.ok(DOORS.rare && DOORS.rest);
+});
