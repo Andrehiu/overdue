@@ -20,6 +20,7 @@
         <button data-act="play" class="primary">▶ Start shift</button>
         <button data-act="howto">How to play</button>
         <button data-act="leaderboard">Hall of Fame</button>
+        <button data-act="codex">Library Codex</button>
         <button data-act="settings">Settings</button>
         <button data-act="fullscreen" class="fs-only">⛶ Fullscreen</button>
       </div>
@@ -73,6 +74,7 @@
       <h2 id="upgradeTitle">Choose a perk</h2>
       <div id="cards" class="cards"></div>
       <button id="btnRenew" class="renew" hidden>↻ Renew</button>
+      <div id="buildStrip" class="build" aria-label="Your build" hidden></div>
       <p class="muted small"><span class="no-touch">Press 1, 2 or 3 — or click a card.</span><span class="touch-only">Tap a card.</span></p>
     </section>
 
@@ -83,6 +85,17 @@
         <button data-act="settings">Settings</button>
         <button data-act="quit">Quit to title</button>
       </div>
+      <div id="pauseBuild" class="build" aria-label="Your build" hidden></div>
+    </section>
+
+    <section id="codex" class="screen" hidden>
+      <h2>Library Codex</h2>
+      <p id="codexProgress" class="muted"></p>
+      <div class="cols codex-cols">
+        <div><h3>Collected Works</h3><ul id="codexCombos" class="codex-list"></ul></div>
+        <div><h3>Masterworks</h3><ul id="codexMasters" class="codex-list"></ul></div>
+      </div>
+      <div class="menu row"><button data-act="back">Back</button></div>
     </section>
 
     <section id="gameover" class="screen" hidden>

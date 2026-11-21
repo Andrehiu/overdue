@@ -5,7 +5,7 @@ import { createBackend } from './backend.js';
 import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
-import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, previewChange, pips } from './upgrades.js';
+import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboHints, pips } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect } from './util.js';
 import { SoundEngine } from './audio.js';
 
@@ -109,7 +109,7 @@ function onKeyPress(k) {
   } else if (game.state === 'paused' && (k === 'KeyP' || k === 'Escape')) resume();
   else if (game.state === 'upgrade' && /^Digit[1-3]$/.test(k)) {
     const b = document.querySelectorAll('#cards .card')[+k.slice(5) - 1];
-    if (b) b.click();
+    if (b && cardsArmed()) b.click();
   } else if (game.state === 'title' && (k === 'Enter') && !document.activeElement?.matches('button')) startRun();
   if (k === 'KeyM') { const on = !(settings.sfx || settings.music); setSetting('sfx', on); setSetting('music', on); toast(on ? '🔊 Sound on' : '🔇 Muted'); }
   if (k === 'KeyF' && game.state === 'playing') { setSetting('autofire', !settings.autofire); toast(`Auto-fire ${settings.autofire ? 'ON' : 'OFF'}`); }
@@ -237,7 +237,7 @@ function startRun() {
   applyLayout();
   game.seed = (Math.random() * 1e9) | 0;
   rng = new Rng(game.seed);
-  Object.assign(game, { wave: 0, score: 0, kills: 0, combo: 0, comboT: 0, bestCombo: 0, playTime: 0, owned: {}, renews: 0,
+  Object.assign(game, { wave: 0, score: 0, kills: 0, combo: 0, comboT: 0, bestCombo: 0, playTime: 0, owned: {}, renews: 0, banishes: 1, banished: new Set(),
     freeze: 0, timeScale: 1, trauma: 0, flash: 0, boss: null });
   stats = baseStats();
   player = makePlayer();
@@ -291,64 +291,160 @@ function showUpgrades() {
   game.state = 'upgrade';
   game.bannerT = 0; texts.length = 0;
   sound.setMuffled(true);
-  const choices = rollUpgrades(rng, game.owned, 3, { lights: settings.lights });
+  const choices = rollUpgrades(rng, game.owned, 3, rollOpts());
   if (!choices.length) return startWave(game.wave + 1);
   $('#upgradeTitle').textContent = `Wave ${game.wave} cleared — choose a perk`;
   renderCards(choices);
   showScreen('upgrade');
-  $('#cards button').focus();
+  if (!touch.enabled) $('#cards button').focus();
 }
 
-const KIND_LABEL = { combo: 'Collected Works', cursed: 'Cursed book', master: 'Masterwork' };
+const KIND_LABEL = { combo: 'Collected Works', cursed: 'Banned', master: 'Masterwork' };
+
+// ---- Codex: what this player has ever seen / discovered (per device) ----
+const CODEX_KEY = 'overdue.codex.v1';
+const codex = (() => { const c = loadJSON(CODEX_KEY); return { seen: new Set(c.seen || []), found: new Set(c.found || []) }; })();
+const saveCodex = () => saveJSON(CODEX_KEY, { seen: [...codex.seen], found: [...codex.found] });
+
+// Cards ignore taps for a moment after appearing, so a thumb still steering can't pick one by accident.
+let cardsArmedAt = 0;
+const cardsArmed = () => performance.now() >= cardsArmedAt;
+
+let currentChoices = [];
+function rollOpts(extra = {}) { return { lights: settings.lights, banned: game.banished, ...extra }; }
+
 function renderCards(choices) {
+  currentChoices = choices;
   const box = $('#cards');
   box.textContent = '';
+  cardsArmedAt = performance.now() + 550;
+  box.classList.remove('dealing'); void box.offsetWidth; box.classList.add('dealing');
   choices.forEach((u, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'card-wrap';
     const b = document.createElement('button');
     b.className = `card ${u.kind}`;
     const lvl = (game.owned[u.id] || 0) + 1;
-    b.innerHTML = '<span class="key"></span><span class="icon"></span><span class="kind"></span><strong></strong><span class="desc"></span><span class="preview"></span><span class="lvl"></span>';
-    b.querySelector('.preview').textContent = previewChange(u, stats, player).slice(0, 3).join(' · ');
+    b.innerHTML = '<span class="key"></span><span class="stamp"></span><span class="icon"></span><strong></strong><span class="gain"></span><span class="hint"></span><span class="lvl"></span>';
     b.querySelector('.key').textContent = String(i + 1);
     b.querySelector('.icon').textContent = u.icon;
-    b.querySelector('.kind').textContent = KIND_LABEL[u.kind] || '';
+    b.querySelector('.stamp').textContent = KIND_LABEL[u.kind] || '';
     b.querySelector('strong').textContent = u.name;
-    b.querySelector('.desc').textContent = u.desc;
+    // Option B: just the gain, in plain words. Specials describe their unique effect instead.
+    const gain = u.kind === 'perk' || u.kind === 'cursed' ? gainText(u, stats, player) : [];
+    b.querySelector('.gain').textContent = gain.length ? gain.join(' · ') : u.desc;
+    const hints = comboHints(u, game.owned);
+    b.querySelector('.hint').textContent = hints.length ? `🔗 With ${hints[0].partner.name}: unlocks ${hints[0].combo.name}` : '';
     const mw = u.kind === 'perk' && lvl === u.max ? masterworkFor(u.id) : null;
     b.querySelector('.lvl').textContent = u.kind === 'combo'
-      ? `Unlocked by ${u.requires.map((r) => byId(r).name).join(' + ')}`
+      ? `${u.requires.map((r) => byId(r).name).join(' + ')}`
       : u.kind === 'master' ? `${byId(u.requires[0]).name} mastered`
         : u.max > 1 ? `${pips(lvl, u.max)}${mw ? `  Unlocks ${mw.name}` : ''}` : 'One-time';
     if (mw) b.classList.add('finale');
+    if (!codex.seen.has(u.id)) { b.classList.add('new'); codex.seen.add(u.id); }
     b.addEventListener('click', () => {
+      if (!cardsArmed() || game.state !== 'upgrade') return;
       game.owned[u.id] = lvl;
       u.apply(stats, player);
       sound.play('upgrade');
+      if (u.kind === 'combo' || u.kind === 'master') { codex.found.add(u.id); saveCodex(); }
       if (u.kind === 'combo') toast(`📚 ${u.name} added to your Collected Works`);
       else if (u.kind === 'master') toast(`🏆 Masterwork: ${u.name}`);
       else if (mw) toast(`🏆 ${u.name} mastered! ${mw.name} will be offered next`);
       startWave(game.wave + 1);
     });
-    box.appendChild(b);
+    wrap.appendChild(b);
+    // Banish: remove a normal perk from this run's pool, and deal a replacement.
+    if (game.banishes > 0 && (u.kind === 'perk' || u.kind === 'cursed')) {
+      const x = document.createElement('button');
+      x.className = 'banish';
+      x.type = 'button';
+      x.textContent = '✕ Banish';
+      x.title = `Never offer ${u.name} again this run`;
+      x.addEventListener('click', () => {
+        if (!cardsArmed() || !(game.banishes > 0)) return;
+        game.banishes--; game.banished.add(u.id);
+        const keep = new Set(currentChoices.map((c) => c.id));
+        const [repl] = rollUpgrades(rng, game.owned, 1, rollOpts({ exclude: keep, noSpecial: true }));
+        const next = currentChoices.slice();
+        if (repl) next[i] = repl; else next.splice(i, 1);
+        sound.play('click');
+        toast(`✕ ${u.name} banished for this run`);
+        renderCards(next);
+        cardsArmedAt = performance.now() + 150;
+      });
+      wrap.appendChild(x);
+    }
+    box.appendChild(wrap);
   });
+  saveCodex();
   const renew = $('#btnRenew');
   renew.hidden = !(game.renews > 0);
   renew.textContent = `↻ Renew (${game.renews || 0})`;
+  renderBuild($('#buildStrip'));
+}
+
+/** "Your build": owned perks with pips, plus combos, Masterworks and curses. */
+function renderBuild(el) {
+  el.textContent = '';
+  const owned = Object.entries(game.owned).map(([id, lvl]) => ({ u: byId(id), lvl })).filter((o) => o.u);
+  if (!owned.length) { el.hidden = true; return; }
+  el.hidden = false;
+  const order = { master: 0, combo: 1, perk: 2, cursed: 3 };
+  owned.sort((a, b) => order[a.u.kind] - order[b.u.kind]);
+  const label = document.createElement('span'); label.className = 'build-label'; label.textContent = 'Your build';
+  el.appendChild(label);
+  for (const { u, lvl } of owned) {
+    const item = document.createElement('span');
+    item.className = `build-item ${u.kind}`;
+    item.title = u.name;
+    item.textContent = u.icon;
+    const sub = document.createElement('small');
+    sub.textContent = u.kind === 'perk' ? pips(lvl, u.max) : u.kind === 'cursed' ? 'cursed' : u.kind === 'combo' ? 'combo' : 'master';
+    item.appendChild(sub);
+    el.appendChild(item);
+  }
 }
 
 $('#btnRenew').addEventListener('click', () => {
-  if (!(game.renews > 0) || game.state !== 'upgrade') return;
+  if (!(game.renews > 0) || game.state !== 'upgrade' || !cardsArmed()) return;
   game.renews--;
   sound.play('pickup');
-  renderCards(rollUpgrades(rng, game.owned, 3, { lights: settings.lights }));
+  renderCards(rollUpgrades(rng, game.owned, 3, rollOpts()));
   $('#cards button').focus();
 });
+
+/** Library Codex: every combo and Masterwork, found or still a mystery. */
+function renderCodex() {
+  const specials = UPGRADES.filter((u) => u.kind === 'combo' || u.kind === 'master');
+  const found = specials.filter((u) => codex.found.has(u.id)).length;
+  $('#codexProgress').textContent = `${found} of ${specials.length} discovered`;
+  for (const [kind, listId] of [['combo', '#codexCombos'], ['master', '#codexMasters']]) {
+    const list = $(listId);
+    list.textContent = '';
+    for (const u of specials.filter((x) => x.kind === kind)) {
+      const has = codex.found.has(u.id);
+      const li = document.createElement('li');
+      li.className = has ? 'found' : 'locked';
+      const ic = document.createElement('span'); ic.className = 'icon'; ic.textContent = has ? u.icon : '?';
+      const body = document.createElement('div');
+      const name = document.createElement('strong'); name.textContent = has ? u.name : '???';
+      const how = document.createElement('small');
+      how.textContent = has ? u.desc
+        : kind === 'combo' ? 'Own the right two perks to reveal it' : `Take ${byId(u.requires[0]).name} to 3/3`;
+      body.append(name, how);
+      li.append(ic, body);
+      list.appendChild(li);
+    }
+  }
+}
 
 function pause() {
   if (game.state !== 'playing') return;
   game.state = 'paused';
   sound.setMuffled(true);
   mouse.down = false;
+  renderBuild($('#pauseBuild'));
   showScreen('pause');
   $('#pause button').focus();
 }
@@ -366,7 +462,7 @@ function die() {
   sound.play('death');
   sound.setIntensity(0);
   burst(player.x, player.y, 60, ['#2bb3a3', '#f1c27d', '#fff'], 260, 1.2);
-  addLight(player.x, player.y, 300, 1.2);
+  addLight(player.x, player.y, 300, 1.2, null, true);
   shake(1);
 }
 
@@ -430,7 +526,10 @@ function materialise(type, x, y) {
     for (let i = 0; i < 6; i++) prev = makeEnemy('worm', x, y, { leader: prev });
   } else if (type === 'boss') {
     const hp = 110 + game.wave * 22;
-    const e = makeEnemy('boss', x, y, { hp, maxHp: hp, name: pickAuthor(), atkT: 2, spiral: 0, summonT: 6, mode: 'idle', modeT: 0 });
+    const name = pickAuthor(), hue = hashString(name) % 360;
+    const e = makeEnemy('boss', x, y, { hp, maxHp: hp, name, atkT: 2, spiral: 0, summonT: 6, mode: 'idle', modeT: 0,
+      cover: `hsl(${hue} 45% 30%)`, spineCol: `hsl(${hue} 50% 16%)`, iris: `hsl(${(hue + 180) % 360} 75% 60%)`,
+      glow: `hsla(${hue}, 80%, 60%, 1)`, bar: `hsl(${hue} 65% 55%)` });
     game.boss = e;
     banner(`ROGUE AUTHOR`, e.name);
     sound.play('boss'); sound.setIntensity(2);
@@ -442,12 +541,18 @@ function materialise(type, x, y) {
 // Effects helpers
 // ======================================================================
 function shake(a) { if (settings.motion) game.trauma = Math.min(1, game.trauma + a); }
-function addLight(x, y, r, life, color = null) { flashes.push({ x, y, r, life, max: life, color }); }
+// Effect budget: big moments (boss, Masterworks, deaths) always show; routine flashes are capped
+// so a screen full of perks doesn't drown the player in bloom.
+function addLight(x, y, r, life, color = null, big = false) {
+  if (!big && flashes.length >= 10) return;
+  flashes.push({ x, y, r, life, max: life, color });
+}
 function floatText(x, y, text, color = '#fff', size = 14, life = 0.8) {
   texts.push({ x: clamp(x, 70, W - 70), y: Math.max(y, 78), text, color, size, life, max: life, vy: -40 });
 }
-function particle(p) { if (particles.length < 700) particles.push(p); }
+function particle(p) { if (particles.length < 450) particles.push(p); }
 function burst(x, y, n, colors, speed = 160, life = 0.6, shape = 'sq') {
+  if (particles.length > 250) n = Math.ceil(n * 0.4);
   for (let i = 0; i < n; i++) {
     const a = Math.random() * TAU, s = speed * (0.3 + Math.random() * 0.7);
     particle({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: life * (0.5 + Math.random() * 0.5), max: life,
@@ -649,10 +754,10 @@ function inkBurst(x, y, radius, dmg, color = '#e8d9b0') {
     const d = Math.hypot(e.x - x, e.y - y);
     if (d < radius + e.r) damageEnemy(e, dmg, ((e.x - x) / (d || 1)) * 120, ((e.y - y) / (d || 1)) * 120, false);
   }
-  burst(x, y, 14, [color, '#fff', '#3a2a1a'], 160, 0.4);
+  burst(x, y, 7, [color, '#3a2a1a'], 140, 0.35);
   pages(x, y, 3);
-  rings.push({ x, y, r: 4, max: radius, speed: radius * 6, friendly: true, life: 1 });
-  addLight(x, y, radius * 1.6, 0.25, color);
+  rings.push({ x, y, r: 4, max: radius, speed: radius * 6, friendly: true, life: 1, faint: true, color: '255,184,107' });
+  addLight(x, y, radius * 1.2, 0.18, color);
   sound.play('hit', 0.7);
 }
 
@@ -860,7 +965,8 @@ function damageEnemy(e, dmg, kx, ky, crit) {
   const kbScale = e.type === 'boss' ? 0.05 : e.type === 'golem' ? 0.3 : 1;
   e.vx += kx * kbScale; e.vy += ky * kbScale;
   const shown = Number.isInteger(dmg) ? dmg : dmg.toFixed(1);
-  floatText(e.x + (Math.random() - 0.5) * 10, e.y - e.r, crit ? `${shown}!` : `${shown}`, crit ? '#ffd54a' : '#fff', crit ? 18 : 12, 0.6);
+  // Damage numbers: crits and boss hits always; routine hits only while the screen is calm.
+  if (crit || e.type === 'boss' || texts.length < 8) floatText(e.x + (Math.random() - 0.5) * 10, e.y - e.r, crit ? `${shown}!` : `${shown}`, crit ? '#ffd54a' : '#e8e0cc', crit ? 18 : 11, crit ? 0.7 : 0.5);
   sound.play(crit ? 'crit' : 'hit', e.type === 'boss' ? 0.6 : 1);
   if (e.type === 'boss') game.freeze = Math.max(game.freeze, 0.012);
   if (e.hp <= 0) killEnemy(e);
@@ -1123,26 +1229,49 @@ function buildBackground() {
   g.save(); g.translate(rx + rw / 2, ry + rh / 2);
   for (let i = 0; i < 8; i++) { g.rotate(TAU / 8); g.fillStyle = 'rgba(201,162,39,0.35)'; g.beginPath(); g.ellipse(26, 0, 18, 6, 0, 0, TAU); g.fill(); }
   g.restore();
-  // Shelves: shadow, frame, spines
+  // Shelves: soft contact shadow, wooden case with a lit top edge and a dark front face,
+  // then spines with the odd gap, leaning book and bookend.
   for (const s of arena.rects) {
-    g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(s.x + 6, s.y + 8, s.w, s.h);
-    g.fillStyle = '#5b3a1e'; g.fillRect(s.x, s.y, s.w, s.h);
-    g.fillStyle = '#24160b'; g.fillRect(s.x + 3, s.y + 3, s.w - 6, s.h - 6);
     const horiz = s.w >= s.h;
+    g.save();
+    g.shadowColor = 'rgba(0,0,0,0.75)'; g.shadowBlur = 16; g.shadowOffsetX = 5; g.shadowOffsetY = 9;
+    g.fillStyle = '#4a2f18'; g.fillRect(s.x, s.y, s.w, s.h);
+    g.restore();
+    g.fillStyle = '#5b3a1e'; g.fillRect(s.x, s.y, s.w, s.h);
+    g.fillStyle = '#86592f'; g.fillRect(s.x, s.y, s.w, 3);                 // lit top edge
+    g.fillStyle = '#2e1c0d'; g.fillRect(s.x, s.y + s.h - 4, s.w, 4);        // front face in shadow
+    g.fillStyle = '#1c1108'; g.fillRect(s.x + 3, s.y + 3, s.w - 6, s.h - 7); // inside of the case
     let p = 4;
     const lenAxis = horiz ? s.w : s.h;
-    while (p < lenAxis - 6) {
+    const across = (horiz ? s.h : s.w) - 7;
+    // bookend at the start
+    g.fillStyle = '#3d3d44';
+    if (horiz) g.fillRect(s.x + 3, s.y + 4, 2, across - 1); else g.fillRect(s.x + 4, s.y + 3, across - 1, 2);
+    p += 3;
+    while (p < lenAxis - 8) {
       const thick = r.int(4, 8);
-      const depth = (horiz ? s.h : s.w) - 6 - r.int(0, 5);
-      g.fillStyle = r.pick(BOOK_PALETTE);
-      if (horiz) g.fillRect(s.x + p, s.y + 3 + ((s.h - 6) - depth), thick - 1, depth);
-      else g.fillRect(s.x + 3 + ((s.w - 6) - depth), s.y + p, depth, thick - 1);
-      g.fillStyle = 'rgba(255,255,255,0.18)';
-      if (horiz) g.fillRect(s.x + p, s.y + 3 + ((s.h - 6) - depth) + 3, thick - 1, 2);
-      else g.fillRect(s.x + 3 + ((s.w - 6) - depth) + 3, s.y + p, 2, thick - 1);
-      p += thick;
+      if (r.chance(0.07)) { p += r.int(3, 6); continue; } // gap where a book is checked out
+      const depth = across - r.int(0, 5);
+      const col = r.pick(BOOK_PALETTE);
+      const lean = r.chance(0.07);
+      g.save();
+      if (horiz) {
+        g.translate(s.x + p, s.y + 3 + (across - depth));
+        if (lean) { g.translate(0, depth); g.rotate(-0.28); g.translate(0, -depth); }
+        g.fillStyle = col; g.fillRect(0, 0, thick - 1, depth);
+        g.fillStyle = 'rgba(255,255,255,0.22)'; g.fillRect(0, 2, thick - 1, 1.5);
+        g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(thick - 2, 0, 1, depth);
+      } else {
+        g.translate(s.x + 3 + (across - depth), s.y + p);
+        if (lean) { g.rotate(0.28); }
+        g.fillStyle = col; g.fillRect(0, 0, depth, thick - 1);
+        g.fillStyle = 'rgba(255,255,255,0.22)'; g.fillRect(2, 0, 1.5, thick - 1);
+        g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, thick - 2, depth, 1);
+      }
+      g.restore();
+      p += thick + (lean ? 3 : 0);
     }
-    g.strokeStyle = '#8a5a2b'; g.lineWidth = 2; g.strokeRect(s.x + 1, s.y + 1, s.w - 2, s.h - 2);
+    g.strokeStyle = '#8a5a2b'; g.lineWidth = 1.5; g.strokeRect(s.x + 0.75, s.y + 0.75, s.w - 1.5, s.h - 1.5);
   }
   // Reading lamps in the corners (also light sources)
   for (const [x, y] of LAMPS) {
@@ -1199,10 +1328,11 @@ function renderLights() {
   ctx.globalCompositeOperation = 'lighter';
   const G = (x, y, r, c, a) => { ctx.globalAlpha = a; ctx.drawImage(glowSprite(c), x - r, y - r, r * 2, r * 2); };
   for (const [x, y] of LAMPS) G(x, y, 90, 'rgba(255,190,90,0.6)', 0.5);
-  for (const b of books) G(b.x, b.y, 22, b.color, 0.5);
+  const bookGlow = books.length > 24 ? 0.2 : 0.45;
+  for (const b of books) G(b.x, b.y, 22, b.color, bookGlow);
   for (const h of hazards) G(h.x, h.y, 18, 'rgba(255,80,80,1)', 0.6);
-  for (const f of flashes) if (f.color) G(f.x, f.y, f.r * 0.6, f.color, 0.6 * (f.life / f.max));
-  if (game.boss) G(game.boss.x, game.boss.y, 120, 'rgba(120,70,255,1)', 0.35);
+  for (const f of flashes) if (f.color) G(f.x, f.y, f.r * 0.6, f.color, 0.4 * (f.life / f.max));
+  if (game.boss) G(game.boss.x, game.boss.y, 120, game.boss.glow || 'rgba(120,70,255,1)', 0.35);
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
 }
@@ -1271,8 +1401,15 @@ function drawPlayer() {
   if (p.inZone) { ctx.fillStyle = 'rgba(255,140,60,0.25)'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 12 + Math.sin(game.time * 20) * 2, 0, TAU); ctx.fill(); }
   if (p.amnesty) { ctx.strokeStyle = 'rgba(155,231,220,0.55)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 6, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
   if (p.nookOn) { ctx.strokeStyle = 'rgba(123,216,143,0.6)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 9 + Math.sin(game.time * 8) * 1.5, 0, TAU); ctx.stroke(); }
+  // Ground ring: always find yourself, even in a crowded fight
+  ctx.strokeStyle = 'rgba(155,231,220,0.45)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.ellipse(p.x, p.y + 9, 15, 6, 0, 0, TAU); ctx.stroke();
   ctx.save(); ctx.translate(p.x, p.y + Math.sin(p.walk) * 1.2); ctx.rotate(p.aim);
   if (touch.enabled) ctx.scale(1.3, 1.3);
+  ctx.fillStyle = OUTLINE;
+  ctx.beginPath(); ctx.ellipse(0, 0, 12, 15, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(-6, 0, 6.8, 0, TAU); ctx.fill();
+  ctx.fillRect(3, 5.5, 16.5, 10);
   // Cardigan body
   ctx.fillStyle = p.rapidT > 0 ? '#c69c6d' : '#2bb3a3';
   ctx.beginPath(); ctx.ellipse(0, 0, 10, 13, 0, 0, TAU); ctx.fill();
@@ -1288,7 +1425,15 @@ function drawPlayer() {
   ctx.beginPath(); ctx.arc(5, -3, 2.4, 0, TAU); ctx.moveTo(7.4, 3); ctx.arc(5, 3, 2.4, 0, TAU); ctx.stroke();
   ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(5, -4, 1.5, 1.5); ctx.fillRect(5, 2, 1.5, 1.5);
   ctx.restore();
+  ctx.save(); ctx.translate(p.x, p.y); if (touch.enabled) ctx.scale(1.3, 1.3); rim(13, 0.6); ctx.restore();
   ctx.globalAlpha = 1;
+}
+
+const OUTLINE = '#120a06';
+/** Warm rim light on the upper-left edge (the lamps' side), in world orientation. */
+function rim(r, a = 0.55) {
+  ctx.strokeStyle = `rgba(255,226,170,${a})`; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(0, 0, r - 1, Math.PI * 1.05, Math.PI * 1.6); ctx.stroke();
 }
 
 function eyes(x, y, sep, r, look, color = '#fff') {
@@ -1307,15 +1452,19 @@ function drawEnemy(e) {
     case 'bunny': {
       const sq = 1 + Math.sin(e.t * 14) * 0.08;
       ctx.scale(1 / sq, sq);
-      ctx.fillStyle = white ? '#fff' : '#c9c2b6';
+      ctx.fillStyle = OUTLINE;
+      for (let i = 0; i < 9; i++) { const a = (i / 9) * TAU + e.t; ctx.beginPath(); ctx.arc(Math.cos(a) * 7, Math.sin(a) * 7, 7.6, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = white ? '#fff' : '#ddd5c6';
       for (let i = 0; i < 9; i++) { const a = (i / 9) * TAU + e.t; ctx.beginPath(); ctx.arc(Math.cos(a) * 7, Math.sin(a) * 7, 6, 0, TAU); ctx.fill(); }
       ctx.beginPath(); ctx.arc(0, 0, 9, 0, TAU); ctx.fill();
+      rim(13, 0.5);
       eyes(0, -1, 4, 3, look);
       break;
     }
     case 'notice': {
       ctx.rotate(Math.sin(e.t * 6) * 0.5);
       ctx.scale(Math.abs(Math.cos(e.t * 4)) * 0.5 + 0.6, 1);
+      ctx.fillStyle = OUTLINE; ctx.fillRect(-10.5, -12.5, 21, 25);
       ctx.fillStyle = white ? '#fff' : '#f4efe1'; ctx.fillRect(-9, -11, 18, 22);
       ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 2; ctx.strokeRect(-6, -3, 12, 7);
       ctx.fillStyle = '#c0392b'; ctx.fillRect(-6, -8, 12, 2);
@@ -1325,17 +1474,21 @@ function drawEnemy(e) {
     case 'patron': {
       const charge = e.atkT < 0.5 ? 1 + (0.5 - e.atkT) * 0.6 : 1;
       ctx.scale(charge, charge);
+      ctx.fillStyle = OUTLINE; ctx.beginPath(); ctx.arc(0, 0, 16, 0, TAU); ctx.fill();
       ctx.fillStyle = white ? '#fff' : '#ff9f43'; ctx.beginPath(); ctx.arc(0, 0, 14, 0, TAU); ctx.fill();
       ctx.strokeStyle = '#b85c12'; ctx.lineWidth = 2; ctx.stroke();
+      rim(14);
       eyes(0, -5, 5, 3, look);
       ctx.fillStyle = '#3a0d0d'; ctx.beginPath(); ctx.ellipse(0, 5, 6, 4 + Math.abs(Math.sin(e.t * 12)) * 3, 0, 0, TAU); ctx.fill();
       break;
     }
     case 'worm': {
       const head = !e.leader;
+      ctx.fillStyle = OUTLINE; ctx.beginPath(); ctx.arc(0, 0, head ? 13 : 11, 0, TAU); ctx.fill();
       ctx.fillStyle = white ? '#fff' : head ? '#ff8fb1' : '#7bd88f';
       ctx.beginPath(); ctx.arc(0, 0, head ? 11 : 9, 0, TAU); ctx.fill();
       ctx.strokeStyle = head ? '#b34d6d' : '#3c8d50'; ctx.lineWidth = 2; ctx.stroke();
+      rim(head ? 11 : 9, 0.45);
       if (head) {
         eyes(0, -2, 4, 3, look);
         ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-7, -2); ctx.lineTo(7, -2); ctx.stroke();
@@ -1343,8 +1496,10 @@ function drawEnemy(e) {
       break;
     }
     case 'golem': {
+      ctx.fillStyle = OUTLINE; ctx.beginPath(); ctx.roundRect(-22.5, -22.5, 45, 45, 10); ctx.fill();
       ctx.fillStyle = white ? '#fff' : '#b8860b';
       ctx.beginPath(); ctx.roundRect(-20, -20, 40, 40, 8); ctx.fill();
+      ctx.fillStyle = 'rgba(255,226,170,0.35)'; ctx.fillRect(-16, -19, 30, 2);
       ctx.strokeStyle = '#6b4f0c'; ctx.lineWidth = 3; ctx.stroke();
       ctx.fillStyle = '#6b4f0c'; ctx.font = 'bold 22px ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('$', 0, 4);
@@ -1355,6 +1510,7 @@ function drawEnemy(e) {
     }
     case 'coin': {
       ctx.scale(Math.abs(Math.cos(e.t * 8)) * 0.7 + 0.3, 1);
+      ctx.fillStyle = OUTLINE; ctx.beginPath(); ctx.arc(0, 0, 8.8, 0, TAU); ctx.fill();
       ctx.fillStyle = white ? '#fff' : '#ffd54a'; ctx.beginPath(); ctx.arc(0, 0, 7, 0, TAU); ctx.fill();
       ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 2; ctx.stroke();
       break;
@@ -1367,20 +1523,30 @@ function drawEnemy(e) {
 function drawBoss(e, look, white) {
   const flap = Math.sin(e.t * 6) * 0.25;
   if (e.mode === 'windup') { ctx.strokeStyle = 'rgba(255,60,60,0.7)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(e.cAim) * 600, Math.sin(e.cAim) * 600); ctx.stroke(); }
-  // Open tome: two covers + pages
+  // Open tome in this author's own binding: covers, gold corner foil, pages
   for (const s of [-1, 1]) {
     ctx.save(); ctx.scale(s, 1); ctx.rotate(flap * s * 0.3);
-    ctx.fillStyle = white ? '#fff' : '#3b1d8f'; ctx.beginPath(); ctx.roundRect(0, -34, 46, 68, 6); ctx.fill();
-    ctx.fillStyle = '#f3ead2'; ctx.fillRect(3, -30, 38, 60);
+    ctx.fillStyle = '#120a06'; ctx.beginPath(); ctx.roundRect(-1, -36, 50, 72, 7); ctx.fill();
+    ctx.fillStyle = white ? '#fff' : e.cover || '#3b1d8f'; ctx.beginPath(); ctx.roundRect(0, -34, 47, 68, 6); ctx.fill();
+    ctx.fillStyle = '#d4a72c';
+    for (const cy of [-34, 34]) { ctx.beginPath(); ctx.moveTo(47, cy); ctx.lineTo(39, cy); ctx.lineTo(47, cy - Math.sign(cy) * 8); ctx.fill(); }
+    ctx.fillStyle = '#f3ead2'; ctx.fillRect(6, -30, 36, 60);
     ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
-    for (let y = -24; y < 26; y += 6) { ctx.beginPath(); ctx.moveTo(8, y); ctx.lineTo(36, y); ctx.stroke(); }
+    for (let y = -24; y < 26; y += 6) { ctx.beginPath(); ctx.moveTo(11, y); ctx.lineTo(37, y); ctx.stroke(); }
     ctx.restore();
   }
-  ctx.fillStyle = '#2a0f66'; ctx.fillRect(-3, -36, 6, 72);
-  // The eye
+  // Spine with the author's name in gold
+  ctx.fillStyle = e.spineCol || '#2a0f66'; ctx.fillRect(-6, -37, 12, 74);
+  ctx.save(); ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = '#e8c35a'; ctx.font = 'bold 7px ui-monospace, Menlo, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(short(e.name.toUpperCase(), 13), 0, 0.5);
+  ctx.textBaseline = 'alphabetic'; ctx.restore();
+  // The eye, set into the spine
+  ctx.fillStyle = '#120a06'; ctx.beginPath(); ctx.ellipse(0, 0, 18.5, 13.5, 0, 0, TAU); ctx.fill();
   ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(0, 0, 17, 12, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = e.phase === 3 ? '#ff2d55' : '#6c3cff'; ctx.beginPath(); ctx.arc(Math.cos(look) * 6, Math.sin(look) * 4, 7, 0, TAU); ctx.fill();
+  ctx.fillStyle = e.phase === 3 ? '#ff2d55' : e.iris || '#6c3cff'; ctx.beginPath(); ctx.arc(Math.cos(look) * 6, Math.sin(look) * 4, 7, 0, TAU); ctx.fill();
   ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(Math.cos(look) * 7, Math.sin(look) * 5, 3, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(Math.cos(look) * 6 - 2.5, Math.sin(look) * 4 - 2.5, 1.6, 0, TAU); ctx.fill();
 }
 
 function drawTelegraph(t) {
@@ -1410,8 +1576,8 @@ function drawHazard(h) {
 }
 
 function drawRing(g) {
-  ctx.strokeStyle = g.friendly ? `rgba(${g.color || '155,231,220'},${g.life})` : `rgba(255,159,67,${0.4 + g.life * 0.6})`;
-  ctx.lineWidth = g.friendly ? 6 * g.life + 1 : g.width;
+  ctx.strokeStyle = g.friendly ? `rgba(${g.color || '155,231,220'},${g.life * (g.faint ? 0.45 : 1)})` : `rgba(255,159,67,${0.4 + g.life * 0.6})`;
+  ctx.lineWidth = g.friendly ? (g.faint ? 2 : 6 * g.life + 1) : g.width;
   ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, TAU); ctx.stroke();
   if (!g.friendly) { ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2; ctx.stroke(); }
 }
@@ -1495,7 +1661,7 @@ function drawHUD() {
     const b = game.boss, bw = Math.min(460, W - 120), bx = (W - bw) / 2, by = PORTRAIT ? 86 : H - 34;
     txt(`${b.name}`, W / 2, by - 6, 13, '#d6c8ff', 'center');
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(bx - 2, by - 2, bw + 4, 14);
-    ctx.fillStyle = b.phase === 3 ? '#ff2d55' : '#6c3cff'; ctx.fillRect(bx, by, bw * clamp(b.hp / b.maxHp, 0, 1), 10);
+    ctx.fillStyle = b.phase === 3 ? '#ff2d55' : b.bar || '#6c3cff'; ctx.fillRect(bx, by, bw * clamp(b.hp / b.maxHp, 0, 1), 10);
     ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(bx + bw * 0.33, by, 2, 10); ctx.fillRect(bx + bw * 0.66, by, 2, 10);
   }
   // Banner
@@ -1558,7 +1724,7 @@ function drawStick() {
 // ======================================================================
 // DOM screens, settings, leaderboard
 // ======================================================================
-const SCREENS = ['title', 'howto', 'settings', 'leaderboard', 'upgrade', 'pause', 'gameover'];
+const SCREENS = ['title', 'howto', 'settings', 'leaderboard', 'upgrade', 'pause', 'gameover', 'codex'];
 let settingsReturn = 'title';
 function showScreen(id) {
   for (const s of SCREENS) $('#' + s).hidden = s !== id;
@@ -1594,6 +1760,7 @@ document.addEventListener('click', (e) => {
   if (act === 'play' || act === 'again') startRun();
   else if (act === 'fullscreen') toggleFullscreen();
   else if (act === 'howto') showScreen('howto');
+  else if (act === 'codex') { renderCodex(); showScreen('codex'); }
   else if (act === 'settings') { settingsReturn = game.state === 'paused' ? 'pause' : 'title'; showScreen('settings'); }
   else if (act === 'leaderboard') { showScreen('leaderboard'); loadLeaderboard($('#lbList')); }
   else if (act === 'back') showScreen(game.state === 'paused' ? settingsReturn : 'title');

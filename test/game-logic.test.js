@@ -212,3 +212,19 @@ test('perk cards preview changes in plain player terms', async () => {
   const st = baseStats();
   for (const u of UPGRADES) for (const line of previewChange(u, st, { hp: 3 })) assert.ok(!/px|rad\b|rad\/s/.test(line), `${u.id}: ${line}`);
 });
+
+test('cards say just the gain, hint at combos, and Banish keeps perks out of the pool', async () => {
+  const { byId, baseStats, gainText, comboHints, rollUpgrades } = await load('upgrades');
+  const { Rng } = await load('util');
+  const s = baseStats();
+  assert.deepEqual(gainText(byId('extendedloan'), s, { hp: 3 }), ['+1 max heart', 'heals 2']);
+  assert.deepEqual(gainText(byId('extendedloan'), s, { hp: 5 }), ['+1 max heart']);
+  assert.deepEqual(gainText(byId('hardcover'), s, { hp: 5 }), ['+50% damage']);
+  assert.deepEqual(gainText(byId('loudreader'), s, { hp: 5 }), ['SHHH! recharges 3× faster', 'Enemies 15% faster']);
+  // Hints only when you already hold the partner perk
+  assert.deepEqual(comboHints(byId('bookmark'), {}), []);
+  assert.deepEqual(comboHints(byId('bookmark'), { dewey: 1 }).map((h) => h.combo.id), ['cyoa']);
+  assert.deepEqual(comboHints(byId('bookmark'), { dewey: 1, cyoa: 1 }), [], 'no hint once taken');
+  const banned = new Set(['hardcover', 'speedreader']);
+  for (let seed = 1; seed < 200; seed++) assert.ok(!rollUpgrades(new Rng(seed), {}, 3, { banned }).some((u) => banned.has(u.id)));
+});

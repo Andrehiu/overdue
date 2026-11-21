@@ -129,6 +129,51 @@ export function previewChange(u, stats, player) {
   return lines;
 }
 
+// "Just the gain": one short line per change, in player words (option B on the perk card).
+const pct = (x) => `${Math.round(x * 100)}%`;
+const GAIN = [
+  ['maxHp', (a, b) => (b > a ? `+${b - a} max heart${b - a > 1 ? 's' : ''}` : `−${a - b} max heart`)],
+  ['damage', (a, b) => `${b > a ? '+' : '−'}${pct(Math.abs(b - a) / BASE.damage)} damage`],
+  ['fireRate', (a, b) => `+${pct(b / a - 1)} throw speed`],
+  ['projectiles', (a, b) => `+${b - a} book per throw`],
+  ['bounces', (a, b) => `+${b - a} bounce${b - a > 1 ? 's' : ''}`],
+  ['pierce', (a, b) => (b >= 99 ? 'Books pierce everything' : `Pierce +${b - a} enemy`)],
+  ['homing', (a, b) => (a === 0 ? 'Books home in on enemies' : b > 10 ? 'Perfect homing' : 'Stronger homing, longer reach')],
+  ['critChance', (a, b) => `+${pct(b - a)} crit chance`],
+  ['critMult', (a, b) => `Crits hit ×${b}`],
+  ['speed', (a, b) => `+${pct(b / a - 1)} move speed`],
+  ['dashCd', (a, b) => `−${pct(1 - b / a)} dash cooldown`],
+  ['dashCharges', (a, b) => `+${b - a} dash charge`],
+  ['shhhCd', (a, b) => (a / b >= 2 ? `SHHH! recharges ${+(a / b).toFixed(1)}× faster` : `−${pct(1 - b / a)} SHHH! cooldown`)],
+  ['shhhRadius', (a, b) => `+${pct(b / a - 1)} SHHH! size`],
+  ['orbiters', (a, b) => (a > 0 && b === a * 2 ? 'Doubles your orbiting books' : `+${b - a} orbiting book`)],
+  ['iframes', (a, b) => `+${+(b - a).toFixed(1)}s safety after a hit`],
+  ['shelfBurst', (a, b) => (a === 0 ? 'Books burst when they hit shelves' : 'Bigger shelf bursts')],
+  ['nook', (a, b) => `+${pct(b - a)} throw speed next to shelves`],
+  ['wraps', (a, b) => (a === 0 ? 'Books come back through the walls' : `+${b - a} trip through the walls`)],
+  ['scoreMult', (a, b) => `+${pct(b / a - 1)} score`],
+  ['enemySpeedMult', (a, b) => `Enemies ${pct(b / a - 1)} faster`],
+  ['lanternScale', (a, b) => 'Your lantern shrinks to half'],
+];
+export function gainText(u, stats, player) {
+  const s = { ...stats }, p = player ? { ...player } : null;
+  u.apply(s, p);
+  const out = [];
+  for (const [k, fmt] of GAIN) if (s[k] !== stats[k]) out.push(fmt(stats[k], s[k]));
+  const healed = p && player ? p.hp - player.hp - Math.max(0, s.maxHp - stats.maxHp) : 0;
+  if (p && player && p.hp > player.hp && s.maxHp === stats.maxHp) out.push(`Heals ${p.hp - player.hp}`);
+  else if (healed > 0) out.push(`heals ${healed}`);
+  return out;
+}
+
+/** Combos this card would complete, given what you already own. */
+export function comboHints(u, owned = {}) {
+  if (u.kind !== 'perk') return [];
+  return UPGRADES.filter((c) => c.kind === 'combo' && !owned[c.id] && c.requires.includes(u.id) && !owned[u.id])
+    .map((c) => ({ combo: c, partner: byId(c.requires.find((r) => r !== u.id)), ready: c.requires.every((r) => r === u.id || owned[r]) }))
+    .filter((h) => h.ready);
+}
+
 /** Level pips for a card: ●●○ */
 export const pips = (lvl, max) => '●'.repeat(lvl) + '○'.repeat(Math.max(0, max - lvl));
 
@@ -153,9 +198,11 @@ export const masterworkFor = (perkId) => UPGRADES.find((u) => u.kind === 'master
  */
 export function rollUpgrades(rng, owned = {}, n = 3, ctx = {}) {
   const out = [];
-  const specials = [...unlockedMasterworks(owned), ...unlockedCombos(owned)];
-  if (specials.length) out.push(rng.pick(specials));
-  const pool = UPGRADES.filter((u) => u.kind !== 'combo' && u.kind !== 'master' && (owned[u.id] || 0) < u.max && !(u.needsLights && ctx.lights === false));
+  const banned = ctx.banned || new Set(), exclude = ctx.exclude || new Set();
+  const specials = [...unlockedMasterworks(owned), ...unlockedCombos(owned)].filter((u) => !exclude.has(u.id));
+  if (specials.length && !ctx.noSpecial) out.push(rng.pick(specials));
+  const pool = UPGRADES.filter((u) => u.kind !== 'combo' && u.kind !== 'master' && (owned[u.id] || 0) < u.max
+    && !(u.needsLights && ctx.lights === false) && !banned.has(u.id) && !exclude.has(u.id));
   while (out.length < n && pool.length) {
     const pick = rng.weighted(pool);
     out.push(pick);
