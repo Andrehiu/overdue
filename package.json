@@ -1,0 +1,16 @@
+{
+  "name": "overdue",
+  "version": "1.0.0",
+  "description": "OVERDUE! Night shift at the Meme Library: a static, phone-friendly arcade roguelite.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "test": "node --test test/*.test.js",
+    "build": "node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.2"
+  },
+  "engines": { "node": ">=20" }
+}
