@@ -53,12 +53,12 @@ test('composeWave without story options is unchanged (endless runs stay reproduc
 
 test('story layouts are fixed per room and every room is connected', async () => {
   const { generateArena, isConnected, setOrientation } = await load('arena');
-  const { WINGS, ROOMS_PER_WING, difficulty, layoutSeed } = await load('story');
+  const { WINGS, ROOMS_PER_WING, difficulty, layoutSeed, roomShape } = await load('story');
   for (const portrait of [false, true]) {
     setOrientation(portrait);
     for (let w = 1; w <= WINGS.length; w++) for (let r = 1; r <= ROOMS_PER_WING; r++) {
       const d = difficulty(w, r);
-      const a = generateArena(layoutSeed(w, r), r, d.shelvesPerHalf), b = generateArena(layoutSeed(w, r), r, d.shelvesPerHalf);
+      const a = generateArena(layoutSeed(w, r), r, d.shelvesPerHalf, roomShape(w, r)), b = generateArena(layoutSeed(w, r), r, d.shelvesPerHalf, roomShape(w, r));
       assert.deepEqual(a.shelves, b.shelves);
       assert.ok(isConnected(a.solid), `wing ${w} room ${r} connected`);
     }
@@ -126,4 +126,21 @@ test('a lost wing-1 run that reaches room 6 still affords the cheapest Renovatio
   for (let r = 1; r <= 5; r++) earned += roomReward(1, r);
   assert.ok(earned >= Math.min(...RENOVATIONS.map((x) => x.cost(0))), `earned ${earned}`);
   for (let w = 2; w <= 10; w++) assert.ok(roomReward(w, 3) > roomReward(w - 1, 3) && roomReward(w, 10) > roomReward(w - 1, 10), 'harder wings pay more');
+});
+
+test('every wing has room shapes; elite and boss rooms are open; shapes do not repeat back to back', async () => {
+  const { WINGS, ROOMS_PER_WING, ELITE_ROOM, BOSS_ROOM, roomShape } = await load('story');
+  const { SHAPES } = await load('arena');
+  for (let w = 1; w <= WINGS.length; w++) {
+    const list = WINGS[w - 1].shapes;
+    assert.ok(list.length >= 1 && list.length <= 3 && list.every((s) => SHAPES.includes(s)), `wing ${w} shapes`);
+    const open = ['pillars', 'reading'].find((s) => list.includes(s)) || 'scatter';
+    for (let r = 1; r <= ROOMS_PER_WING; r++) {
+      const s = roomShape(w, r);
+      assert.equal(s, roomShape(w, r), 'deterministic');
+      if (r === ELITE_ROOM || r === BOSS_ROOM) { assert.equal(s, open, `wing ${w} room ${r} is the open shape`); continue; }
+      assert.ok(list.includes(s), `wing ${w} room ${r}: ${s} is one of the wing's shapes`);
+      if (r > 1 && list.length >= 2) assert.notEqual(s, roomShape(w, r - 1), `wing ${w}: room ${r} repeats ${s}`);
+    }
+  }
 });

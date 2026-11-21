@@ -11,6 +11,7 @@ import { execSync } from 'node:child_process';
 import { readFile, mkdir, rm, cp, writeFile } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const ROOT = resolve(new URL('../..', import.meta.url).pathname);
 const OUT = join(ROOT, 'qa-report');
@@ -365,6 +366,30 @@ if (want('perf')) {
   if (PERF.fps) record('perf', `story wing 10 fps ≥ ${PERF.fps}`, story.fps >= PERF.fps, `${story.fps.toFixed(0)} fps`);
   await ctx.close();
 }
+// ---------------------------------------------------------------- 4b. one story room per layout shape (iphone-landscape)
+if (want('shapes')) {
+  const { WINGS, ROOMS_PER_WING, roomShape } = await import(pathToFileURL(join(ROOT, 'src/story.js')).href);
+  const { SHAPES } = await import(pathToFileURL(join(ROOT, 'src/arena.js')).href);
+  const ctx = await browser.newContext(devices['iPhone 13 landscape']);
+  const page = await ctx.newPage();
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  await page.goto(URL0); await page.waitForTimeout(500);
+  for (const shape of SHAPES) {
+    // Prefer a mid-to-late normal room so the shape is at a decent density.
+    let pick = null;
+    for (const r of [8, 7, 9, 6, 4, 3, 2, 1, 5, 10]) for (let w = 1; w <= WINGS.length && !pick; w++) if (roomShape(w, r) === shape) pick = [w, r];
+    if (!pick) { record('shapes', `${shape}: a story room uses it`, shape === 'scatter' ? true : false, 'no wing/room found'); continue; }
+    await page.evaluate(([w, r]) => { const O = __overdue; O.unlockAll(); O.startRun('story', w); O.startWave(r); O.god(); }, pick);
+    await page.waitForTimeout(1500);
+    await shot(page, `shape-${shape}`);
+    const ok = await page.evaluate(() => __overdue.game.state === 'playing' && Number.isFinite(__overdue.player.x));
+    record('shapes', `${shape} room (wing ${pick[0]} room ${pick[1]}) plays`, ok);
+  }
+  record('shapes', 'no script errors', errs.length === 0, errs.join('; ').slice(0, 200));
+  await ctx.close();
+}
+
 await browser.close();
 server.close();
 

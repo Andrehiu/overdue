@@ -27,7 +27,7 @@ Or play online at **https://andrehiu.github.io/overdue/**. On a phone, use **Sha
 ## What's inside
 
 - **Two modes:**
-  - **Story: the library wings.** Ten handmade wings (Front Desk, Children's Wing, Periodicals … The Restricted Section), unlocked in order. A run is one wing of **10 rooms**: pick a perk after every room. Room 5 is an **elite room**, and room 10 is a **Rogue Author**. Each room is harder than the last, and each wing is harder than the one before it:
+  - **Story: the library wings.** Ten handmade wings (Front Desk, Children's Wing, Periodicals … The Restricted Section), unlocked in order. A run is one wing of **10 rooms**: pick a perk after every room. Room 5 is an **elite room**, and room 10 is a **Rogue Author**. Each room is harder than the last, and each wing is harder than the one before it. Wings also have their own **room shapes** (long aisles, pillared halls, mazes, reading-room rings, bridges), fixed per room:
     - tougher, faster enemies, and more of them;
     - a growing share of **★ elites**, which wear a gold crown and fire pages at you (from wing 7, three at a time);
     - faster enemy pages;

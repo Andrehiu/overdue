@@ -318,12 +318,14 @@ const shelfGap = (a, b) => Math.max(a.x - (b.x + b.w), b.x - (a.x + a.w), a.y - 
 
 test('aisles are at least 2 cells (60 px) wide in every room, on every screen shape, and never empty', async () => {
   const A = await load('arena');
-  const { WINGS, ROOMS_PER_WING, difficulty, layoutSeed } = await load('story');
+  const { WINGS, ROOMS_PER_WING, difficulty, layoutSeed, roomShape } = await load('story');
   const shapes = [[32, 18], [18, 32], [28, 20], [20, 28], ...[0.5, 1, 1.4, 2].map((a) => A.gridForAspect(a))];
   const check = (a, label) => {
     assert.ok(a.shelves.length > 0, `${label}: has shelves`);
     assert.ok(A.isConnected(a.solid), `${label}: connected`);
     for (let y = A.SAFE.y0; y <= A.SAFE.y1; y++) for (let x = A.SAFE.x0; x <= A.SAFE.x1; x++) assert.equal(a.solid[A.idx(x, y)], 0, `${label}: spawn zone clear`);
+    assert.ok(A.isWide(a.solid), `${label}: every free cell is in a free 2x2 block`);
+    if (a.shape !== 'scatter') return; // shaped rooms may have touching walls; the 2x2 rule above is what they must keep
     for (const s of a.shelves) { // walls
       assert.ok(s.x >= A.AISLE && s.y >= A.AISLE && A.COLS - (s.x + s.w) >= A.AISLE && A.ROWS - (s.y + s.h) >= A.AISLE, `${label}: wall aisle`);
     }
@@ -336,7 +338,7 @@ test('aisles are at least 2 cells (60 px) wide in every room, on every screen sh
       A.setGrid(cols, rows);
       for (let seed = 1; seed <= 20; seed++) for (let wave = 1; wave <= 30; wave++) check(A.generateArena(seed, wave), `${cols}x${rows} endless seed ${seed} wave ${wave}`);
       for (let w = 1; w <= WINGS.length; w++) for (let r = 1; r <= ROOMS_PER_WING; r++) {
-        check(A.generateArena(layoutSeed(w, r), r, difficulty(w, r).shelvesPerHalf), `${cols}x${rows} story wing ${w} room ${r}`);
+        check(A.generateArena(layoutSeed(w, r), r, difficulty(w, r).shelvesPerHalf, roomShape(w, r)), `${cols}x${rows} story wing ${w} room ${r}`);
       }
     }
   } finally { A.setOrientation(false); }
@@ -413,4 +415,88 @@ test('every perk has a short name for the build strip, and buildChips links comb
   assert.equal(buildChips({ dewey: 1 }, [byId('speedreader')])[0].linked, false);
   assert.equal(buildChips({ dewey: 1, bookmark: 1, cyoa: 1 }, offered).find((c) => c.id === 'dewey').linked, false, 'taken combo: no link');
   assert.equal(buildChips({ dewey: 1 })[0].linked, false);
+});
+
+test('scatter layouts are byte-identical to the pre-shapes generator (endless stays as it was)', async () => {
+  const { createHash } = await import('node:crypto');
+  const A = await load('arena');
+  // sha256 over endless seeds 1-20 x waves 1-30, captured from the v1.4.0 generator.
+  const expected = {
+    '32x18': '38a12670b7f5bced59cca3c0d354c700c637cdf81a256934dbb488ba38ff314d',
+    '28x20': '0a351cb2c6041bcd686f377a48f40542e1aa839af2f792e2505884481edf6c08',
+    '28x21': 'f6f95a470ea3223f681f09476f5fbd6c52304149bfc898f5c13f955fffdb80a2',
+  };
+  try {
+    for (const [cols, rows] of [[32, 18], [28, 20], A.gridForAspect(4 / 3)]) {
+      A.setGrid(cols, rows);
+      const plain = createHash('sha256'), named = createHash('sha256');
+      for (let s = 1; s <= 20; s++) for (let w = 1; w <= 30; w++) {
+        plain.update(Buffer.from(A.generateArena(s, w).solid));
+        named.update(Buffer.from(A.generateArena(s, w, null, 'scatter').solid));
+      }
+      assert.equal(plain.digest('hex'), expected[`${cols}x${rows}`], `${cols}x${rows} endless layouts unchanged`);
+      assert.equal(named.digest('hex'), expected[`${cols}x${rows}`], `${cols}x${rows} 'scatter' = default`);
+    }
+  } finally { A.setOrientation(false); }
+});
+
+test('every room shape keeps the rules: connected, clear spawn, no passage under 2 cells, open edges, denser = more shelf', async () => {
+  const A = await load('arena');
+  const { computeFlowField } = await load('flowfield');
+  const grids = [[32, 18], [28, 20], A.gridForAspect(4 / 3), A.gridForAspect(1.6)];
+  try {
+    for (const [cols, rows] of grids) {
+      A.setGrid(cols, rows);
+      for (const shape of A.SHAPES) for (let seed = 1; seed <= 12; seed++) {
+        let prevCells = 0;
+        for (let d = 1; d <= 7; d++) {
+          const label = `${cols}x${rows} ${shape} seed ${seed} density ${d}`;
+          const a = A.generateArena(seed * 977, (seed % 10) + 1, d, shape);
+          assert.deepEqual(a.solid, A.generateArena(seed * 977, (seed % 10) + 1, d, shape).solid, `${label}: deterministic`);
+          assert.ok(a.shelves.length > 0, `${label}: not empty`);
+          if (shape !== 'scatter') assert.equal(a.shape, shape, `${label}: no fallback`);
+          assert.ok(A.isConnected(a.solid), `${label}: connected`);
+          for (let y = A.SAFE.y0; y <= A.SAFE.y1; y++) for (let x = A.SAFE.x0; x <= A.SAFE.x1; x++) assert.equal(a.solid[A.idx(x, y)], 0, `${label}: spawn clear`);
+          assert.ok(A.isWide(a.solid), `${label}: no passage narrower than 2 cells`);
+          if (shape === 'scatter') for (let i = 0; i < a.shelves.length; i++) for (let j = i + 1; j < a.shelves.length; j++) assert.ok(shelfGap(a.shelves[i], a.shelves[j]) >= A.AISLE, `${label}: shelves ${i}/${j} too close`);
+          // The flow field (what enemies follow) must reach every free cell from the player's spawn.
+          const f = computeFlowField(a.solid, cols, rows, cols >> 1, rows >> 1);
+          for (let i = 0; i < a.solid.length; i++) if (!a.solid[i]) assert.ok(Number.isFinite(f.dist[i]), `${label}: flow field reaches cell ${i}`);
+          const edge = A.edgeCells(a.solid);
+          const sides = new Set(edge.map(([x, y]) => (y === 0 ? 't' : y === rows - 1 ? 'b' : x === 0 ? 'l' : 'r')));
+          assert.ok(edge.length >= 12 && sides.size >= 3, `${label}: edge entry points`);
+          const cells = a.solid.reduce((s, v) => s + v, 0);
+          if (shape !== 'scatter') assert.ok(cells >= prevCells, `${label}: denser never has fewer shelf cells`);
+          prevCells = cells;
+        }
+      }
+    }
+  } finally { A.setOrientation(false); }
+});
+
+test('reading rooms have four openings and bridge walls are continuous but for 2-3 gaps', async () => {
+  const A = await load('arena');
+  try {
+    for (const [cols, rows] of [[32, 18], [28, 20], A.gridForAspect(4 / 3)]) {
+      A.setGrid(cols, rows);
+      for (let seed = 1; seed <= 10; seed++) {
+        const r = A.generateArena(seed * 31, 5, 3, 'reading');
+        // Walk outwards from the rug centre along the four axes: each must cross the ring through a gap.
+        const cx = cols >> 1, cy = rows >> 1;
+        const solidAt = (x, y) => r.solid[A.idx(x, y)] === 1;
+        let up = false, down = false, left = false, right = false;
+        for (const x of [cx - 1, cx]) { up = up || !solidAt(x, A.SAFE.y0 - 2); down = down || !solidAt(x, A.SAFE.y1 + 2); }
+        for (const y of [cy - 1, cy]) { left = left || !solidAt(A.SAFE.x0 - 2, y); right = right || !solidAt(A.SAFE.x1 + 2, y); }
+        assert.ok(up && down && left && right, `${cols}x${rows} seed ${seed}: openings top/bottom/left/right`);
+        // ...and the ring is otherwise closed: the corners are solid.
+        assert.ok(solidAt(A.SAFE.x0 - 2, A.SAFE.y0 - 2) && solidAt(A.SAFE.x1 + 2, A.SAFE.y1 + 2), 'closed corners');
+        const b = A.generateArena(seed * 31, 5, 3, 'bridge');
+        const wallX = b.shelves.filter((s) => s.w === 1 && s.h >= 3 && s.x < cols / 2 && s.y + s.h <= rows).map((s) => s.x);
+        const x = Math.min(...wallX);
+        let gaps = 0, run = false;
+        for (let y = 0; y < rows; y++) { const free = !b.solid[A.idx(x, y)]; if (free && !run) gaps++; run = free; }
+        assert.ok(gaps >= 2 && gaps <= 3, `${cols}x${rows} seed ${seed}: bridge wall has ${gaps} gaps`);
+      }
+    }
+  } finally { A.setOrientation(false); }
 });

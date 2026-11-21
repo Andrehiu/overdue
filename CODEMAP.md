@@ -29,7 +29,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | File | Lines | What it is |
 |---|---|---|
 | `index.html` | 196 | Page shell: menus and screens as `<section id>` |
-| `src/arena.js` | 131 | Procedural, mirrored library layouts on a grid. Pure module (no DOM) so it is unit-testable. |
+| `src/arena.js` | 332 | Procedural, mirrored library layouts on a grid. Pure module (no DOM) so it is unit-testable. |
 | `src/audio.js` | 166 | 100% procedural audio: every sound effect and the adaptive soundtrack are synthesised |
 | `src/backend.js` | 84 | Score storage. The game is fully static, so there are two places a Hall of Fame can live: |
 | `src/catalogue.js` | 140 | Built-in book catalogue: the titles you throw and the authors bosses are named after. |
@@ -37,14 +37,14 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/main.js` | 2361 | OVERDUE! — Night Shift at the Meme Library |
 | `src/meta.js` | 99 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
 | `src/palette.js` | 52 | Projectile colours. Pure module (no DOM), unit-tested. |
-| `src/story.js` | 97 | Story mode: ten handmade library wings, unlocked in order. Pure module (no DOM) so it is unit-tested. |
+| `src/story.js` | 114 | Story mode: ten handmade library wings, unlocked in order. Pure module (no DOM) so it is unit-tested. |
 | `src/upgrades.js` | 248 | Perks offered between waves. Pure data + a seeded roller (no DOM), so it is unit-tested. |
 | `src/util.js` | 110 | Small, dependency-free helpers shared by the game and its unit tests. |
 | `src/version.js` | 22 | Which build of the game is running. The build script injects the real values |
 | `src/waves.js` | 59 | Budget-based wave composer. Pure + seeded => every run with the same seed plays the same waves. |
-| `test/game-logic.test.js` | 417 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
-| `test/story-meta.test.js` | 130 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
-| `scripts/qa/run.mjs` | 407 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
+| `test/game-logic.test.js` | 503 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
+| `test/story-meta.test.js` | 147 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
+| `scripts/qa/run.mjs` | 432 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 43 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
 | `scripts/codemap.mjs` | 112 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
@@ -55,7 +55,7 @@ Screens: title:23 · howto:44 · settings:69 · leaderboard:90 · upgrade:96 · 
 
 ## src/arena.js
 
-SAFE:12 · setGrid:18 · setOrientation:26 · gridForAspect:33 · idx:41 · cellOf:43 · isSolidPx:48 · isConnected:54 · overlapsSafe:77 · generateArena:85 · edgeCells:125
+SAFE:12 · setGrid:18 · setOrientation:26 · gridForAspect:33 · idx:41 · cellOf:43 · isSolidPx:48 · isConnected:54 · overlapsSafe:77 · generateArena:85 · scatterArena:94 · SHAPES:137 · shuffled:139 · SHAPE_GEN:145 · rectsOf:253 · isWide:274 · shapedArena:287 · edgeCells:326
 
 ## src/audio.js
 
@@ -97,7 +97,7 @@ PLAYER:7 · ENEMY:22 · hueOf:25 · isEnemyHue:34 · bookLook:45
 
 ## src/story.js
 
-WINGS:17 · roomKind:40 · difficulty:46 · threat:74 · composeRoom:79 · layoutSeed:89 · roomReward:92 · firstClearBonus:96
+WINGS:18 · roomKind:41 · difficulty:47 · threat:75 · composeRoom:80 · layoutSeed:90 · forcedRoom:92 · roomShape:98 · roomReward:109 · firstClearBonus:113
 
 ## src/upgrades.js
 
@@ -140,9 +140,12 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 - 282: combo partners and combos in reach explain what pairs with what
 - 300: perk art: each perk adds one trait, they stack, and normal books stay plain
 - 319: aisles are at least 2 cells (60 px) wide in every room, on every screen shape, and never empty
-- 345: cornerAssist slides the player around a clipped shelf corner, but not off a head-on face
-- 386: cornerAssist + wall collision lets a circle walk past a corner it clips
-- 399: every perk has a short name for the build strip, and buildChips links combo partners
+- 347: cornerAssist slides the player around a clipped shelf corner, but not off a head-on face
+- 388: cornerAssist + wall collision lets a circle walk past a corner it clips
+- 401: every perk has a short name for the build strip, and buildChips links combo partners
+- 420: scatter layouts are byte-identical to the pre-shapes generator (endless stays as it was)
+- 443: every room shape keeps the rules: connected, clear spawn, no passage under 2 cells, open edges, denser = more shelf
+- 477: reading rooms have four openings and bridge walls are continuous but for 2-3 gaps
 
 ## test/story-meta.test.js
 
@@ -155,10 +158,11 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 - 84: buying spends fines, refuses when broke or maxed
 - 96: runs bank fines, unlock the next wing once, and saves repair themselves
 - 122: a lost wing-1 run that reaches room 6 still affords the cheapest Renovation
+- 131: every wing has room shapes; elite and boss rooms are open; shapes do not repeat back to back
 
 ## scripts/qa/run.mjs
 
-results:23 · record:24 · want:28 · sh:31 · TYPES:46 · TARGETS:56 · shot:63 · md:394
+results:24 · record:25 · want:29 · sh:32 · TYPES:47 · TARGETS:57 · shot:64 · md:419
 
 ## scripts/build.mjs
 
