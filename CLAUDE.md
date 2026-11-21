@@ -12,6 +12,8 @@ Every session is either a **planner** or a **coder**. A session is a coder only 
 message says "You are a coder session"; every other session is a planner.
 
 **Planner (default):**
+- Reads **`ROADMAP.md`** right after this file, and keeps it current (decisions, plan status, parked ideas).
+  Saves each coder prompt in `docs/handoffs/<version>-<topic>.md`.
 - Talks with the owner: ideas, design, priorities, reviewing results. **Never edits game code** (`src/`, `index.html`,
   `test/`, `scripts/`). It may edit docs only (CLAUDE.md, README.md, TESTING.md, ROADMAP.md, `docs/`).
 - Hands each coding task to a **new coder session**: model Sonnet, on this repo (`https://github.com/Andrehiu/overdue`, so
