@@ -395,3 +395,22 @@ test('cornerAssist + wall collision lets a circle walk past a corner it clips', 
   }
   assert.ok(p.x > 200, `got past the shelf (x=${p.x})`);
 });
+
+test('every perk has a short name for the build strip, and buildChips links combo partners', async () => {
+  const { UPGRADES, byId, buildChips } = await load('upgrades');
+  const shorts = UPGRADES.map((u) => u.short);
+  for (const u of UPGRADES) assert.ok(u.short && u.short.length <= 13, `${u.id} short name "${u.short}"`);
+  assert.equal(new Set(shorts).size, shorts.length, 'short names are unique');
+  // sorted master, combo, perk, cursed; reports level
+  const chips = buildChips({ bannedbook: 1, dewey: 2, cyoa: 1, m_tome: 1, hardcover: 3 });
+  assert.deepEqual(chips.map((c) => c.kind), ['master', 'combo', 'perk', 'perk', 'cursed']);
+  const dewey = chips.find((c) => c.id === 'dewey');
+  assert.deepEqual([dewey.lvl, dewey.max, dewey.short, dewey.icon], [2, 3, 'Dewey', '🧭']);
+  // linked: owned Dewey + offered Bouncy Bookmark completes CYOA
+  const offered = [byId('bookmark'), byId('speedreader')];
+  assert.equal(buildChips({ dewey: 1 }, offered)[0].linked, true);
+  assert.equal(buildChips({ dewey: 1, speedreader: 1 }, offered).find((c) => c.id === 'speedreader').linked, false);
+  assert.equal(buildChips({ dewey: 1 }, [byId('speedreader')])[0].linked, false);
+  assert.equal(buildChips({ dewey: 1, bookmark: 1, cyoa: 1 }, offered).find((c) => c.id === 'dewey').linked, false, 'taken combo: no link');
+  assert.equal(buildChips({ dewey: 1 })[0].linked, false);
+});
