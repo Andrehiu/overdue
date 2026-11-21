@@ -34,7 +34,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/backend.js` | 84 | Score storage. The game is fully static, so there are two places a Hall of Fame can live: |
 | `src/catalogue.js` | 140 | Built-in book catalogue: the titles you throw and the authors bosses are named after. |
 | `src/flowfield.js` | 102 | Dijkstra flow field: one search from the player gives every enemy a path around the shelves. |
-| `src/main.js` | 2361 | OVERDUE! — Night Shift at the Meme Library |
+| `src/main.js` | 2368 | OVERDUE! — Night Shift at the Meme Library |
 | `src/meta.js` | 99 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
 | `src/palette.js` | 52 | Projectile colours. Pure module (no DOM), unit-tested. |
 | `src/story.js` | 97 | Story mode: ten handmade library wings, unlocked in order. Pure module (no DOM) so it is unit-tested. |
@@ -44,7 +44,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/waves.js` | 59 | Budget-based wave composer. Pure + seeded => every run with the same seed plays the same waves. |
 | `test/game-logic.test.js` | 417 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
 | `test/story-meta.test.js` | 130 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
-| `scripts/qa/run.mjs` | 355 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
+| `scripts/qa/run.mjs` | 362 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 43 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
 | `scripts/codemap.mjs` | 112 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
@@ -79,13 +79,13 @@ NEIGH:4 · canStep:44 · computeFlowField:54 · lineOfSight:91
 - **Canvas sizing (logical 960x540 or 540x960 on portrait phones, letterboxed, HiDPI aware)** (53–96): isPortraitScreen:57 · applyLayout:59 · resize:73 · updateRotateOverlay:83
 - **Input: keyboard + mouse, touch (virtual stick), gamepad** (97–220): keys:100 · actions:101 · mouse:102 · touch:103 · pad:104 · toLogical:106 · onKeyPress:122 · endPointer:164 · enableTouch:173 · pollGamepad:187 · onPadPress:203
 - **World state** (221–245): game:224 · rng:235 · spawnQueue:236 · enemies:237 · makePlayer:239 · comboMult:244
-- **Run / wave flow** (246–593): keepAwake:250 · startRun:256 · clearWorld:277 · startWave:283 · bannerQueue:306 · banner:307 · waveCleared:312 · showUpgrades:339 · KIND_LABEL:351 · codex:355 · saveCodex:356 · cardsArmed:360 · currentChoices:362 · rollOpts:363 · renderCards:365 · renderBuild:445 · pop:476 · closeBuildPop:477 · openBuildPop:481 · renderReach:524 · renderCodex:542 · pause:566 · resume:576 · die:583
-- **Spawning** (594–676): DEF:597 · hpScaleNow:608 · makeEnemy:609 · spawnPoint:628 · updateSpawning:638 · materialise:656
-- **Effects helpers** (677–705): shake:680 · addLight:683 · floatText:687 · particle:690 · burst:691 · pages:699
-- **Update** (706–1400): step:709 · moveInput:741 · nearestEnemy:753 · updatePlayer:763 · collideWorld:844 · spawnBook:857 · fire:872 · abilityReady:893 · inkBurst:904 · nextToShelf:918 · doShhh:926 · updateFlow:963 · seek:974 · updateEnemies:986 · bossAI:1075 · shootHazard:1128 · fan:1133 · radial:1134 · damageEnemy:1136 · killEnemy:1165 · buzz:1207 · hurtPlayer:1212 · updateBooks:1246 · orbiterPositions:1319 · updateOrbiters:1328 · updateHazards:1342 · updateRings:1355 · updatePickups:1368 · updateParticles:1385
-- **Rendering** (1401–2026): BOOK_PALETTE:1404 · buildBackground:1406 · lampPositions:1494 · lightSprite:1502 · glowCache:1508 · glowSprite:1509 · renderLights:1518 · render:1557 · drawThrownBook:1603 · drawBook:1636 · drawPlayer:1644 · rim:1687 · eyes:1692 · drawEliteHalo:1700 · drawEnemy:1715 · drawBoss:1793 · drawTelegraph:1827 · drawPickup:1835 · hazardSprite:1848 · drawHazards:1856 · drawRing:1873 · drawParticles:1880 · heartPath:1893 · FONT:1903 · txt:1904 · drawHUD:1910 · cooldown:1982 · btnCache:1998 · setTouchButton:1999 · drawCrosshair:2011 · drawStick:2020
-- **DOM screens, settings, leaderboard** (2027–2296): SCREENS:2030 · showScreen:2032 · renderFineBadges:2041 · renderShop:2046 · defaultWing:2080 · wingStatus:2084 · renderStory:2090 · bankRun:2123 · inRun:2130 · setSetting:2154 · toast:2168 · toggleFullscreen:2201 · loadLeaderboard:2211 · showGameOver:2234
-- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2297–2361): frame:2302 · checkForUpdate:2323
+- **Run / wave flow** (246–600): keepAwake:250 · startRun:256 · clearWorld:277 · startWave:283 · bannerQueue:306 · banner:307 · waveCleared:312 · showUpgrades:339 · KIND_LABEL:351 · codex:355 · saveCodex:356 · cardsArmed:360 · currentChoices:362 · rollOpts:363 · renderCards:365 · renderBuild:445 · pop:476 · closeBuildPop:477 · openBuildPop:481 · renderReach:531 · renderCodex:549 · pause:573 · resume:583 · die:590
+- **Spawning** (601–683): DEF:604 · hpScaleNow:615 · makeEnemy:616 · spawnPoint:635 · updateSpawning:645 · materialise:663
+- **Effects helpers** (684–712): shake:687 · addLight:690 · floatText:694 · particle:697 · burst:698 · pages:706
+- **Update** (713–1407): step:716 · moveInput:748 · nearestEnemy:760 · updatePlayer:770 · collideWorld:851 · spawnBook:864 · fire:879 · abilityReady:900 · inkBurst:911 · nextToShelf:925 · doShhh:933 · updateFlow:970 · seek:981 · updateEnemies:993 · bossAI:1082 · shootHazard:1135 · fan:1140 · radial:1141 · damageEnemy:1143 · killEnemy:1172 · buzz:1214 · hurtPlayer:1219 · updateBooks:1253 · orbiterPositions:1326 · updateOrbiters:1335 · updateHazards:1349 · updateRings:1362 · updatePickups:1375 · updateParticles:1392
+- **Rendering** (1408–2033): BOOK_PALETTE:1411 · buildBackground:1413 · lampPositions:1501 · lightSprite:1509 · glowCache:1515 · glowSprite:1516 · renderLights:1525 · render:1564 · drawThrownBook:1610 · drawBook:1643 · drawPlayer:1651 · rim:1694 · eyes:1699 · drawEliteHalo:1707 · drawEnemy:1722 · drawBoss:1800 · drawTelegraph:1834 · drawPickup:1842 · hazardSprite:1855 · drawHazards:1863 · drawRing:1880 · drawParticles:1887 · heartPath:1900 · FONT:1910 · txt:1911 · drawHUD:1917 · cooldown:1989 · btnCache:2005 · setTouchButton:2006 · drawCrosshair:2018 · drawStick:2027
+- **DOM screens, settings, leaderboard** (2034–2303): SCREENS:2037 · showScreen:2039 · renderFineBadges:2048 · renderShop:2053 · defaultWing:2087 · wingStatus:2091 · renderStory:2097 · bankRun:2130 · inRun:2137 · setSetting:2161 · toast:2175 · toggleFullscreen:2208 · loadLeaderboard:2218 · showGameOver:2241
+- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2304–2368): frame:2309 · checkForUpdate:2330
 
 ## src/meta.js
 
@@ -158,7 +158,7 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 
 ## scripts/qa/run.mjs
 
-results:23 · record:24 · want:28 · sh:31 · TYPES:46 · TARGETS:56 · shot:63 · md:342
+results:23 · record:24 · want:28 · sh:31 · TYPES:46 · TARGETS:56 · shot:63 · md:349
 
 ## scripts/build.mjs
 

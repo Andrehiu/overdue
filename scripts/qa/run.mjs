@@ -126,6 +126,13 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     record(area, 'chip tap opens popover, picks no card', !pp.hidden && pp.state === 'upgrade' && /Dewey Decimal Guidance/.test(pp.text) && /1\/3/.test(pp.text) && /Choose Your Own Adventure: 🔖 Bookmark needed/.test(pp.text) && /Unlocks/.test(pp.text), pp.text.slice(0, 160));
     record(area, 'popover stays on screen', pp.l >= 0 && pp.t >= 0 && pp.r <= pp.vw && pp.b <= pp.vh, `${Math.round(pp.l)},${Math.round(pp.t)}-${Math.round(pp.r)},${Math.round(pp.b)} in ${pp.vw}x${pp.vh}`);
     await shot(page, `${name}-build-popover`);
+    // Tap away: only closes the popover, never picks the card underneath
+    const cardBox = await page.locator('#cards .card').nth(1).boundingBox();
+    await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+    await page.waitForTimeout(250);
+    record(area, 'tap outside closes popover without picking a card', await page.evaluate(() => document.querySelector('#buildPop').hidden && __overdue.game.state === 'upgrade' && Object.keys(__overdue.game.owned).length === 2), await page.evaluate(() => JSON.stringify(__overdue.game.owned)));
+    await page.locator('#buildStrip .build-item[data-id=dewey]').click();
+    await page.waitForTimeout(150);
     await page.keyboard.press('Escape');
     record(area, 'Esc closes popover', await page.evaluate(() => document.querySelector('#buildPop').hidden && __overdue.game.state === 'upgrade'));
     await page.evaluate(() => __overdue.showUpgrades());

@@ -509,7 +509,14 @@ function openBuildPop(item, c) {
   p.style.top = `${above >= 4 ? above : Math.min(sr.height - ph - 4, ir.bottom - sr.top + 6)}px`;
   item.classList.add('open'); pop.item = item;
 }
-document.addEventListener('pointerdown', (e) => { if (pop.item && !e.target.closest('#buildPop, .build-item')) closeBuildPop(); }, true);
+// A tap outside the popover only closes it: the click that follows is swallowed so nothing underneath (a card, Renew, Resume) fires.
+let swallowClickUntil = 0;
+document.addEventListener('pointerdown', (e) => {
+  if (pop.item && !e.target.closest('#buildPop, .build-item')) { closeBuildPop(); swallowClickUntil = performance.now() + 600; }
+}, true);
+document.addEventListener('click', (e) => {
+  if (performance.now() < swallowClickUntil) { swallowClickUntil = 0; e.stopPropagation(); e.preventDefault(); }
+}, true);
 addEventListener('keydown', (e) => { if (e.code === 'Escape' && pop.item) { e.stopImmediatePropagation(); closeBuildPop(); } }, true);
 
 $('#btnRenew').addEventListener('click', () => {
