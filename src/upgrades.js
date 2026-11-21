@@ -10,7 +10,7 @@
 export function baseStats() {
   return {
     maxHp: 5, speed: 210, fireRate: 4, damage: 1, projectiles: 1, spread: 0.2,
-    bounces: 0, pierce: 0, homing: 0, critChance: 0.05, dashCd: 0.9,
+    bounces: 0, pierce: 0, homing: 0, homingRange: 0, critChance: 0.05, dashCd: 0.9,
     shhhCd: 8, shhhRadius: 140, orbiters: 0, iframes: 0.8, projSpeed: 520,
     // behaviour perks (0/false = off)
     shelfBurst: 0,        // Spine Breaker: burst radius when a book hits a shelf or wall
@@ -43,7 +43,7 @@ export const UPGRADES = [
   perk({ id: 'trilogy', icon: '📚', name: 'Trilogy Box Set', desc: '+1 book per throw', max: 3, weight: 6, apply: (s) => { s.projectiles += 1; s.spread = Math.max(0.14, s.spread * 0.9); } }),
   perk({ id: 'bookmark', icon: '🔖', name: 'Bouncy Bookmark', desc: 'Books ricochet off shelves & walls (+1 bounce)', max: 3, apply: (s) => { s.bounces += 1; } }),
   perk({ id: 'plottwist', icon: '🌀', name: 'Plot Twist', desc: 'Books pierce through +1 enemy', max: 3, apply: (s) => { s.pierce += 1; } }),
-  perk({ id: 'dewey', icon: '🧭', name: 'Dewey Decimal Guidance', desc: 'Books home in on nearby enemies', max: 3, weight: 6, apply: (s) => { s.homing += 2.4; } }),
+  perk({ id: 'dewey', icon: '🧭', name: 'Dewey Decimal Guidance', desc: 'Books home in on enemies. Each level turns harder and reaches further.', max: 3, weight: 6, apply: (s) => { s.homing += 2.4; s.homingRange = s.homingRange ? s.homingRange + 80 : 240; } }),
   perk({ id: 'coffee', icon: '☕', name: 'Double Espresso', desc: '+12% move speed, −15% dash cooldown', max: 3, weight: 8, apply: (s) => { s.speed *= 1.12; s.dashCd *= 0.85; } }),
   perk({ id: 'extendedloan', icon: '❤️', name: 'Extended Loan', desc: '+1 max heart and fully heal', max: 3, apply: (s, p) => { s.maxHp += 1; if (p) p.hp = s.maxHp; } }),
   perk({ id: 'quietplease', icon: '🤫', name: 'Quiet Please', desc: 'SHHH! recharges 25% faster and reaches 20% further', max: 3, weight: 6, apply: (s) => { s.shhhCd *= 0.75; s.shhhRadius *= 1.2; } }),
@@ -75,7 +75,7 @@ export const UPGRADES = [
   master('trilogy', { id: 'm_saga', icon: '🏛️', name: 'Complete Saga', desc: 'Every 3rd throw adds a fan of 7 books.', apply: (s) => { s.sagaEvery = 3; } }),
   master('bookmark', { id: 'm_infinite', icon: '♾️', name: 'Infinite Bookmark', desc: '+3 bounces, and books speed up 15% with every bounce.', apply: (s) => { s.bounces += 3; s.bounceAccel = 0.15; } }),
   master('plottwist', { id: 'm_twist', icon: '🎬', name: 'Twist Ending', desc: 'Books pierce through everything.', apply: (s) => { s.pierce = 99; } }),
-  master('dewey', { id: 'm_congress', icon: '🏛', name: 'Library of Congress', desc: 'Near-perfect homing, and books fly twice as far.', apply: (s) => { s.homing = Math.max(s.homing, 14); s.bookLife *= 2; } }),
+  master('dewey', { id: 'm_congress', icon: '🏛', name: 'Library of Congress', desc: 'Near-perfect homing, and books fly twice as far.', apply: (s) => { s.homing = Math.max(s.homing, 14); s.homingRange = Math.max(s.homingRange, 420); s.bookLife *= 2; } }),
   master('coffee', { id: 'm_caffeine', icon: '⚡', name: 'Caffeine Overdose', desc: 'Two dash charges.', apply: (s) => { s.dashCharges = 2; } }),
   master('extendedloan', { id: 'm_lifetime', icon: '💳', name: 'Lifetime Membership', desc: 'Heal 1 heart every time you clear a wave.', apply: (s) => { s.regenPerWave = 1; } }),
   master('quietplease', { id: 'm_silence', icon: '🔇', name: 'Absolute Silence', desc: 'SHHH! freezes every enemy in the library for 2.5s.', apply: (s) => { s.shhhGlobal = true; } }),
@@ -86,6 +86,40 @@ export const UPGRADES = [
   master('readingnook', { id: 'm_fortress', icon: '🏰', name: 'Fortress of Solitude', desc: 'Next to a shelf you also deal double damage.', apply: (s) => { s.nookDamage = 1; } }),
   master('interlibrary', { id: 'm_interdim', icon: '🌌', name: 'Interdimensional Loan', desc: 'Books that come back through a wall home in and hit twice as hard.', apply: (s) => { s.wrapHoming = true; } }),
 ];
+
+// What a card changes, as "label: before → after" lines (shown on perk cards).
+const PREVIEW = [
+  ['maxHp', 'Max hearts', (v) => v],
+  ['damage', 'Damage', (v) => `${Math.round(v * 100)}%`],
+  ['fireRate', 'Throws/sec', (v) => v.toFixed(1)],
+  ['projectiles', 'Books per throw', (v) => v],
+  ['bounces', 'Bounces', (v) => v],
+  ['pierce', 'Pierce', (v) => (v >= 99 ? '∞' : v)],
+  ['homing', 'Homing turn', (v) => `${v.toFixed(1)} rad/s`],
+  ['homingRange', 'Homing reach', (v) => `${v}px`],
+  ['critChance', 'Crit chance', (v) => `${Math.round(v * 100)}%`],
+  ['critMult', 'Crit damage', (v) => `${v}×`],
+  ['speed', 'Move speed', (v) => Math.round(v)],
+  ['dashCd', 'Dash cooldown', (v) => `${v.toFixed(2)}s`],
+  ['dashCharges', 'Dash charges', (v) => v],
+  ['shhhCd', 'SHHH! cooldown', (v) => `${v.toFixed(1)}s`],
+  ['shhhRadius', 'SHHH! reach', (v) => `${Math.round(v)}px`],
+  ['orbiters', 'Orbiting books', (v) => v],
+  ['iframes', 'Invulnerability', (v) => `${v.toFixed(1)}s`],
+  ['shelfBurst', 'Burst radius', (v) => `${v}px`],
+  ['nook', 'Nook throw bonus', (v) => `+${Math.round(v * 100)}%`],
+  ['wraps', 'Wall wraps', (v) => v],
+  ['scoreMult', 'Score', (v) => `${Math.round(v * 100)}%`],
+];
+export function previewChange(u, stats, player) {
+  const s = { ...stats }, p = player ? { ...player } : null;
+  u.apply(s, p);
+  const lines = [];
+  for (const [k, label, fmt] of PREVIEW) if (s[k] !== stats[k]) lines.push(`${label} ${fmt(stats[k])} → ${fmt(s[k])}`);
+  if (p && player && p.hp !== player.hp && s.maxHp === stats.maxHp) lines.push(`Hearts ${player.hp} → ${p.hp}`);
+  if (p && player && s.maxHp !== stats.maxHp) lines.push(`Hearts now ${player.hp}/${stats.maxHp} → ${p.hp}/${s.maxHp}`);
+  return lines;
+}
 
 export const byId = (id) => UPGRADES.find((u) => u.id === id);
 

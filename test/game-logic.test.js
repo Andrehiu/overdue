@@ -196,3 +196,14 @@ test('every stackable perk tops out at 3/3 and leads to exactly one Masterwork',
     for (const [k, v] of Object.entries(s)) if (typeof v === 'number') assert.ok(Number.isFinite(v), `${mw.id} broke ${k}`);
   }
 });
+
+test('perk cards preview exact before → after numbers', async () => {
+  const { byId, baseStats, previewChange } = await load('upgrades');
+  const s = baseStats();
+  assert.deepEqual(previewChange(byId('extendedloan'), s, { hp: 4 }), ['Max hearts 5 → 6', 'Hearts now 4/5 → 6/6']);
+  assert.equal(s.maxHp, 5, 'preview must not mutate real stats');
+  assert.deepEqual(previewChange(byId('dewey'), s, { hp: 5 }), ['Homing turn 0.0 rad/s → 2.4 rad/s', 'Homing reach 0px → 240px']);
+  byId('dewey').apply(s);
+  assert.ok(previewChange(byId('dewey'), s, { hp: 5 }).includes('Homing reach 240px → 320px'), 'level 2 reaches further');
+  assert.deepEqual(previewChange(byId('graceperiod'), s, { hp: 3 }), ['Invulnerability 0.8s → 1.1s', 'Hearts 3 → 4']);
+});

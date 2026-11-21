@@ -163,3 +163,6 @@ body.portrait .card .kind { flex-basis: 100%; order: -1; }
 .card.master { border-color: #9be7dc; background: linear-gradient(160deg, rgba(155,231,220,.25), rgba(108,60,255,.25) 60%, rgba(16,10,30,.92)); box-shadow: 0 0 1.4em rgba(155,231,220,.3); }
 .card.master .kind { color: var(--teal); }
 .card.finale .lvl { color: var(--teal); }
+.card .preview { font-size: .75em; color: var(--teal); font-variant-numeric: tabular-nums; }
+.card .preview:empty { display: none; }
+body.portrait .card .preview { flex-basis: 100%; }

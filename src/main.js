@@ -5,7 +5,7 @@ import { createBackend } from './backend.js';
 import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
-import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor } from './upgrades.js';
+import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, previewChange } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect } from './util.js';
 import { SoundEngine } from './audio.js';
 
@@ -307,7 +307,8 @@ function renderCards(choices) {
     const b = document.createElement('button');
     b.className = `card ${u.kind}`;
     const lvl = (game.owned[u.id] || 0) + 1;
-    b.innerHTML = '<span class="key"></span><span class="icon"></span><span class="kind"></span><strong></strong><span class="desc"></span><span class="lvl"></span>';
+    b.innerHTML = '<span class="key"></span><span class="icon"></span><span class="kind"></span><strong></strong><span class="desc"></span><span class="preview"></span><span class="lvl"></span>';
+    b.querySelector('.preview').textContent = previewChange(u, stats, player).slice(0, 3).join(' · ');
     b.querySelector('.key').textContent = String(i + 1);
     b.querySelector('.icon').textContent = u.icon;
     b.querySelector('.kind').textContent = KIND_LABEL[u.kind] || '';
@@ -939,7 +940,7 @@ function updateBooks(dt) {
     b.rot += b.spin * dt;
     const homing = b.homingBoost ? Math.max(stats.homing, 8) : stats.homing;
     if (homing > 0) {
-      const t = nearestEnemy(b.x, b.y, homing > 10 ? 420 : 240);
+      const t = nearestEnemy(b.x, b.y, Math.max(stats.homingRange, 240));
       if (t) {
         const cur = Math.atan2(b.vy, b.vx), want = Math.atan2(t.y - b.y, t.x - b.x);
         const na = cur + clamp(angleDiff(cur, want), -homing * dt, homing * dt);
