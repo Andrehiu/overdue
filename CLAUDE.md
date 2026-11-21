@@ -7,6 +7,26 @@ conflicts with a request, ask the owner, don't silently pick one.
 A static, phone-first arcade roguelite (HTML canvas + ES modules, no server). The live site is
 GitHub Pages: https://andrehiu.github.io/overdue/ (auto-deployed from `main`). See README.md for the code map.
 
+## Session roles: planners plan, coders code
+Every session is either a **planner** or a **coder**. A session is a coder only if its system prompt or first
+message says "You are a coder session"; every other session is a planner.
+
+**Planner (default):**
+- Talks with the owner: ideas, design, priorities, reviewing results. **Never edits game code** (`src/`, `index.html`,
+  `test/`, `scripts/`). It may edit docs only (CLAUDE.md, README.md, TESTING.md, ROADMAP.md, `docs/`).
+- Hands each coding task to a **new coder session**: model Sonnet, on this repo (`https://github.com/Andrehiu/overdue`, so
+  it is grouped with the other Overdue sessions), one task per session and branch.
+  - Title: `Overdue · v<version> <short topic>`, e.g. `Overdue · v1.3.1 stuck fix`.
+  - Tag: `overdue-coder`.
+  - Start its prompt with "You are a coder session" and make it stand alone: goal, known cause, exact scope, tests,
+    definition of done, and what to report back.
+- Checks on the coder until it finishes, then **reviews its work itself**: fetches the branch, reads the diff, runs
+  `npm test` and `npm run qa`, and looks at the screenshots. Only then reports to the owner, with numbers.
+- If the coder's work is wrong, sends it fixes, or (after asking the owner) deletes its branch and starts again.
+- Ships to `main` only when the owner says so.
+
+**Coder:** does the task it was given, following everything below. It never hands work to another session.
+
 ## Find code cheaply (read this first)
 **`CODEMAP.md`** lists every file, every section of `src/main.js` and every function with its line number, plus a
 "where to change what" table. Read it first, then read only the lines you need (`Read` with offset/limit, or
