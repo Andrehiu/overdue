@@ -127,8 +127,19 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     record(area, 'popover stays on screen', pp.l >= 0 && pp.t >= 0 && pp.r <= pp.vw && pp.b <= pp.vh, `${Math.round(pp.l)},${Math.round(pp.t)}-${Math.round(pp.r)},${Math.round(pp.b)} in ${pp.vw}x${pp.vh}`);
     await shot(page, `${name}-build-popover`);
     // Tap away: only closes the popover, never picks the card underneath
-    const cardBox = await page.locator('#cards .card').nth(1).boundingBox();
-    await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+    // Pick a point that is on a card but outside the popover (the popover may cover some card centres).
+    const tapPoint = await page.evaluate(() => {
+      const pr = document.querySelector('#buildPop').getBoundingClientRect();
+      const free = (x, y) => !(x >= pr.left && x <= pr.right && y >= pr.top && y <= pr.bottom);
+      for (const c of document.querySelectorAll('#cards .card')) {
+        const r = c.getBoundingClientRect(), m = 10;
+        const pts = [[r.left + r.width / 2, r.top + r.height / 2], [r.left + m, r.top + m], [r.right - m, r.top + m], [r.left + m, r.bottom - m], [r.right - m, r.bottom - m]];
+        for (const [x, y] of pts) if (free(x, y) && document.elementFromPoint(x, y)?.closest('.card') === c) return { x, y };
+      }
+      return null;
+    });
+    record(area, 'a card point outside the popover exists to tap', !!tapPoint);
+    if (tapPoint) await page.mouse.click(tapPoint.x, tapPoint.y);
     await page.waitForTimeout(250);
     record(area, 'tap outside closes popover without picking a card', await page.evaluate(() => document.querySelector('#buildPop').hidden && __overdue.game.state === 'upgrade' && Object.keys(__overdue.game.owned).length === 2), await page.evaluate(() => JSON.stringify(__overdue.game.owned)));
     await page.locator('#buildStrip .build-item[data-id=dewey]').click();
