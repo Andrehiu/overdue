@@ -309,3 +309,88 @@ test('perk art: each perk adds one trait, they stack, and normal books stay plai
   const all = bookLook({ hardcover: 3, bookmark: 1, speedreader: 2, dewey: 1, plottwist: 1, spinebreaker: 1 });
   assert.ok(all.ribbon && all.streak && all.trail && all.glint && all.crack && all.pointed, 'traits stack');
 });
+
+// ---- v1.3.1: wider aisles + corner assist ("I keep getting stuck") ----
+
+/** Free cells between two shelves: the larger of the horizontal and vertical gaps (negative = overlap). */
+const shelfGap = (a, b) => Math.max(a.x - (b.x + b.w), b.x - (a.x + a.w), a.y - (b.y + b.h), b.y - (a.y + a.h));
+
+test('aisles are at least 2 cells (60 px) wide in every room, on every screen shape, and never empty', async () => {
+  const A = await load('arena');
+  const { WINGS, ROOMS_PER_WING, difficulty, layoutSeed } = await load('story');
+  const shapes = [[32, 18], [18, 32], [28, 20], [20, 28], ...[0.5, 1, 1.4, 2].map((a) => A.gridForAspect(a))];
+  const check = (a, label) => {
+    assert.ok(a.shelves.length > 0, `${label}: has shelves`);
+    assert.ok(A.isConnected(a.solid), `${label}: connected`);
+    for (let y = A.SAFE.y0; y <= A.SAFE.y1; y++) for (let x = A.SAFE.x0; x <= A.SAFE.x1; x++) assert.equal(a.solid[A.idx(x, y)], 0, `${label}: spawn zone clear`);
+    for (const s of a.shelves) { // walls
+      assert.ok(s.x >= A.AISLE && s.y >= A.AISLE && A.COLS - (s.x + s.w) >= A.AISLE && A.ROWS - (s.y + s.h) >= A.AISLE, `${label}: wall aisle`);
+    }
+    for (let i = 0; i < a.shelves.length; i++) for (let j = i + 1; j < a.shelves.length; j++) {
+      assert.ok(shelfGap(a.shelves[i], a.shelves[j]) >= A.AISLE, `${label}: shelves ${i}/${j} too close`);
+    }
+  };
+  try {
+    for (const [cols, rows] of shapes) {
+      A.setGrid(cols, rows);
+      for (let seed = 1; seed <= 20; seed++) for (let wave = 1; wave <= 30; wave++) check(A.generateArena(seed, wave), `${cols}x${rows} endless seed ${seed} wave ${wave}`);
+      for (let w = 1; w <= WINGS.length; w++) for (let r = 1; r <= ROOMS_PER_WING; r++) {
+        check(A.generateArena(layoutSeed(w, r), r, difficulty(w, r).shelvesPerHalf), `${cols}x${rows} story wing ${w} room ${r}`);
+      }
+    }
+  } finally { A.setOrientation(false); }
+});
+
+test('cornerAssist slides the player around a clipped shelf corner, but not off a head-on face', async () => {
+  const { cornerAssist } = await load('util');
+  const rect = { x: 100, y: 100, w: 60, h: 30 };
+  const r = 9;
+  // Moving right, the circle's bottom edge dips 5 px into the rect's top: slide up by 5 to clear the corner.
+  let o = { x: 92, y: 100 - r + 5 };
+  const before = { x: 90, y: o.y };
+  assert.equal(cornerAssist(o, before, r, rect), true);
+  assert.equal(o.y, 100 - r); assert.equal(o.x, 92);
+  // Clipping the bottom corner slides down.
+  o = { x: 92, y: 130 + r - 5 };
+  assert.equal(cornerAssist(o, { x: 90, y: o.y }, r, rect), true);
+  assert.equal(o.y, 130 + r);
+  // Moving left onto the right-hand face, clipping the top corner.
+  o = { x: 168, y: 100 - r + 6 };
+  assert.equal(cornerAssist(o, { x: 170, y: o.y }, r, rect), true);
+  assert.equal(o.y, 100 - r);
+  // Moving down and clipping the left edge slides left.
+  o = { x: 100 - r + 4, y: 92 };
+  assert.equal(cornerAssist(o, { x: o.x, y: 90 }, r, rect), true);
+  assert.equal(o.x, 100 - r);
+  // maxStep makes a long snag slide over several steps.
+  o = { x: 92, y: 100 - r + 6 };
+  cornerAssist(o, { x: 90, y: o.y }, r, rect, 8, 2);
+  assert.equal(o.y, 100 - r + 4);
+  // Head-on at the middle of the face: no sideways movement.
+  o = { x: 92, y: 115 }; const ho = { x: 92, y: 115 };
+  assert.equal(cornerAssist(o, { x: 90, y: 115 }, r, rect), false);
+  assert.deepEqual(o, ho);
+  // Overlapping the corner by more than 8 px is a real hit, not a clip.
+  o = { x: 92, y: 100 - r + 9 };
+  assert.equal(cornerAssist(o, { x: 90, y: o.y }, r, rect), false);
+  // Mostly-diagonal movement and no movement are left alone.
+  o = { x: 92, y: 100 - r + 5 };
+  assert.equal(cornerAssist(o, { x: 90.5, y: o.y - 1.5 }, r, rect), false);
+  assert.equal(cornerAssist(o, { x: o.x, y: o.y }, r, rect), false);
+  // Moving away from a rect does nothing.
+  o = { x: 88, y: 100 - r + 5 };
+  assert.equal(cornerAssist(o, { x: 90, y: o.y }, r, rect), false);
+});
+
+test('cornerAssist + wall collision lets a circle walk past a corner it clips', async () => {
+  const { cornerAssist, pushCircleOutOfRect } = await load('util');
+  const rect = { x: 100, y: 100, w: 60, h: 30 }, r = 9;
+  const p = { x: 60, y: 100 - r + 6 }; // 6 px of the circle sticks into the shelf's row
+  for (let i = 0; i < 240; i++) {
+    const before = { x: p.x, y: p.y };
+    p.x += 1.75;
+    cornerAssist(p, before, r, rect, 8, 3);
+    pushCircleOutOfRect(p, r, rect);
+  }
+  assert.ok(p.x > 200, `got past the shelf (x=${p.x})`);
+});
