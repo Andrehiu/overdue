@@ -106,6 +106,30 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     record(area, 'Masterwork offered at 3/3', cards[0]?.kind.includes('master'));
     const cardLum = await page.evaluate(`(${LUM})(getComputedStyle(document.querySelector('#cards .card strong')).color)`);
     record(area, 'card title readable on paper', cardLum < 0.3, `luminance ${cardLum.toFixed(2)}`);
+    // Build strip: short names as text, linked chip when a combo partner is offered, popover opens without picking a card
+    await page.evaluate(() => __overdue.showCards(['bookmark', 'extendedloan', 'plottwist']));
+    await page.waitForTimeout(800);
+    const strip = await page.evaluate(() => ({
+      chips: [...document.querySelectorAll('#buildStrip .build-item')].map((c) => ({ id: c.dataset.id, text: c.textContent, linked: c.classList.contains('linked'), r: c.getBoundingClientRect() })),
+      strip: (() => { const r = document.querySelector('#buildStrip').getBoundingClientRect(); return { b: r.bottom }; })(),
+      hint: document.querySelector('#cards .card .hint').textContent,
+      vh: innerHeight, owned: JSON.stringify(__overdue.game.owned),
+    }));
+    record(area, 'build strip shows short names', strip.chips.some((c) => c.id === 'dewey' && /Dewey/.test(c.text)) && strip.chips.some((c) => c.id === 'speedreader' && /Speed Reader/.test(c.text)), strip.chips.map((c) => c.text).join(' | '));
+    record(area, 'linked chip when partner offered', strip.chips.find((c) => c.id === 'dewey')?.linked === true && !strip.chips.find((c) => c.id === 'speedreader').linked && /🔗.*🧭 Dewey/.test(strip.hint), strip.hint);
+    const rows = new Set(strip.chips.map((c) => Math.round(c.r.top))).size;
+    record(area, 'build strip fits in 2 rows and on screen', rows <= 2 && strip.strip.b <= strip.vh + 1, `${rows} rows, bottom ${Math.round(strip.strip.b)} of ${strip.vh}`);
+    await shot(page, `${name}-build-strip`);
+    await page.locator('#buildStrip .build-item[data-id=dewey]').click();
+    await page.waitForTimeout(200);
+    const pp = await page.evaluate(() => { const p = document.querySelector('#buildPop'), r = p.getBoundingClientRect(); return { hidden: p.hidden, text: p.textContent, state: __overdue.game.state, l: r.left, t: r.top, r: r.right, b: r.bottom, vw: innerWidth, vh: innerHeight, n: Object.keys(__overdue.game.owned).length }; });
+    record(area, 'chip tap opens popover, picks no card', !pp.hidden && pp.state === 'upgrade' && /Dewey Decimal Guidance/.test(pp.text) && /1\/3/.test(pp.text) && /Choose Your Own Adventure: 🔖 Bookmark needed/.test(pp.text) && /Unlocks/.test(pp.text), pp.text.slice(0, 160));
+    record(area, 'popover stays on screen', pp.l >= 0 && pp.t >= 0 && pp.r <= pp.vw && pp.b <= pp.vh, `${Math.round(pp.l)},${Math.round(pp.t)}-${Math.round(pp.r)},${Math.round(pp.b)} in ${pp.vw}x${pp.vh}`);
+    await shot(page, `${name}-build-popover`);
+    await page.keyboard.press('Escape');
+    record(area, 'Esc closes popover', await page.evaluate(() => document.querySelector('#buildPop').hidden && __overdue.game.state === 'upgrade'));
+    await page.evaluate(() => __overdue.showUpgrades());
+    await page.waitForTimeout(800);
     await page.waitForTimeout(400);
     await page.locator('#cards .card').first().click();
     await page.waitForTimeout(300);

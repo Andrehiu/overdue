@@ -6,7 +6,7 @@ import { BUILD, versionLabel, fetchLatestBuild } from './version.js';
 import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
-import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips } from './upgrades.js';
+import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips, buildChips } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist } from './util.js';
 import { PLAYER, bookLook } from './palette.js';
 import { SoundEngine } from './audio.js';
@@ -384,8 +384,8 @@ function renderCards(choices) {
     b.querySelector('.gain').textContent = gain.length ? gain.join(' · ') : u.desc;
     // Combo hints: loud when this card completes a combo now, quiet when it just has a partner to look for.
     const partners = comboPartners(u, game.owned), hint = b.querySelector('.hint');
-    if (partners[0]?.partnerOwned) { hint.textContent = `🔗 Completes a combo! + your ${partners[0].partner.name} → ${partners[0].combo.icon} ${partners[0].combo.name}`; hint.classList.add('ready'); }
-    else if (partners.length) hint.textContent = `🔗 Combos with ${partners.map((x) => x.partner.name).join(' or ')}`;
+    if (partners[0]?.partnerOwned) { hint.textContent = `🔗 Completes a combo! + your ${partners[0].partner.icon} ${partners[0].partner.short} → ${partners[0].combo.icon} ${partners[0].combo.name}`; hint.classList.add('ready'); }
+    else if (partners.length) hint.textContent = `🔗 Combos with ${partners.map((x) => `${x.partner.icon} ${x.partner.short}`).join(' or ')}`;
     else hint.textContent = '';
     const mw = u.kind === 'perk' && lvl === u.max ? masterworkFor(u.id) : null;
     b.querySelector('.lvl').textContent = u.kind === 'combo'
@@ -435,30 +435,82 @@ function renderCards(choices) {
   const renew = $('#btnRenew');
   renew.hidden = !(game.renews > 0);
   renew.textContent = `↻ Renew (${game.renews || 0})`;
-  renderBuild($('#buildStrip'));
+  renderBuild($('#buildStrip'), choices);
 }
 
-/** "Your build": owned perks with pips, plus combos, Masterworks and curses. */
-function renderBuild(el) {
+/**
+ * "Your build": one chip per owned upgrade (icon + short name + pips). `offered` = the cards on screen, so chips
+ * that pair with one of them glow and show 🔗. Tapping a chip opens a details popover (never picks a card).
+ */
+function renderBuild(el, offered = []) {
+  closeBuildPop();
   el.textContent = '';
-  const owned = Object.entries(game.owned).map(([id, lvl]) => ({ u: byId(id), lvl })).filter((o) => o.u);
-  if (!owned.length) { el.hidden = true; return; }
+  const chips = buildChips(game.owned, offered);
+  if (!chips.length) { el.hidden = true; return; }
   el.hidden = false;
-  const order = { master: 0, combo: 1, perk: 2, cursed: 3 };
-  owned.sort((a, b) => order[a.u.kind] - order[b.u.kind]);
   const label = document.createElement('span'); label.className = 'build-label'; label.textContent = 'Your build';
   el.appendChild(label);
-  for (const { u, lvl } of owned) {
-    const item = document.createElement('span');
-    item.className = `build-item ${u.kind}`;
-    item.title = u.name;
-    item.textContent = u.icon;
+  for (const c of chips) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = `build-item ${c.kind}${c.linked ? ' linked' : ''}`;
+    item.dataset.id = c.id;
+    item.title = c.name;
+    item.setAttribute('aria-label', `${c.name}, tap for details`);
+    const ic = document.createElement('span'); ic.className = 'bi-icon'; ic.textContent = c.icon;
+    const nm = document.createElement('span'); nm.className = 'bi-name'; nm.textContent = c.short;
     const sub = document.createElement('small');
-    sub.textContent = u.kind === 'perk' ? pips(lvl, u.max) : u.kind === 'cursed' ? 'cursed' : u.kind === 'combo' ? 'combo' : 'master';
-    item.appendChild(sub);
+    sub.textContent = c.kind === 'perk' ? pips(c.lvl, c.max) : c.kind === 'cursed' ? 'cursed' : c.kind === 'combo' ? 'combo' : 'master';
+    item.append(ic, nm, sub);
+    if (c.linked) { const l = document.createElement('span'); l.className = 'bi-link'; l.textContent = '🔗'; l.setAttribute('aria-hidden', 'true'); item.appendChild(l); }
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (game.state === 'upgrade' && !cardsArmed()) return;
+      if (pop.item === item) closeBuildPop(); else openBuildPop(item, c);
+    });
     el.appendChild(item);
   }
 }
+
+// ---- Build chip details popover ----
+const pop = { el: $('#buildPop'), item: null };
+function closeBuildPop() {
+  if (pop.item) pop.item.classList.remove('open');
+  pop.item = null; pop.el.hidden = true;
+}
+function openBuildPop(item, c) {
+  closeBuildPop();
+  const u = byId(c.id), p = pop.el;
+  p.textContent = '';
+  const add = (tag, cls, text) => { const n = document.createElement(tag); n.className = cls; n.textContent = text; p.appendChild(n); return n; };
+  add('strong', 'bp-title', `${u.icon} ${u.name}`);
+  add('span', 'bp-desc', u.desc);
+  if (u.kind === 'perk') {
+    add('span', 'bp-lvl', `${pips(c.lvl, u.max)} ${c.lvl}/${u.max}`);
+    const mw = c.lvl < u.max ? masterworkFor(u.id) : null;
+    if (mw) add('span', 'bp-note', `Unlocks ${mw.icon} ${mw.name} at ${u.max}/${u.max}`);
+    for (const cb of UPGRADES.filter((x) => x.kind === 'combo' && x.requires.includes(u.id))) {
+      const partner = byId(cb.requires.find((r) => r !== u.id));
+      const state = game.owned[cb.id] ? 'owned' : game.owned[partner.id] ? '✓' : 'needed';
+      add('span', `bp-combo ${state === 'needed' ? 'need' : 'have'}`, `${cb.icon} ${cb.name}: ${partner.icon} ${partner.short} ${state}`);
+    }
+  } else if (u.kind === 'combo') {
+    add('span', 'bp-note', `Made from ${u.requires.map((r) => `${byId(r).icon} ${byId(r).short}`).join(' + ')}`);
+  } else if (u.kind === 'master') {
+    add('span', 'bp-note', `${byId(u.requires[0]).icon} ${byId(u.requires[0]).short} mastered`);
+  }
+  p.hidden = false;
+  // Place it just above the chip (below if there is no room), kept inside the stage.
+  const sr = stage.getBoundingClientRect(), ir = item.getBoundingClientRect();
+  const pw = p.offsetWidth, ph = p.offsetHeight;
+  const left = Math.max(4, Math.min(sr.width - pw - 4, ir.left - sr.left + ir.width / 2 - pw / 2));
+  const above = ir.top - sr.top - ph - 6;
+  p.style.left = `${left}px`;
+  p.style.top = `${above >= 4 ? above : Math.min(sr.height - ph - 4, ir.bottom - sr.top + 6)}px`;
+  item.classList.add('open'); pop.item = item;
+}
+document.addEventListener('pointerdown', (e) => { if (pop.item && !e.target.closest('#buildPop, .build-item')) closeBuildPop(); }, true);
+addEventListener('keydown', (e) => { if (e.code === 'Escape' && pop.item) { e.stopImmediatePropagation(); closeBuildPop(); } }, true);
 
 $('#btnRenew').addEventListener('click', () => {
   if (!(game.renews > 0) || game.state !== 'upgrade' || !cardsArmed()) return;
@@ -1980,6 +2032,7 @@ let settingsReturn = 'title', shopReturn = 'title', currentScreen = 'title';
 function showScreen(id) {
   for (const s of SCREENS) $('#' + s).hidden = s !== id;
   currentScreen = id;
+  closeBuildPop();
   document.body.classList.toggle('in-game', id === null);
   if (id === 'title') renderFineBadges();
 }
@@ -2301,6 +2354,7 @@ if (DEBUG) {
 
     god: () => { player.hp = 999; stats.maxHp = 999; },
     grant: (id) => { const u = UPGRADES.find((x) => x.id === id); game.owned[id] = (game.owned[id] || 0) + 1; u.apply(stats, player); },
+    showCards: (ids) => renderCards(ids.map(byId)),
     showUpgrades, setRenews: (n) => { game.renews = n; }, die: () => { player.hp = 1; player.inv = 0; hurtPlayer(player.x + 1, player.y); },
   };
 }
