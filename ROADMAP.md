@@ -6,6 +6,8 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-21 | Story rooms get shapes per wing; endless keeps today's generator | Owner: "every room feels the same"; endless must stay comparable |
+| 2026-11-21 | Remove all meme book-title text (banner, kill pop-ups), keep author-named bosses | Owner |
 | 2026-11-21 | Remove the meme book-title line at the bottom of the screen | Owner: it no longer serves a purpose |
 | 2026-11-21 | Build strip shows names; combo partners are linked visually; chips open details | Owner: perk names are hard to remember |
 | 2026-11-21 | Loud Patron shout reaches 30% less far (280 → 196 px), story and endless; thickness and speed unchanged. Done by the planner as an owner-approved one-line exception | Owner playtest: the ring felt too big |
@@ -21,9 +23,10 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 | 1.3.1 | **Stuck fix:** shelf gaps ≥ 60 px, player 18 px wide against shelves (22 vs enemies), corner assist | Shipped 2026-11-21; owner playtest: no longer cramped. Handoff: `docs/handoffs/1.3.1-stuck-fix.md` |
 | 1.3.2 | **Smaller patron shout:** Loud Patron ring reach 280 → 196 px | Shipped 2026-11-21 together with 1.4.0 |
 | 1.4.0 | **Landscape only:** "rotate your phone" screen in portrait, manifest `orientation: landscape`, update CLAUDE.md / README / QA devices | Built by coder session "Overdue · v1.4.0 landscape only" (branch `claude/landscape-only`), reviewed and merged with 1.3.2 by the planner; shipped 2026-11-21. Handoff: `docs/handoffs/1.4.0-landscape-only.md` |
-| 1.4.1 | **Remove the book-title line** at the bottom of the HUD (banner + kill titles kept for now) | In progress: coder session "Overdue · v1.4.1 remove ammo line". Handoff: `docs/handoffs/1.4.1-remove-ammo-line.md` |
+| 1.4.1 | **Remove the meme book-title text:** HUD bottom line, wave-banner subtitle and floating kill titles (catalogue kept: bosses are named after authors) | In progress: coder session "Overdue · v1.4.1 remove ammo line". Handoff: `docs/handoffs/1.4.1-remove-ammo-line.md` |
 | 1.4.2 | **Menus fit:** sticky Back row on every menu, Renovations/Settings fit short screens, safe areas (Codex Back was cut on every device) | In progress: coder session "Overdue · v1.4.2 menus fit". Handoff: `docs/handoffs/1.4.2-menus-fit.md` |
 | 1.5.0 | **Build strip:** owned perks as chips with short names, combo partner glows, tap a chip for details | In progress: coder session "Overdue · v1.5.0 build strip". Handoff: `docs/handoffs/1.5.0-build-strip.md` |
+| 1.6.0 | **Room shapes per story wing:** aisles, pillars, maze, reading room, bridge (+ today's scatter); 2–3 per wing; rooms 5/10 open; endless layouts unchanged | In progress: coder session "Overdue · v1.6.0 room shapes". Handoff: `docs/handoffs/1.6.0-room-shapes.md` |
 | — | **Bigger map (parked):** ~40×24 cells (1.7× floor), camera follows the player with a dead zone; light layer screen-sized (same look; owner OK needed since CLAUDE.md says keep lighting); auto-aim only on screen; spawns just off-screen; edge arrows for off-screen enemies; perf budget must hold. Build behind `?bigmap=1` first | Parked: 1.3.1 fixed the cramped feeling. Revisit only if it comes back |
 
 ### 1.3.1 phone checklist (wing 1, rooms 1–10)
@@ -33,7 +36,6 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 Report problems as "row + wing/room + what happened".
 
 ## Parked ideas
-- **Room shapes:** 6–8 layout types (long aisles, pillared hall, maze, round reading room, bridge, dark room); each wing favours 2–3. Fixes "every room looks the same".
 - **Room goals (story):** survive 30s, rescue stolen books, defend the returns desk, catch a thief. Fixes "every room plays the same".
 - **Weapon types:** Paperback (4 × 1 = 4 dmg/s), Encyclopedia (1.3 × 3.5 = 4.6, slow, knockback), Index Cards (10 × 0.4 = 4, flurry),
   Card Catalogue Drawer (5-card shotgun, 4.8), Ink Pot (lobbed, puddle). Keep damage per second within ±25%; every perk must work with
