@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/serve.mjs",
-    "test": "node --test test/*.test.js",
+    "test": "node --test test/*.test.js && node scripts/codemap.mjs --check",
+    "codemap": "node scripts/codemap.mjs",
     "build": "node scripts/build.mjs",
     "qa": "node scripts/qa/run.mjs"
   },

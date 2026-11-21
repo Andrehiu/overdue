@@ -7,8 +7,15 @@ conflicts with a request, ask the owner, don't silently pick one.
 A static, phone-first arcade roguelite (HTML canvas + ES modules, no server). The live site is
 GitHub Pages: https://andrehiu.github.io/overdue/ (auto-deployed from `main`). See README.md for the code map.
 
+## Find code cheaply (read this first)
+**`CODEMAP.md`** lists every file, every section of `src/main.js` and every function with its line number, plus a
+"where to change what" table. Read it first, then read only the lines you need (`Read` with offset/limit, or
+`grep -n`). Don't read `src/main.js` (~2,200 lines) whole. After editing code, run `npm run codemap`;
+`npm test` fails while CODEMAP.md is stale.
+
 ## Commands
 ```bash
+npm run codemap # regenerate CODEMAP.md after code changes
 npm run dev     # local play at http://localhost:5173 (add ?debug=1 for test hooks)
 npm test        # unit tests for the pure game modules (fast)
 npm run qa      # FULL QA: unit tests + every screen on phone/tablet/desktop + perf budget + privacy scan
