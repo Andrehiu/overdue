@@ -558,9 +558,9 @@ function addLight(x, y, r, life, color = null, big = false) {
 function floatText(x, y, text, color = '#fff', size = 14, life = 0.8) {
   texts.push({ x: clamp(x, 70, W - 70), y: Math.max(y, game.boss && PORTRAIT ? 120 : 78), text, color, size, life, max: life, vy: -40 });
 }
-function particle(p) { if (particles.length < 450) particles.push(p); }
+function particle(p) { if (particles.length < 320) particles.push(p); }
 function burst(x, y, n, colors, speed = 160, life = 0.6, shape = 'sq') {
-  if (particles.length > 250) n = Math.ceil(n * 0.4);
+  if (particles.length > 160) n = Math.ceil(n * (particles.length > 240 ? 0.25 : 0.5));
   for (let i = 0; i < n; i++) {
     const a = Math.random() * TAU, s = speed * (0.3 + Math.random() * 0.7);
     particle({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: life * (0.5 + Math.random() * 0.5), max: life,
@@ -719,7 +719,14 @@ function collideWorld(o, r) {
   if (o.y > H - r) { o.y = H - r; hit = { nx: 0, ny: -1 }; }
   return hit;
 }
+const MAX_BOOKS = 110;
 function spawnBook(x, y, a, extra = {}) {
+  // Cap books in flight: bonus books (saga fans, splits, volleys) are skipped first; your own throws
+  // replace the oldest book instead, so firing never feels like it stopped working.
+  if (books.length >= MAX_BOOKS) {
+    if (extra.child || extra.bonus) return;
+    books.shift();
+  }
   const book = game.ammo || pickBook();
   books.push({ x, y, vx: Math.cos(a) * stats.projSpeed, vy: Math.sin(a) * stats.projSpeed,
     r: 6, life: stats.bookLife, rot: a, dmgMult: 1, scale: 1, spin: (Math.random() < 0.5 ? -1 : 1) * 14, bounces: stats.bounces, pierce: stats.pierce,
@@ -740,7 +747,7 @@ function fire() {
   }
   // Complete Saga: a fan of 7 every Nth throw
   if (stats.sagaEvery && p.throws % stats.sagaEvery === 0) {
-    for (let i = 0; i < 7; i++) spawnBook(p.x, p.y, p.aim + (i - 3) * 0.16, { color: '#7bd88f' });
+    for (let i = 0; i < 7; i++) spawnBook(p.x, p.y, p.aim + (i - 3) * 0.16, { color: '#7bd88f', bonus: true });
   }
   sound.play('throw');
 }
@@ -807,7 +814,7 @@ function doShhh() {
   if (stats.shhhVolley) {
     for (let k = 0; k < stats.shhhVolley; k++) {
       const a = (k / stats.shhhVolley) * TAU + game.time;
-      spawnBook(p.x, p.y, a, { pierce: stats.pierce + 2, color: '#b48cff' });
+      spawnBook(p.x, p.y, a, { pierce: stats.pierce + 2, color: '#b48cff', bonus: true });
     }
   }
   floatText(p.x, p.y - 26, 'SHHH!', '#9be7dc', 22, 1);
@@ -987,7 +994,12 @@ function damageEnemy(e, dmg, kx, ky, crit) {
     e.dmgText = texts[texts.length - 1]; e.dmgText.sum = dmg; e.dmgText.crit = crit;
   }
   sound.play(crit ? 'crit' : 'hit', e.type === 'boss' ? 0.6 : 1);
-  if (e.type === 'boss') game.freeze = Math.max(game.freeze, 0.012);
+  // Hit-stop on the boss sells impact, but chained on every hit it slowed late fights to ~0.4x speed.
+  // Budget: only crits / big hits, and at most one micro-freeze per 0.3s of game time.
+  if (e.type === 'boss' && (crit || dmg >= stats.damage * 3) && game.time - (game.lastBossStop || -1) > 0.3) {
+    game.lastBossStop = game.time;
+    game.freeze = Math.max(game.freeze, 0.012);
+  }
   if (e.hp <= 0) killEnemy(e);
 }
 
@@ -1338,7 +1350,7 @@ function renderLights() {
   for (const [x, y] of LAMPS) L(x, y, 170 + Math.sin(game.time * 3 + x) * 4, 0.8);
   L(W / 2, H / 2, 200, 0.35);
   if (game.state !== 'gameover' && !(game.state === 'dying' && game.deathT < 1.2)) L(player.x, player.y, 230 * stats.lanternScale, 1);
-  for (const b of books) L(b.x, b.y, 55, 0.7);
+  for (let i = 0; i < books.length && i < 24; i++) L(books[i].x, books[i].y, 55, 0.7); // light budget
   for (const h of hazards) L(h.x, h.y, 30, 0.5);
   for (const e of enemies) if (e.type === 'boss') L(e.x, e.y, 160, 0.7); else if (e.type === 'golem') L(e.x, e.y, 60, 0.4);
   for (const g of rings) L(g.x, g.y, g.r + 30, 0.3 * g.life);
@@ -1350,8 +1362,8 @@ function renderLights() {
   ctx.globalCompositeOperation = 'lighter';
   const G = (x, y, r, c, a) => { ctx.globalAlpha = a; ctx.drawImage(glowSprite(c), x - r, y - r, r * 2, r * 2); };
   for (const [x, y] of LAMPS) G(x, y, 90, 'rgba(255,190,90,0.6)', 0.5);
-  const bookGlow = books.length > 24 ? 0.2 : 0.45;
-  for (const b of books) G(b.x, b.y, 22, b.color, bookGlow);
+  const bookGlow = books.length > 24 ? 0.25 : 0.45;
+  for (let i = 0; i < books.length && i < 24; i++) G(books[i].x, books[i].y, 22, books[i].color, bookGlow);
   for (const h of hazards) G(h.x, h.y, 18, 'rgba(255,80,80,1)', 0.6);
   for (const f of flashes) if (f.color) G(f.x, f.y, f.r * 0.6, f.color, 0.4 * (f.life / f.max));
   if (game.boss) G(game.boss.x, game.boss.y, 120, game.boss.glow || 'rgba(120,70,255,1)', 0.35);
@@ -1931,7 +1943,7 @@ requestAnimationFrame(frame);
 // Test hooks (only with ?debug) — used by the automated Playwright smoke test.
 if (DEBUG) {
   window.__overdue = {
-    game, get player() { return player; }, get stats() { return stats; }, enemies, get content() { return content; },
+    game, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, enemies, get content() { return content; },
     startRun, startWave, killAll: () => { for (const e of [...enemies]) killEnemy(e); spawnQueue.length = 0; telegraphs.length = 0; },
     god: () => { player.hp = 999; stats.maxHp = 999; },
     grant: (id) => { const u = UPGRADES.find((x) => x.id === id); game.owned[id] = (game.owned[id] || 0) + 1; u.apply(stats, player); },
