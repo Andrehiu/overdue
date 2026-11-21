@@ -277,3 +277,21 @@ test('everything the player throws stays out of the red/pink reserved for enemie
   assert.ok(!/spawnBook\([^)]*color: '#/.test(main), 'spawnBook colours come from palette.js');
   assert.ok(!/bookColor|bookHue/.test(main), 'no per-title book colours');
 });
+
+test('combo partners and combos in reach explain what pairs with what', async () => {
+  const { byId, comboPartners, combosInReach, UPGRADES } = await load('upgrades');
+  // Every core perk that belongs to a combo names its partner
+  const p = comboPartners(byId('hardcover'), {});
+  assert.deepEqual(p.map((x) => [x.combo.id, x.partner.id, x.partnerOwned]), [['annotated', 'footnotes', false]]);
+  assert.ok(comboPartners(byId('hardcover'), { footnotes: 1 })[0].partnerOwned, 'owning the partner makes it a "completes" hint');
+  assert.deepEqual(comboPartners(byId('hardcover'), { annotated: 1 }), [], 'taken combos are not hinted');
+  assert.deepEqual(comboPartners(byId('bannedbook'), {}), [], 'curses have no combos');
+  // Half-way combos, closest first
+  assert.deepEqual(combosInReach({}), []);
+  const reach = combosInReach({ bookmark: 1, dewey: 1, footnotes: 1 });
+  assert.equal(reach[0].combo.id, 'cyoa'); assert.equal(reach[0].need.length, 0);
+  assert.deepEqual(reach.slice(1).map((x) => x.combo.id).sort(), ['annotated', 'collapsing']);
+  for (const x of reach) assert.equal(x.have.length + x.need.length, 2);
+  // Every combo recipe is two real perks
+  for (const c of UPGRADES.filter((u) => u.kind === 'combo')) assert.ok(c.requires.every((r) => byId(r)?.kind === 'perk'));
+});

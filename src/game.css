@@ -353,3 +353,19 @@ body.portrait #gameover .menu.row > .primary:not([hidden]) ~ .primary { flex-bas
 .progress-tools .danger.armed { background: var(--danger); color: #2a0008; border-color: var(--danger); font-weight: bold; }
 .debug-only { display: none; }
 body.debug .debug-only { display: flex; }
+
+/* Combo clarity: card hint is loud when the card completes a combo, quiet when it only has partners */
+.cards .card .hint { background: rgba(60, 100, 150, .12); color: #2b4a6b; }
+.cards .card .hint.ready { background: rgba(201, 162, 39, .35); color: #4a3000; font-weight: bold; }
+/* Pause: combos you're half-way to */
+.reach { --have: var(--teal); max-width: 34em; display: grid; gap: .25em; font-size: .8em; text-align: left; }
+.reach-label { margin: .2em 0 0; text-align: center; font-size: .85em; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.reach-row { display: grid; grid-template-columns: minmax(0, 13em) 1fr; gap: .2em .8em; padding: .2em .5em; border-radius: 4px; background: rgba(255, 255, 255, .04); }
+.reach-row strong { color: var(--accent); }
+.reach-row .have { color: var(--have); }
+.reach-row .need { color: var(--ink); }
+body.portrait .reach-row { grid-template-columns: 1fr; }
+/* Game over: the action buttons stay on screen however long the stats get */
+#gameover .menu.row { position: sticky; bottom: 0; padding: .5em 0 calc(.5em + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to bottom, transparent, rgba(5, 3, 12, .92) 35%); width: 100%; justify-content: center; }
+#goBuild { justify-content: flex-start; padding-left: 0; }

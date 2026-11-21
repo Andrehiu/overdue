@@ -174,6 +174,25 @@ export function comboHints(u, owned = {}) {
     .filter((h) => h.ready);
 }
 
+/**
+ * Every combo this perk belongs to that you haven't taken yet, with its partner and whether you own the
+ * partner already (then taking this card unlocks the combo).
+ */
+export function comboPartners(u, owned = {}) {
+  if (u.kind !== 'perk') return [];
+  return UPGRADES.filter((c) => c.kind === 'combo' && !owned[c.id] && c.requires.includes(u.id))
+    .map((c) => { const partner = byId(c.requires.find((r) => r !== u.id)); return { combo: c, partner, partnerOwned: !!owned[partner.id] }; })
+    .sort((a, b) => b.partnerOwned - a.partnerOwned);
+}
+
+/** Combos you're half-way to: one of the two perks owned, combo not taken. For the pause screen. */
+export function combosInReach(owned = {}) {
+  return UPGRADES.filter((c) => c.kind === 'combo' && !owned[c.id])
+    .map((c) => ({ combo: c, have: c.requires.filter((r) => owned[r]).map(byId), need: c.requires.filter((r) => !owned[r]).map(byId) }))
+    .filter((x) => x.have.length > 0)
+    .sort((a, b) => a.need.length - b.need.length);
+}
+
 /** Level pips for a card: ●●○ */
 export const pips = (lvl, max) => '●'.repeat(lvl) + '○'.repeat(Math.max(0, max - lvl));
 

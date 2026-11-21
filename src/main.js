@@ -6,7 +6,7 @@ import { BUILD, versionLabel, fetchLatestBuild } from './version.js';
 import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
-import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboHints, pips } from './upgrades.js';
+import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect } from './util.js';
 import { PLAYER } from './palette.js';
 import { SoundEngine } from './audio.js';
@@ -371,8 +371,11 @@ function renderCards(choices) {
     // Option B: just the gain, in plain words. Specials describe their unique effect instead.
     const gain = u.kind === 'perk' || u.kind === 'cursed' ? gainText(u, stats, player) : [];
     b.querySelector('.gain').textContent = gain.length ? gain.join(' · ') : u.desc;
-    const hints = comboHints(u, game.owned);
-    b.querySelector('.hint').textContent = hints.length ? `🔗 With ${hints[0].partner.name}: unlocks ${hints[0].combo.name}` : '';
+    // Combo hints: loud when this card completes a combo now, quiet when it just has a partner to look for.
+    const partners = comboPartners(u, game.owned), hint = b.querySelector('.hint');
+    if (partners[0]?.partnerOwned) { hint.textContent = `🔗 Completes a combo! + your ${partners[0].partner.name} → ${partners[0].combo.icon} ${partners[0].combo.name}`; hint.classList.add('ready'); }
+    else if (partners.length) hint.textContent = `🔗 Combos with ${partners.map((x) => x.partner.name).join(' or ')}`;
+    else hint.textContent = '';
     const mw = u.kind === 'perk' && lvl === u.max ? masterworkFor(u.id) : null;
     b.querySelector('.lvl').textContent = u.kind === 'combo'
       ? `${u.requires.map((r) => byId(r).name).join(' + ')}`
@@ -454,6 +457,24 @@ $('#btnRenew').addEventListener('click', () => {
   $('#cards button').focus();
 });
 
+/** Pause screen: combos you're half-way to ("Annotated Edition: Hardcover ✓ + Footnotes"). */
+function renderReach(el) {
+  const rows = combosInReach(game.owned);
+  el.textContent = '';
+  el.hidden = !rows.length;
+  if (!rows.length) return;
+  const h = document.createElement('p'); h.className = 'reach-label'; h.textContent = 'Combos in reach'; el.appendChild(h);
+  for (const { combo, have, need } of rows) {
+    const li = document.createElement('div'); li.className = 'reach-row';
+    const name = document.createElement('strong'); name.textContent = `${combo.icon} ${combo.name}`;
+    const recipe = document.createElement('span');
+    recipe.append(...[...have.map((u) => ['have', `${u.icon} ${u.name} ✓`]), ...need.map((u) => ['need', `${u.icon} ${u.name}`])]
+      .flatMap(([cls, t], i) => { const s = document.createElement('span'); s.className = cls; s.textContent = t; return i ? [' + ', s] : [s]; }));
+    li.append(name, recipe);
+    el.appendChild(li);
+  }
+}
+
 /** Library Codex: every combo and Masterwork, found or still a mystery. */
 function renderCodex() {
   const specials = UPGRADES.filter((u) => u.kind === 'combo' || u.kind === 'master');
@@ -471,7 +492,7 @@ function renderCodex() {
       const name = document.createElement('strong'); name.textContent = has ? u.name : '???';
       const how = document.createElement('small');
       how.textContent = has ? u.desc
-        : kind === 'combo' ? 'Own the right two perks to reveal it' : `Take ${byId(u.requires[0]).name} to 3/3`;
+        : kind === 'combo' ? `Recipe: ${u.requires.map((r) => `${byId(r).icon} ${byId(r).name}`).join(' + ')}` : `Take ${byId(u.requires[0]).name} to 3/3`;
       body.append(name, how);
       li.append(ic, body);
       list.appendChild(li);
@@ -485,6 +506,7 @@ function pause() {
   sound.setMuffled(true);
   mouse.down = false;
   renderBuild($('#pauseBuild'));
+  renderReach($('#pauseCombos'));
   showScreen('pause');
   $('#pause button').focus();
 }
@@ -2124,7 +2146,7 @@ function showGameOver() {
     ['Score', score.toLocaleString() + (isBest ? ' ★ new personal best' : '')],
     ...(story ? [] : [['Wave reached', game.wave]]), ['Disturbances shushed', game.kills], ['Best combo', game.bestCombo],
     ['Time on shift', `${Math.floor(game.playTime / 60)}m ${Math.floor(game.playTime % 60)}s`],
-    ['Perks', Object.keys(game.owned).length ? Object.entries(game.owned).map(([k, v]) => `${(UPGRADES.find((u) => u.id === k) || { name: k }).name}${v > 1 ? ' ×' + v : ''}`).join(', ') : 'none'],
+    ...(Object.keys(game.owned).length ? [] : [['Perks', 'none']]),
   ];
   for (const [k, v] of rows) {
     const dt = document.createElement('dt'); dt.textContent = k;
@@ -2140,6 +2162,7 @@ function showGameOver() {
   $('#btnAgain').textContent = story ? (won ? '↻ Replay wing' : '↻ Retry wing') : '↻ Another shift';
   $('#btnAgain').classList.toggle('primary', nextBtn.hidden);
   $('#nameInput').value = loadJSON('overdue.name.v1').name || '';
+  renderBuild($('#goBuild'));
   $('#goBoard').hidden = story;
   showScreen('gameover');
   if (!story) loadLeaderboard($('#goList'));

@@ -115,7 +115,8 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     await page.waitForTimeout(400);
     await page.keyboard.press('Escape');            // pause (Esc toggles; press once only)
     await page.waitForTimeout(300);
-    if (await page.isVisible('#pause')) { await shot(page, `${name}-4-pause`); record(area, 'pause shows build', (await page.textContent('#pauseBuild')).includes('Your build')); await tap('[data-act=resume]'); }
+    if (await page.isVisible('#pause')) { await shot(page, `${name}-4-pause`); record(area, 'pause shows build', (await page.textContent('#pauseBuild')).includes('Your build'));
+      record(area, 'pause shows combos in reach', /Combos in reach[\s\S]*Choose Your Own Adventure/.test(await page.textContent('#pauseCombos'))); await tap('[data-act=resume]'); }
     else record(area, 'pause opens', false);
 
     // Boss fight renders with name plate
@@ -178,12 +179,16 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
       return { state: __overdue.game.state, room: __overdue.game.wave, types: [...seen] };
     });
     record(area, 'elite room spawns elites', eliteRoom.types.length > 0 && eliteRoom.types.filter((t) => !t.startsWith('worm')).every((t) => t.endsWith('★')), JSON.stringify(eliteRoom).slice(0, 200));
-    await page.evaluate(() => { __overdue.startWave(10); __overdue.god(); }); await page.waitForTimeout(3600);
+    // A real build (8 perks) on the way into the boss: the end screen must still fit (iPad bug: buttons fell off-screen)
+    await page.evaluate(() => { const O = __overdue; for (const id of ['trilogy', 'trilogy', 'dewey', 'speedreader', 'interlibrary', 'hardcover', 'hardcover', 'hardcover', 'extendedloan', 'footnotes']) O.grant(id); O.startWave(10); O.god(); });
+    await page.waitForTimeout(3600);
     record(area, 'room 10 boss spawns', await page.evaluate(() => __overdue.enemies.some((e) => e.type === 'boss')));
     await clearRoom(); await page.waitForTimeout(3400);
     await shot(page, `${name}-13-wing-cleared`);
     const won = await page.evaluate(() => ({ title: document.querySelector('#goTitle').textContent, unlocked: __overdue.progress.unlocked, next: !document.querySelector('#btnNextWing').hidden }));
     record(area, 'clearing wing 1 unlocks wing 2', /cleared/i.test(won.title) && won.unlocked === 2 && won.next, JSON.stringify(won));
+    const btns = await page.$$eval('#gameover .menu.row button:not([hidden])', (bs) => bs.map((b) => { const r = b.getBoundingClientRect(); return { t: b.textContent.trim(), ok: r.top >= 0 && r.bottom <= innerHeight + 1 && r.left >= 0 && r.right <= innerWidth + 1 }; }));
+    record(area, 'end-screen buttons on screen with a big build', btns.length >= 3 && btns.every((b) => b.ok), btns.filter((b) => !b.ok).map((b) => b.t).join(', ') || `${btns.length} buttons visible`);
 
     // Reset progress (Settings): needs two taps, then fines, Renovations and unlocks are gone
     await tap('#gameover [data-act=menu]'); await page.waitForTimeout(250);
