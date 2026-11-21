@@ -5,7 +5,7 @@ import { createBackend } from './backend.js';
 import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
-import { baseStats, rollUpgrades } from './upgrades.js';
+import { baseStats, rollUpgrades, UPGRADES } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect } from './util.js';
 import { SoundEngine } from './audio.js';
 
@@ -51,7 +51,7 @@ function applyLayout(force = false) {
   const want = isPortraitScreen();
   if (force || want !== PORTRAIT) {
     setOrientation(want);
-    LAMPS = [[44, 44], [W - 44, 44], [44, H - 44], [W - 44, H - 44]];
+    LAMPS = lampPositions();
     lightCanvas.width = W * LS; lightCanvas.height = H * LS;
     arena = generateArena(game.seed, Math.max(1, game.wave));
     player.x = W / 2; player.y = H / 2;
@@ -156,6 +156,9 @@ function enableTouch() {
   touch.enabled = true;
   document.body.classList.add('touch');
 }
+// Show touch controls from the first touch anywhere on the page (e.g. tapping "Start shift").
+addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') enableTouch(); }, { capture: true });
+if (window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches) enableTouch();
 const btnDash = $('#btnDash'), btnShhh = $('#btnShhh');
 $('#btnDash').addEventListener('pointerdown', (e) => { e.preventDefault(); actions.dash = true; });
 $('#btnShhh').addEventListener('pointerdown', (e) => { e.preventDefault(); actions.shhh = true; });
@@ -281,6 +284,7 @@ function waveCleared() {
 
 function showUpgrades() {
   game.state = 'upgrade';
+  game.bannerT = 0; texts.length = 0;
   sound.setMuffled(true);
   const choices = rollUpgrades(rng, game.owned, 3);
   if (!choices.length) return startWave(game.wave + 1);
@@ -408,7 +412,7 @@ function materialise(type, x, y) {
 function shake(a) { if (settings.motion) game.trauma = Math.min(1, game.trauma + a); }
 function addLight(x, y, r, life, color = null) { flashes.push({ x, y, r, life, max: life, color }); }
 function floatText(x, y, text, color = '#fff', size = 14, life = 0.8) {
-  texts.push({ x, y, text, color, size, life, max: life, vy: -40 });
+  texts.push({ x: clamp(x, 70, W - 70), y: Math.max(y, 78), text, color, size, life, max: life, vy: -40 });
 }
 function particle(p) { if (particles.length < 700) particles.push(p); }
 function burst(x, y, n, colors, speed = 160, life = 0.6, shape = 'sq') {
@@ -483,12 +487,14 @@ function nearestEnemy(x, y, maxD = Infinity) {
 function updatePlayer(dt) {
   const p = player;
   const mv = moveInput();
+  if (mv.x || mv.y) { const l = Math.hypot(mv.x, mv.y); p.lastDx = mv.x / l; p.lastDy = mv.y / l; p.lastMoveT = 0.45; }
+  else p.lastMoveT = Math.max(0, (p.lastMoveT || 0) - dt);
   // Aim: gamepad stick > touch aim > auto-aim (touch) > mouse
   let firing = false;
   if (pad.connected && (pad.ax || pad.ay)) { p.aim = Math.atan2(pad.ay, pad.ax); firing = pad.fire; }
   else if (touch.aimId !== null) { p.aim = Math.atan2(touch.ay - p.y, touch.ax - p.x); firing = true; }
   else if (touch.enabled || (pad.connected && !mouse.seen)) {
-    const t = nearestEnemy(p.x, p.y, 420);
+    const t = nearestEnemy(p.x, p.y, PORTRAIT ? 600 : 460);
     if (t) { p.aim = Math.atan2(t.y - p.y, t.x - p.x); firing = true; }
   } else {
     p.aim = Math.atan2(mouse.y - p.y, mouse.x - p.x);
@@ -505,7 +511,14 @@ function updatePlayer(dt) {
 
   if (actions.dash && p.dashCd <= 0 && game.state !== 'dying') {
     const l = Math.hypot(mv.x, mv.y);
-    p.dx = l ? mv.x / l : Math.cos(p.aim); p.dy = l ? mv.y / l : Math.sin(p.aim);
+    if (l) { p.dx = mv.x / l; p.dy = mv.y / l; }
+    else if (p.lastMoveT > 0) { p.dx = p.lastDx; p.dy = p.lastDy; } // thumb just lifted to tap DASH
+    else if (touch.enabled || pad.connected) {
+      // Standing still on touch/gamepad: dash AWAY from the closest threat, never into it.
+      const t = nearestEnemy(p.x, p.y);
+      const a = t ? Math.atan2(p.y - t.y, p.x - t.x) : p.aim + Math.PI;
+      p.dx = Math.cos(a); p.dy = Math.sin(a);
+    } else { p.dx = Math.cos(p.aim); p.dy = Math.sin(p.aim); } // mouse: dash where you aim
     p.dashT = 0.17; p.dashCd = stats.dashCd;
     sound.play('dash');
     burst(p.x, p.y, 8, ['#9be7dc', '#fff'], 90, 0.3);
@@ -994,7 +1007,8 @@ function buildBackground() {
   // Walls
   g.strokeStyle = '#120b06'; g.lineWidth = 10; g.strokeRect(0, 0, W, H);
 }
-let LAMPS = [[44, 44], [W - 44, 44], [44, H - 44], [W - 44, H - 44]];
+function lampPositions() { return [[26, H * 0.3], [W - 26, H * 0.3], [26, H * 0.66], [W - 26, H * 0.66]]; }
+let LAMPS = lampPositions();
 
 // Light layer: darkness with "holes" punched by light sprites (destination-out), at half resolution.
 const LS = 0.5;
@@ -1088,7 +1102,7 @@ function render() {
     ctx.fillStyle = `rgba(255,40,60,${(settings.motion ? 0.35 : 0.15) * game.flash})`;
     ctx.fillRect(0, 0, W, H);
   }
-  if (game.state !== 'title') drawHUD();
+  if (game.state === 'playing' || game.state === 'waveclear' || game.state === 'dying') drawHUD();
   if (touch.enabled && touch.moveId !== null) drawStick();
   if (!touch.enabled && mouse.seen && (game.state === 'playing' || game.state === 'waveclear')) drawCrosshair();
 }
@@ -1110,6 +1124,7 @@ function drawPlayer() {
   ctx.globalAlpha = p.inv > 0 && Math.floor(game.time * 18) % 2 ? 0.35 : 1;
   ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(p.x + 3, p.y + 10, 12, 5, 0, 0, TAU); ctx.fill();
   ctx.save(); ctx.translate(p.x, p.y + Math.sin(p.walk) * 1.2); ctx.rotate(p.aim);
+  if (touch.enabled) ctx.scale(1.3, 1.3);
   // Cardigan body
   ctx.fillStyle = p.rapidT > 0 ? '#c69c6d' : '#2bb3a3';
   ctx.beginPath(); ctx.ellipse(0, 0, 10, 13, 0, 0, TAU); ctx.fill();
@@ -1321,7 +1336,7 @@ function drawHUD() {
   // Ammo ticker
   if (game.ammo && !game.boss) {
     ctx.globalAlpha = 0.85;
-    txt(`📖 “${short(game.ammo.title, 44)}”${game.ammo.author ? ' — ' + short(game.ammo.author, 20) : ''}`, W / 2, H - 14, 11, '#e8d9b0', 'center');
+    txt(`📖 “${short(game.ammo.title, 44)}”${game.ammo.author ? ' — ' + short(game.ammo.author, 20) : ''}`, W / 2, touch.enabled && PORTRAIT ? 104 : H - 14, 11, '#e8d9b0', 'center');
     ctx.globalAlpha = 1;
   }
   // Boss bar
@@ -1459,7 +1474,7 @@ function showGameOver() {
     ['Score', score.toLocaleString() + (isBest ? ' ★ new personal best' : '')],
     ['Wave reached', game.wave], ['Disturbances shushed', game.kills], ['Best combo', game.bestCombo],
     ['Time on shift', `${Math.floor(game.playTime / 60)}m ${Math.floor(game.playTime % 60)}s`],
-    ['Perks', Object.keys(game.owned).length ? Object.entries(game.owned).map(([k, v]) => `${k}×${v}`).join(', ') : 'none'],
+    ['Perks', Object.keys(game.owned).length ? Object.entries(game.owned).map(([k, v]) => `${(UPGRADES.find((u) => u.id === k) || { name: k }).name}${v > 1 ? ' ×' + v : ''}`).join(', ') : 'none'],
   ];
   for (const [k, v] of rows) {
     const dt = document.createElement('dt'); dt.textContent = k;

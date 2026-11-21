@@ -129,3 +129,7 @@ body.touch .no-touch { display: none; }
 body.portrait h2 { font-size: 1.6em; }
 /* cooldown ring on touch buttons: --k goes 0 → 1 as the ability recharges */
 #btnDash, #btnShhh { --k: 1; background-image: conic-gradient(rgba(255,255,255,.28) calc(var(--k) * 360deg), transparent 0); }
+
+/* Even two-column layouts (How to play, Game over) */
+.cols > * { flex: 1 1 18em; max-width: 26em; min-width: 0; }
+.bestiary { max-width: none; }
