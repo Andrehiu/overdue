@@ -27,8 +27,8 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 | 1.4.1 | **Remove the meme book-title text:** HUD bottom line, wave-banner subtitle and floating kill titles (catalogue kept: bosses are named after authors) | Shipped 2026-11-21 (with 1.5.0) |
 | 1.4.2 | **Menus fit:** sticky Back row on every menu, Renovations/Settings fit short screens, safe areas (Codex Back was cut on every device) | Shipped 2026-11-21 (with 1.5.0) |
 | 1.5.0 | **Build strip:** owned perks as chips with short names, combo partner glows, tap a chip for details | Shipped 2026-11-21 (live, b6e745d), incl. reset note kept on short screens |
-| 1.6.0 | **Room shapes per story wing:** aisles, pillars, maze, reading room, bridge (+ today's scatter); 2–3 per wing; rooms 5/10 open; endless layouts unchanged | In progress: coder session "Overdue · v1.6.0 room shapes". Handoff: `docs/handoffs/1.6.0-room-shapes.md` |
-| 1.7.0 | **Pick your next door** (story): 2 doors after rooms 1–3 and 6–8: 💰 Rare Books (+0.5 elite share, ×2 fines), ☕ Break Room (heal 1, ×0.5 fines min 3), 🎲 Mystery Shelf (cursed book or bonus perk); 🚪 Stacks replaces Break Room at full HP | In progress: coder session "Overdue · v1.7.0 doors" (owner defaults; owner will test balance). Handoff: `docs/handoffs/1.7.0-doors.md` |
+| 1.6.0 | **Room shapes per story wing:** aisles, pillars, maze, reading room, bridge (+ today's scatter); 2–3 per wing; rooms 5/10 open; endless layouts unchanged | Merged + QA green on claude/brave-galileo-jyg38o; held for owner balance test |
+| 1.7.0 | **Pick your next door** (story): 2 doors after rooms 1–3 and 6–8: 💰 Rare Books (+0.5 elite share, ×2 fines), ☕ Break Room (heal 1, ×0.5 fines min 3), 🎲 Mystery Shelf (cursed book or bonus perk); 🚪 Stacks replaces Break Room at full HP | Merged with 1.6.0 (888de3c), QA green; held for owner balance test. Balance bot running (handoff docs/handoffs/1.7.1-balance-bot.md) |
 | — | **Bigger map (parked):** ~40×24 cells (1.7× floor), camera follows the player with a dead zone; light layer screen-sized (same look; owner OK needed since CLAUDE.md says keep lighting); auto-aim only on screen; spawns just off-screen; edge arrows for off-screen enemies; perf budget must hold. Build behind `?bigmap=1` first | Parked: 1.3.1 fixed the cramped feeling. Revisit only if it comes back |
 
 ### 1.3.1 phone checklist (wing 1, rooms 1–10)
@@ -38,6 +38,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 Report problems as "row + wing/room + what happened".
 
 ## Next ideas
+Morning brief: `docs/plans/morning-brief.md`. Room Atlas (private): https://claude.ai/artifact/5kXSXFYFDShVAGw81fPhzS
 Ranked proposals for 1.8+ with draft handoffs: `docs/plans/next-ideas.md` (story beats → room goals → balance pass → Daily Shift → weapons).
 
 ## Parked ideas
