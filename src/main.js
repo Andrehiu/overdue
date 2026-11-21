@@ -1,6 +1,6 @@
 // OVERDUE! — Night Shift at the Meme Library
 // Engine: fixed-timestep loop, flow-field AI, dynamic lighting, procedural audio, roguelite perks.
-import { W, H, CELL, COLS, ROWS, SAFE, PORTRAIT, setOrientation, generateArena, isSolidPx, cellOf, edgeCells, idx } from './arena.js';
+import { W, H, CELL, COLS, ROWS, SAFE, PORTRAIT, setGrid, gridForAspect, generateArena, isSolidPx, cellOf, edgeCells, idx } from './arena.js';
 import { createBackend } from './backend.js';
 import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
@@ -48,9 +48,9 @@ let dpr = 1, viewScale = 1;
 const isPortraitScreen = () => innerHeight > innerWidth * 1.15;
 /** Pick the arena shape for the current screen. Only called between runs. */
 function applyLayout(force = false) {
-  const want = isPortraitScreen();
-  if (force || want !== PORTRAIT) {
-    setOrientation(want);
+  const [cols, rows] = gridForAspect(innerWidth / innerHeight);
+  if (force || cols !== COLS || rows !== ROWS) {
+    setGrid(cols, rows);
     LAMPS = lampPositions();
     lightCanvas.width = W * LS; lightCanvas.height = H * LS;
     arena = generateArena(game.seed, Math.max(1, game.wave));
@@ -1900,6 +1900,8 @@ function frame(now) {
 }
 
 applyLayout(true);
+// iPhones have no Fullscreen API: hide the button rather than show one that does nothing.
+if (!document.fullscreenEnabled) document.querySelectorAll('.fs-only').forEach((el) => el.remove());
 updateSourceBadge();
 showScreen('title');
 document.body.classList.add('ready');

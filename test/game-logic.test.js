@@ -241,3 +241,21 @@ test('home-screen app: manifest icons exist and the Pages deploy ships them', as
   const pages = readFileSync(new URL('.github/workflows/pages.yml', root), 'utf8');
   assert.ok(pages.includes('icons') && pages.includes('manifest.webmanifest'), 'Pages deploy copies icons + manifest');
 });
+
+test('arena shape fits the screen: phones, iPads, laptops, desktops', async () => {
+  const A = await load('arena');
+  const cases = [[390 / 844, 18, 32], [1920 / 1080, 32, 18], [1180 / 820, 28, 20], [2.4, 32, 18], [0.3, 18, 32]];
+  for (const [aspect, c, r] of cases) assert.deepEqual(A.gridForAspect(aspect), [c, r], `aspect ${aspect}`);
+  try {
+    for (const aspect of [0.46, 0.69, 0.75, 1.0, 1.33, 1.42, 1.6, 1.78, 2.2]) {
+      const [cols, rows] = A.gridForAspect(aspect);
+      assert.equal(cols % 2, 0, 'even columns for mirror symmetry');
+      A.setGrid(cols, rows);
+      for (let wave = 1; wave <= 12; wave++) {
+        const a = A.generateArena(77, wave);
+        assert.ok(A.isConnected(a.solid), `connected ${cols}x${rows} wave ${wave}`);
+        for (let y = A.SAFE.y0; y <= A.SAFE.y1; y++) for (let x = A.SAFE.x0; x <= A.SAFE.x1; x++) assert.equal(a.solid[A.idx(x, y)], 0);
+      }
+    }
+  } finally { A.setOrientation(false); }
+});

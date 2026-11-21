@@ -12,14 +12,28 @@ export let H = ROWS * CELL;
 export let SAFE = { x0: 12, y0: 6, x1: 19, y1: 11 };
 export let PORTRAIT = false;
 
-/** Switch between the landscape and portrait arena. Call only between runs. */
-export function setOrientation(portrait) {
-  PORTRAIT = !!portrait;
-  COLS = portrait ? 18 : 32;
-  ROWS = portrait ? 32 : 18;
-  W = COLS * CELL; H = ROWS * CELL;
-  const hw = portrait ? 3 : 4, hh = portrait ? 4 : 3; // half-size of the clear zone
+/** Use an arena of `cols` x `rows` cells. Call only between runs. */
+export function setGrid(cols, rows) {
+  COLS = cols; ROWS = rows; W = COLS * CELL; H = ROWS * CELL;
+  PORTRAIT = ROWS > COLS;
+  const hw = PORTRAIT ? 3 : 4, hh = PORTRAIT ? 4 : 3; // half-size of the clear zone
   SAFE = { x0: (COLS >> 1) - hw, y0: (ROWS >> 1) - hh, x1: (COLS >> 1) + hw - 1, y1: (ROWS >> 1) + hh - 1 };
+}
+
+/** Switch between the classic landscape (32x18) and phone-portrait (18x32) arenas. */
+export function setOrientation(portrait) { setGrid(portrait ? 18 : 32, portrait ? 32 : 18); }
+
+/**
+ * Pick an arena shape that matches the screen, so there are no big black bars:
+ * 16:9 desktop -> 32x18, iPad landscape -> 28x20, iPad portrait -> 20x28, phone portrait -> 18x32.
+ * Keeps roughly the same number of cells (same amount of room to play) and an even column count.
+ */
+export function gridForAspect(aspect) {
+  const a = clamp(aspect || 16 / 9, 18 / 32, 32 / 18);
+  let rows = Math.round(Math.sqrt(576 / a));
+  let cols = Math.round((rows * a) / 2) * 2;
+  cols = clamp(cols, 18, 32); rows = clamp(rows, 18, 32);
+  return [cols, rows];
 }
 
 export const idx = (cx, cy) => cy * COLS + cx;

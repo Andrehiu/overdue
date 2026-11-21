@@ -270,3 +270,15 @@ body.touch .cards .card .key { display: none; }
 /* phones: punch hole in the left margin; cards in thumb reach */
 body.portrait .cards .card::after { left: .85em; top: 50%; bottom: auto; margin-left: 0; margin-top: -.35em; }
 body.portrait #upgrade { justify-content: flex-end; padding-bottom: 3em; }
+
+/* ---- Menus never clip ----
+   Centre when the content fits; when it doesn't (short screens), start at the top and scroll,
+   instead of pushing the title off the top where it can't be reached. */
+.screen { justify-content: flex-start; }
+.screen > :first-child { margin-top: auto; }
+.screen > :last-child { margin-bottom: auto; }
+body.portrait #upgrade > :last-child { margin-bottom: 0; }
+/* Short stages (landscape phones, iPads with the browser bar): tighter title screen */
+@media (max-height: 640px) { .logo { font-size: 3.4em; } .blurb { display: none; } .menu { gap: .4em; } .menu button { padding: .45em 1.2em; } }
+/* Fullscreen button only where it can work: hidden when launched from the Home Screen */
+@media (display-mode: standalone), (display-mode: fullscreen) { .fs-only { display: none !important; } }
