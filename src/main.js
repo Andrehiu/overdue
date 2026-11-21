@@ -951,7 +951,7 @@ function updateEnemies(dt) {
         e.atkT -= dt;
         if (e.atkT <= 0) {
           e.atkT = Math.max(1.6, 3 - game.wave * 0.06);
-          rings.push({ x: e.x, y: e.y, r: e.r, max: 280, speed: 140, width: 12, life: 1 });
+          rings.push({ x: e.x, y: e.y, r: e.r, max: 196, speed: 140, width: 12, life: 1 });
           sound.play('ring');
         }
         break;
