@@ -10,19 +10,33 @@ export const ENEMY_TYPES = {
 
 export const isBossWave = (w) => w > 0 && w % 5 === 0;
 
+/** Threat budget before the boss-wave discount. */
+export const baseBudget = (w) => 5 + w * 3.5 + Math.pow(w, 1.35) * 0.5;
+
 export function waveBudget(w) {
-  const b = 5 + w * 3.5 + Math.pow(w, 1.35) * 0.5;
+  const b = baseBudget(w);
   return isBossWave(w) ? b * 0.35 : b;
 }
 
-/** Returns {wave, boss, spawns:[{type, t}]} sorted by spawn time t (seconds). */
-export function composeWave(wave, rng) {
-  let budget = waveBudget(wave);
+/**
+ * Returns {wave, boss, spawns:[{type, t, elite?}]} sorted by spawn time t (seconds).
+ * `opts` (story mode; endless passes nothing and plays exactly as before):
+ *   boss        override whether a boss joins (default: every 5th wave)
+ *   budget      override the threat budget
+ *   weights     {type: multiplier} to theme a wing (0 removes a type)
+ *   unlockShift unlock enemy types this many waves earlier
+ *   gapMult     scales the time between spawn groups (<1 = more pressure)
+ *   eliteChance chance each enemy (not worms) spawns as an elite
+ */
+export function composeWave(wave, rng, opts = {}) {
+  const boss = opts.boss ?? isBossWave(wave);
+  let budget = opts.budget ?? waveBudget(wave);
   const spawns = [];
-  const gap = Math.max(0.55, 2.3 - wave * 0.09);
+  const gap = Math.max(0.45, (2.3 - wave * 0.09) * (opts.gapMult ?? 1));
+  const shift = opts.unlockShift || 0;
   const unlocked = Object.entries(ENEMY_TYPES)
-    .filter(([, d]) => d.unlock <= wave)
-    .map(([type, d]) => ({ type, ...d }));
+    .filter(([type, d]) => d.unlock - shift <= wave && (opts.weights?.[type] ?? 1) > 0)
+    .map(([type, d]) => ({ type, ...d, weight: d.weight * (opts.weights?.[type] ?? 1) }));
   let t = 0.8;
   for (let guard = 0; guard < 500; guard++) {
     const options = unlocked.filter((d) => d.cost <= budget + 1e-9);
@@ -31,12 +45,14 @@ export function composeWave(wave, rng) {
     const maxCount = Math.max(1, Math.min(def.maxGroup, Math.floor(budget / def.cost)));
     const count = rng.int(1, maxCount);
     for (let i = 0; i < count; i++) {
-      spawns.push({ type: def.type, t: +(t + i * 0.2).toFixed(3) });
+      const s = { type: def.type, t: +(t + i * 0.2).toFixed(3) };
+      if (opts.eliteChance && def.type !== 'worm' && rng.chance(opts.eliteChance)) s.elite = true;
+      spawns.push(s);
       budget -= def.cost;
     }
     t += gap * (0.7 + rng.next() * 0.6);
   }
-  if (isBossWave(wave)) spawns.push({ type: 'boss', t: 1.2 });
+  if (boss) spawns.push({ type: 'boss', t: 1.2 });
   spawns.sort((a, b) => a.t - b.t);
-  return { wave, boss: isBossWave(wave), spawns };
+  return { wave, boss, spawns };
 }

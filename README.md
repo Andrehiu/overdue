@@ -24,6 +24,28 @@ Or play online at **https://andrehiu.github.io/overdue/**. On a phone, use **Sha
 
 ## What's inside
 
+- **Two modes:**
+  - **Story: the library wings.** Ten handmade wings (Front Desk, Children's Wing, Periodicals … The Restricted Section), unlocked in order. A run is one wing of **10 rooms**: pick a perk after every room. Room 5 is an **elite room**, and room 10 is a **Rogue Author**. Each room is harder than the last, and each wing is harder than the one before it:
+    - tougher, faster enemies, and more of them;
+    - a growing share of **★ elites**, which wear a gold crown and fire pages at you (from wing 7, three at a time);
+    - faster enemy pages;
+    - elites burst into pages when they die (from wing 4);
+    - bosses learn a new pattern every 3 wings.
+
+    Each wing has its own enemy mix, shelf density, floor and rug. Shelf layouts are the same every time you play a room.
+  - **Endless shift:** the original wave mode with the Hall of Fame. It plays exactly as before.
+- **Late fees (permanent progression):** every run earns **fines 🪙**:
+  - from Late Fee Golem coins, cleared rooms or waves, elite rooms and bosses;
+  - plus a one-time bonus the first time you clear a wing.
+
+  Fines are banked when a run ends, **even if you lose or quit**. Spend them on **Renovations**, permanent upgrades for both modes:
+  - +10% damage (×10), +1 heart (×3), +8% throw speed (×5), +5% move speed (×5);
+  - a 4th perk card;
+  - start with random perks;
+  - extra Banishes and Renews;
+  - +20% fines (×5);
+  - **Second Wind**, a once-per-run revive.
+
 - **Enemies:** Dust Bunny, Overdue Notice, Loud Patron, Bookworm and Late Fee Golem, plus a three-phase **Rogue Author** boss every 5th wave.
 - **Perks between waves:**
   - **15 core perks**, including shelf-play perks: Spine Breaker makes books burst on shelves, Reading Nook speeds up throwing next to a shelf, and Interlibrary Loan sends books back through the opposite wall.
@@ -62,6 +84,8 @@ src/main.js         game loop (fixed 120 Hz), entities, AI, rendering, lighting,
 src/arena.js        procedural shelf layouts + connectivity check            (unit-tested)
 src/flowfield.js    Dijkstra flow field + grid line of sight                 (unit-tested)
 src/waves.js        budget-based, seeded wave composer                       (unit-tested)
+src/story.js        story wings: rooms, difficulty curve, rewards            (unit-tested)
+src/meta.js         late fees: fines, Renovations, saved progress            (unit-tested)
 src/upgrades.js     perk definitions + weighted roller                       (unit-tested)
 src/util.js         seeded RNG, hashing, collision helpers                   (unit-tested)
 src/audio.js        Web Audio synth: sound effects + look-ahead music sequencer

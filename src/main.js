@@ -9,6 +9,8 @@ import { composeWave } from './waves.js';
 import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboHints, pips } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect } from './util.js';
 import { SoundEngine } from './audio.js';
+import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, difficulty, composeRoom, layoutSeed, roomReward } from './story.js';
+import { PROGRESS_KEY, RENOVATIONS, normalizeProgress, applyRenovations, runBonuses, recordRun, level, nextCost, canBuy, buy } from './meta.js';
 
 // ======================================================================
 // Setup, settings, content
@@ -28,6 +30,12 @@ const sound = new SoundEngine();
 sound.sfxOn = settings.sfx; sound.musicOn = settings.music;
 
 const content = CATALOGUE;
+
+// Late fees: permanent progression (fines + Renovations + story unlocks). Its own key; no old save is touched.
+let progress = normalizeProgress(loadJSON(PROGRESS_KEY));
+const saveProgress = () => saveJSON(PROGRESS_KEY, progress);
+const isStory = () => game.mode === 'story';
+const wingDef = () => WINGS[(game.wingN || 1) - 1];
 const backend = createBackend();
 
 function updateSourceBadge() {
@@ -108,7 +116,7 @@ function onKeyPress(k) {
     if (k === 'KeyE' || k === 'KeyQ') actions.shhh = true;
     if (k === 'KeyP' || k === 'Escape') pause();
   } else if (game.state === 'paused' && (k === 'KeyP' || k === 'Escape')) resume();
-  else if (game.state === 'upgrade' && /^Digit[1-3]$/.test(k)) {
+  else if (game.state === 'upgrade' && /^Digit[1-4]$/.test(k)) {
     const b = document.querySelectorAll('#cards .card')[+k.slice(5) - 1];
     if (b && cardsArmed()) b.click();
   } else if (game.state === 'title' && (k === 'Enter') && !document.activeElement?.matches('button')) startRun();
@@ -206,6 +214,7 @@ const game = {
   state: 'title', wave: 0, score: 0, kills: 0, combo: 0, comboT: 0, bestCombo: 0, time: 0, playTime: 0,
   seed: 1, freeze: 0, timeScale: 1, trauma: 0, flash: 0, banner: '', bannerSub: '', bannerT: 0,
   owned: {}, noHitWave: true, clearT: 0, boss: null, deathT: 0, waveT: 0, ammoT: 0, ammo: null,
+  mode: 'endless', wingN: 1, diff: null, fines: 0, cards: 3, banked: null, wingCleared: false,
 };
 let stats = baseStats();
 let player = makePlayer();
@@ -217,7 +226,7 @@ let spawnQueue = [];
 const enemies = [], books = [], hazards = [], rings = [], particles = [], texts = [], pickups = [], telegraphs = [], flashes = [];
 
 function makePlayer() {
-  return { x: W / 2, y: H / 2, vx: 0, vy: 0, r: 11, hp: 5, aim: 0, fireT: 0, dashT: 0, dashCd: 0, dashStock: 1, throws: 0, streak: 0, amnesty: false, dx: 1, dy: 0,
+  return { x: W / 2, y: H / 2, vx: 0, vy: 0, r: 11, hp: 5, aim: 0, fireT: 0, dashT: 0, dashCd: 0, dashStock: 1, throws: 0, streak: 0, amnesty: false, dx: 1, dy: 0, revives: 0,
     inv: 0, shhhT: 0, rapidT: 0, walk: 0, trail: [] };
 }
 
@@ -232,18 +241,26 @@ async function keepAwake() {
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && game.state === 'playing') keepAwake(); });
 
-function startRun() {
+/** mode 'endless' (classic waves) or 'story' (one wing of ROOMS_PER_WING rooms). */
+function startRun(mode = 'endless', wing = 1) {
   sound.init();
   keepAwake();
   applyLayout();
   game.seed = (Math.random() * 1e9) | 0;
   rng = new Rng(game.seed);
-  Object.assign(game, { wave: 0, score: 0, kills: 0, combo: 0, comboT: 0, bestCombo: 0, playTime: 0, owned: {}, renews: 0, banishes: 1, banished: new Set(),
-    freeze: 0, timeScale: 1, trauma: 0, flash: 0, boss: null });
-  stats = baseStats();
+  const bonus = runBonuses(progress);
+  Object.assign(game, { wave: 0, score: 0, kills: 0, combo: 0, comboT: 0, bestCombo: 0, playTime: 0, owned: {}, renews: bonus.renews, banishes: bonus.banishes, banished: new Set(),
+    freeze: 0, timeScale: 1, trauma: 0, flash: 0, boss: null, mode, wingN: mode === 'story' ? clamp(wing, 1, WINGS.length) : 1, diff: null,
+    fines: 0, cards: bonus.cards, banked: null, wingCleared: false });
+  stats = applyRenovations(baseStats(), progress);
   player = makePlayer();
   player.hp = stats.maxHp;
+  player.revives = bonus.revives;
+  // Head Start: free random perks (never specials) before room/wave 1.
+  const head = bonus.startPerks ? rollUpgrades(rng, game.owned, bonus.startPerks, rollOpts({ noSpecial: true })) : [];
+  for (const u of head) { game.owned[u.id] = (game.owned[u.id] || 0) + 1; u.apply(stats, player); }
   startWave(1);
+  if (head.length) toast(`🎒 Head Start: ${head.map((u) => u.name).join(' + ')}`);
 }
 
 function clearWorld() {
@@ -255,15 +272,20 @@ function clearWorld() {
 function startWave(n) {
   game.wave = n;
   clearWorld();
-  arena = generateArena(game.seed, n);
+  game.diff = isStory() ? difficulty(game.wingN, n) : null;
+  // Story rooms keep the same shelf layout every time you play them, like handmade levels.
+  arena = isStory() ? generateArena(layoutSeed(game.wingN, n), n, game.diff.shelvesPerHalf) : generateArena(game.seed, n);
   buildBackground();
   flowCell = -1;
   player.x = W / 2; player.y = H / 2; player.vx = player.vy = 0;
-  spawnQueue = composeWave(n, rng).spawns;
+  spawnQueue = (isStory() ? composeRoom(game.wingN, n, rng) : composeWave(n, rng)).spawns;
   game.waveT = 0; game.noHitWave = true; game.boss = null;
   game.ammo = pickBook(); game.ammoT = 0;
   player.dashStock = stats.dashCharges; player.dashCd = 0; player.amnesty = stats.amnesty;
-  banner(`WAVE ${n}`, n % 5 === 0 ? 'A rogue author approaches…' : `“${short(game.ammo.title, 40)}” is loaded`);
+  if (isStory()) {
+    const kind = game.diff.kind;
+    banner(`ROOM ${n}/${ROOMS_PER_WING}`, kind === 'boss' ? 'A rogue author approaches…' : kind === 'elite' ? '★ Elite room: they fight back' : wingDef().name);
+  } else banner(`WAVE ${n}`, n % 5 === 0 ? 'A rogue author approaches…' : `“${short(game.ammo.title, 40)}” is loaded`);
   sound.setIntensity(1); sound.setMuffled(false);
   game.state = 'playing';
   showScreen(null);
@@ -279,16 +301,26 @@ function banner(text, sub = '') {
 function waveCleared() {
   const bonus = Math.round((250 * game.wave + (game.noHitWave ? 500 : 0)) * stats.scoreMult);
   game.score += bonus;
-  banner('SHELF CLEARED!', `+${bonus.toLocaleString()} ${game.noHitWave ? '(flawless bonus!)' : ''}`);
+  // Fines for the clear: story rooms pay by room type; endless pays more every 5 waves and for bosses.
+  const fine = isStory() ? roomReward(game.wingN, game.wave) : 1 + Math.floor(game.wave / 5) + (game.wave % 5 === 0 ? 15 : 0);
+  game.fines += fine;
+  const wingDone = isStory() && game.wave >= BOSS_ROOM;
+  banner(wingDone ? 'WING CLEARED!' : 'SHELF CLEARED!', `+${bonus.toLocaleString()} · +${fine} 🪙${game.noHitWave ? ' · flawless!' : ''}`);
   if (stats.regenPerWave && player.hp < stats.maxHp) {
     player.hp = Math.min(stats.maxHp, player.hp + stats.regenPerWave);
     floatText(player.x, player.y - 24, '+1 ♥ Lifetime Membership', '#ff6b81', 13, 1.4);
   }
+  // Reading break after the elite room: a heart back before the second half of the wing.
+  if (isStory() && game.wave === ELITE_ROOM && player.hp < stats.maxHp) {
+    player.hp = Math.min(stats.maxHp, player.hp + 1);
+    floatText(player.x, player.y - 40, '+1 ♥ Reading break', '#ff6b81', 13, 1.4);
+  }
+  game.wingCleared = wingDone;
   sound.play('wave');
   for (const h of hazards) burst(h.x, h.y, 3, ['#ff6b6b', '#fff'], 60, 0.3);
   hazards.length = 0; rings.length = 0;
   game.state = 'waveclear';
-  game.clearT = 1.8;
+  game.clearT = wingDone ? 2.6 : 1.8;
   // Vacuum up leftover pickups for convenience.
   for (const p of pickups) p.magnet = true;
 }
@@ -297,9 +329,9 @@ function showUpgrades() {
   game.state = 'upgrade';
   game.bannerT = 0; texts.length = 0;
   sound.setMuffled(true);
-  const choices = rollUpgrades(rng, game.owned, 3, rollOpts());
+  const choices = rollUpgrades(rng, game.owned, game.cards || 3, rollOpts());
   if (!choices.length) return startWave(game.wave + 1);
-  $('#upgradeTitle').textContent = `Wave ${game.wave} cleared — choose a perk`;
+  $('#upgradeTitle').textContent = isStory() ? `Room ${game.wave}/${ROOMS_PER_WING} cleared — choose a perk` : `Wave ${game.wave} cleared — choose a perk`;
   renderCards(choices);
   showScreen('upgrade');
   if (!touch.enabled) $('#cards button').focus();
@@ -418,7 +450,7 @@ $('#btnRenew').addEventListener('click', () => {
   if (!(game.renews > 0) || game.state !== 'upgrade' || !cardsArmed()) return;
   game.renews--;
   sound.play('pickup');
-  renderCards(rollUpgrades(rng, game.owned, 3, rollOpts()));
+  renderCards(rollUpgrades(rng, game.owned, game.cards || 3, rollOpts()));
   $('#cards button').focus();
 });
 
@@ -487,12 +519,23 @@ const DEF = {
   boss: { r: 40, hp: 1, speed: 60, score: 2000 },
 };
 
+/** Enemy HP multiplier for the current wave/room (story wings multiply on top of the room curve). */
+const hpScaleNow = () => (game.diff ? game.diff.hpMult : 1 + Math.max(0, game.wave - 1) * 0.08);
 function makeEnemy(type, x, y, extra = {}) {
   const d = DEF[type];
-  const hpScale = 1 + Math.max(0, game.wave - 1) * 0.08;
-  const hp = Math.max(1, Math.round(d.hp * (d.hp > 1 ? hpScale : 1)));
-  const e = { type, x, y, vx: 0, vy: 0, r: d.r, hp, maxHp: hp, speed: d.speed * (1 + Math.min(0.35, game.wave * 0.015)) * stats.enemySpeedMult,
+  const hpScale = hpScaleNow();
+  // Story: even 1-HP enemies toughen up in later wings (only the wing part of the curve).
+  const oneHp = game.diff ? Math.max(1, Math.floor(1 + 0.22 * (game.wingN - 1))) : 1;
+  const hp = Math.max(1, Math.round(d.hp > 1 ? d.hp * hpScale : oneHp));
+  const speedScale = game.diff ? game.diff.speedMult : 1 + Math.min(0.35, game.wave * 0.015);
+  const e = { type, x, y, vx: 0, vy: 0, r: d.r, hp, maxHp: hp, speed: d.speed * speedScale * stats.enemySpeedMult,
     score: d.score, t: Math.random() * 10, stun: 0, flash: 0, dead: false, leader: null, atkT: 1.5 + Math.random() * 1.5, orbitHit: 0, ...extra };
+  // Elites: bigger, ~2.2x HP, worth double, and they fire aimed pages (story mode).
+  if (e.elite) {
+    e.hp = e.maxHp = Math.max(2, Math.round(e.hp * 2.2));
+    e.r = Math.round(e.r * 1.25); e.score *= 2;
+    e.shootT = 1.2 + Math.random() * (game.diff ? game.diff.eliteShootEvery : 3);
+  }
   enemies.push(e);
   return e;
 }
@@ -512,7 +555,7 @@ function updateSpawning(dt) {
   while (spawnQueue.length && spawnQueue[0].t <= game.waveT) {
     const s = spawnQueue.shift();
     const p = s.type === 'boss' ? { x: W / 2, y: 130 } : spawnPoint();
-    telegraphs.push({ type: s.type, x: p.x, y: p.y, t: 0, dur: s.type === 'boss' ? 1.6 : 0.85 });
+    telegraphs.push({ type: s.type, x: p.x, y: p.y, t: 0, dur: s.type === 'boss' ? 1.6 : 0.85, elite: !!s.elite });
     sound.play('spawn');
   }
   for (let i = telegraphs.length - 1; i >= 0; i--) {
@@ -520,29 +563,30 @@ function updateSpawning(dt) {
     tg.t += dt;
     if (tg.t >= tg.dur) {
       telegraphs.splice(i, 1);
-      materialise(tg.type, tg.x, tg.y);
+      materialise(tg.type, tg.x, tg.y, tg.elite);
     }
   }
 }
 
-function materialise(type, x, y) {
+function materialise(type, x, y, elite = false) {
   if (type !== 'boss') { x += (Math.random() - 0.5) * 8; y += (Math.random() - 0.5) * 8; }
-  burst(x, y, 14, ['#b48cff', '#fff'], 120, 0.5);
+  burst(x, y, 14, elite ? ['#ffd54a', '#fff'] : ['#b48cff', '#fff'], 120, 0.5);
   if (type === 'worm') {
-    let prev = makeEnemy('worm', x, y, { hp: Math.round(4 * (1 + game.wave * 0.08)), head: true });
+    const headHp = game.diff ? 4 * (1 + game.wave * 0.08) * (1 + 0.22 * (game.wingN - 1)) : 4 * (1 + game.wave * 0.08);
+    let prev = makeEnemy('worm', x, y, { hp: Math.round(headHp), head: true });
     prev.maxHp = prev.hp;
     for (let i = 0; i < 6; i++) prev = makeEnemy('worm', x, y, { leader: prev });
   } else if (type === 'boss') {
-    const hp = 110 + game.wave * 22;
+    const hp = game.diff ? game.diff.bossHp : 110 + game.wave * 22;
     const name = pickAuthor(), hue = hashString(name) % 360;
-    const e = makeEnemy('boss', x, y, { hp, maxHp: hp, name, atkT: 2, spiral: 0, summonT: 6, mode: 'idle', modeT: 0,
+    const e = makeEnemy('boss', x, y, { hp, maxHp: hp, name, atkT: 2, spiral: 0, summonT: 6, mode: 'idle', modeT: 0, tier: game.diff ? game.diff.bossTier : 0,
       cover: `hsl(${hue} 45% 30%)`, spineCol: `hsl(${hue} 50% 16%)`, iris: `hsl(${(hue + 180) % 360} 75% 60%)`,
       glow: `hsla(${hue}, 80%, 60%, 1)`, bar: `hsl(${hue} 65% 55%)` });
     game.boss = e;
     banner(`ROGUE AUTHOR`, e.name);
     sound.play('boss'); sound.setIntensity(2);
     shake(0.7);
-  } else makeEnemy(type, x, y);
+  } else makeEnemy(type, x, y, elite ? { elite: true } : {});
 }
 
 // ======================================================================
@@ -604,7 +648,7 @@ function step(dt) {
   if (game.ammoT > 7) { game.ammoT = 0; game.ammo = pickBook(); }
 
   if (game.state === 'playing' && !spawnQueue.length && !telegraphs.length && !enemies.length) waveCleared();
-  if (game.state === 'waveclear') { game.clearT -= dt; if (game.clearT <= 0) showUpgrades(); }
+  if (game.state === 'waveclear') { game.clearT -= dt; if (game.clearT <= 0) (game.wingCleared ? showGameOver() : showUpgrades()); }
   if (game.state === 'dying') { game.deathT -= dt; if (game.deathT <= 0) showGameOver(); }
   actions.dash = actions.shhh = false;
 }
@@ -895,6 +939,17 @@ function updateEnemies(dt) {
       }
       case 'boss': bossAI(e, dt); break;
     }
+    // Elites return fire: an aimed page (a 3-page fan from wing 7) when they can see you.
+    if (e.elite && e.stun <= 0 && game.state === 'playing') {
+      e.shootT -= dt;
+      if (e.shootT <= 0) {
+        e.shootT = (game.diff ? game.diff.eliteShootEvery : 3) * (0.8 + Math.random() * 0.4);
+        if (lineOfSight(arena.solid, COLS, ROWS, CELL, e.x, e.y, p.x, p.y)) {
+          const a = Math.atan2(p.y - e.y, p.x - e.x);
+          if (game.diff && game.diff.bossTier >= 2) fan(e.x, e.y, a, 3, 0.2, 150); else { shootHazard(e.x, e.y, a, 150); sound.play('shoot'); }
+        }
+      }
+    }
     if (e.type !== 'boss' || e.mode !== 'charge') { e.x += (mx + e.vx) * dt; e.y += (my + e.vy) * dt; }
   }
   // Separation (cheap O(n²); n stays < ~100) + world collision
@@ -956,21 +1011,32 @@ function bossAI(e, dt) {
   e.x += ((dx / d) * want * e.speed + Math.cos(e.t * 0.7) * 30) * dt;
   e.y += ((dy / d) * want * e.speed + Math.sin(e.t * 0.9) * 20) * dt;
   e.atkT -= dt;
-  if (phase === 1 && e.atkT <= 0) { e.atkT = 1.25; fan(e.x, e.y, aim, 5, 0.22, 210); }
+  // Story bosses learn a pattern every 3 wings (tier 0..3): wider fans, more spiral arms, elite summons.
+  const tier = e.tier || 0;
+  if (phase === 1 && e.atkT <= 0) { e.atkT = 1.25; fan(e.x, e.y, aim, tier >= 1 ? 7 : 5, 0.22, 210); }
   if (phase === 2) {
     e.spiral += dt * 2.3;
-    if (e.atkT <= 0) { e.atkT = 0.14; for (const o of [0, Math.PI]) shootHazard(e.x, e.y, e.spiral + o, 165); }
+    const arms = tier >= 2 ? [0, TAU / 3, (2 * TAU) / 3] : [0, Math.PI];
+    if (e.atkT <= 0) { e.atkT = tier >= 2 ? 0.17 : 0.14; for (const o of arms) shootHazard(e.x, e.y, e.spiral + o, 165); }
     e.summonT -= dt;
-    if (e.summonT <= 0) { e.summonT = 7; for (let i = 0; i < 3; i++) telegraphs.push({ type: 'bunny', ...spawnPoint(), t: 0, dur: 0.85 }); }
+    if (e.summonT <= 0) {
+      e.summonT = 7;
+      for (let i = 0; i < 3; i++) telegraphs.push({ type: tier >= 3 ? 'notice' : 'bunny', ...spawnPoint(), t: 0, dur: 0.85, elite: tier >= 3 && i === 0 });
+    }
   }
   if (phase === 3) {
     if (e.atkT <= 0) {
-      if (Math.random() < 0.5) { e.mode = 'windup'; e.modeT = 0.6; e.cAim = aim; e.atkT = 2.2; }
-      else { e.atkT = 1.4; radial(e.x, e.y, 18, 190, e.t); fan(e.x, e.y, aim, 3, 0.15, 260); }
+      if (Math.random() < 0.5) { e.mode = 'windup'; e.modeT = 0.6; e.cAim = aim; e.atkT = tier >= 1 ? 1.9 : 2.2; }
+      else { e.atkT = 1.4; radial(e.x, e.y, tier >= 1 ? 22 : 18, 190, e.t); fan(e.x, e.y, aim, tier >= 2 ? 5 : 3, 0.15, 260); }
     }
   }
 }
-function shootHazard(x, y, a, s) { hazards.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: 5, life: 6, rot: a }); }
+const MAX_HAZARDS = 260;
+function shootHazard(x, y, a, s) {
+  if (hazards.length >= MAX_HAZARDS) return;
+  s *= game.diff ? game.diff.hazardSpeed : 1; // story: pages fly faster in later rooms and wings
+  hazards.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: 5, life: 6, rot: a });
+}
 function fan(x, y, a, n, spread, s) { for (let i = 0; i < n; i++) shootHazard(x, y, a + (i - (n - 1) / 2) * spread, s); sound.play('shoot'); }
 function radial(x, y, n, s, off) { for (let i = 0; i < n; i++) shootHazard(x, y, off + (i / n) * TAU, s); sound.play('shoot'); }
 
@@ -1019,6 +1085,9 @@ function killEnemy(e) {
   sound.play('kill', 1 + Math.min(game.combo, 20) * 0.03);
   if (game.combo > 0 && game.combo % 10 === 0) floatText(player.x, player.y - 34, `${game.combo} COMBO!`, '#ffd54a', 18, 1.1);
   else if (Math.random() < 0.18 && game.ammo) floatText(e.x, e.y - 18, `“${short(game.ammo.title, 22)}”`, '#e8d9b0', 10, 1);
+  if (e.type === 'coin') { game.fines += 1; floatText(e.x, e.y - 12, '+1 🪙', '#ffd54a', 12, 0.7); }
+  // From wing 4, elites burst into a ring of pages as they go down: don't stand on them.
+  if (e.elite && game.diff && game.diff.deathBurst && game.state === 'playing') radial(e.x, e.y, game.diff.deathBurst, 120, Math.random() * TAU);
   if (e.type === 'golem') {
     for (let i = 0; i < 4; i++) { const a = (i / 4) * TAU; const c = makeEnemy('coin', e.x + Math.cos(a) * 14, e.y + Math.sin(a) * 14); c.vx = Math.cos(a) * 200; c.vy = Math.sin(a) * 200; }
     shake(0.3);
@@ -1029,8 +1098,8 @@ function killEnemy(e) {
     shake(1); game.flash = 0.6;
     sound.play('explode'); sound.setIntensity(1);
     hazards.length = 0;
-    banner('AUTHOR DEFEATED', `${e.name} has been… shelved. +1 Renew`);
-    game.renews = (game.renews || 0) + 1;
+    if (isStory()) banner('AUTHOR DEFEATED', `${e.name} has been… shelved.`);
+    else { banner('AUTHOR DEFEATED', `${e.name} has been… shelved. +1 Renew`); game.renews = (game.renews || 0) + 1; }
     pickups.push({ type: 'heart', x: e.x, y: e.y, t: 0, life: 20 });
   }
   // Drops
@@ -1067,8 +1136,19 @@ function hurtPlayer(sx, sy) {
   shake(0.6); game.flash = 0.5; game.freeze = 0.07;
   sound.play('hurt');
   burst(p.x, p.y, 18, ['#ff6b6b', '#fff'], 200, 0.5);
+  if (p.hp <= 0 && p.revives > 0) {
+    // Second Wind (Renovation): back up with 2 hearts, and the room's pages are swept away.
+    p.revives--; p.hp = Math.min(2, stats.maxHp); p.inv = 2.2;
+    hazards.length = 0; rings.length = 0;
+    banner('SECOND WIND', 'Back on your feet');
+    burst(p.x, p.y, 40, ['#ffd54a', '#fff'], 260, 0.8); sound.play('upgrade');
+    rings.push({ x: p.x, y: p.y, r: 10, max: 200, speed: 600, friendly: true, life: 1 });
+    for (const e of enemies) { const dx = e.x - p.x, dy = e.y - p.y, d = Math.hypot(dx, dy) || 1; if (d < 200 && e.type !== 'boss') { e.vx += (dx / d) * 500; e.vy += (dy / d) * 500; e.stun = 1.2; } }
+    return;
+  }
   if (p.hp <= 0) die();
 }
+
 
 function updateBooks(dt) {
   for (let i = books.length - 1; i >= 0; i--) {
@@ -1236,6 +1316,9 @@ function buildBackground() {
   const g = bg.getContext('2d');
   g.scale(2, 2);
   const r = new Rng(hashString(`bg:${game.seed}:${game.wave}`));
+  // Story wings each have their own floor colour and rug.
+  const wing = game.mode === 'story' ? WINGS[game.wingN - 1] : null;
+  const hue = wing ? wing.floorHue : 25, sat = wing && (wing.floorHue < 10 || wing.floorHue > 60) ? 18 : 35;
   // Wooden floor planks
   const ph = 18;
   for (let y = 0; y < H; y += ph) {
@@ -1243,7 +1326,7 @@ function buildBackground() {
     while (x < W) {
       const len = r.int(90, 210);
       const l = r.int(16, 23);
-      g.fillStyle = `hsl(25 35% ${l}%)`;
+      g.fillStyle = `hsl(${hue} ${sat}% ${l}%)`;
       g.fillRect(x, y, len, ph);
       g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 1;
       g.strokeRect(x + 0.5, y + 0.5, len, ph);
@@ -1254,7 +1337,7 @@ function buildBackground() {
   }
   // Central rug
   const rx = SAFE.x0 * CELL + 6, ry = SAFE.y0 * CELL + 6, rw = (SAFE.x1 - SAFE.x0 + 1) * CELL - 12, rh = (SAFE.y1 - SAFE.y0 + 1) * CELL - 12;
-  g.fillStyle = '#4a1622'; g.fillRect(rx, ry, rw, rh);
+  g.fillStyle = wing ? wing.rug : '#4a1622'; g.fillRect(rx, ry, rw, rh);
   g.strokeStyle = '#c9a227'; g.lineWidth = 3; g.strokeRect(rx + 6, ry + 6, rw - 12, rh - 12);
   g.lineWidth = 1; g.strokeRect(rx + 12, ry + 12, rw - 24, rh - 24);
   g.save(); g.translate(rx + rw / 2, ry + rh / 2);
@@ -1352,7 +1435,12 @@ function renderLights() {
   if (game.state !== 'gameover' && !(game.state === 'dying' && game.deathT < 1.2)) L(player.x, player.y, 230 * stats.lanternScale, 1);
   for (let i = 0; i < books.length && i < 24; i++) L(books[i].x, books[i].y, 55, 0.7); // light budget
   for (const h of hazards) L(h.x, h.y, 30, 0.5);
-  for (const e of enemies) if (e.type === 'boss') L(e.x, e.y, 160, 0.7); else if (e.type === 'golem') L(e.x, e.y, 60, 0.4);
+  let eliteLights = 0;
+  for (const e of enemies) {
+    if (e.type === 'boss') L(e.x, e.y, 160, 0.7);
+    else if (e.elite && eliteLights++ < 12) L(e.x, e.y, 70, 0.5); // light budget for elites
+    else if (e.type === 'golem') L(e.x, e.y, 60, 0.4);
+  }
   for (const g of rings) L(g.x, g.y, g.r + 30, 0.3 * g.life);
   for (const t of telegraphs) L(t.x, t.y, 70, t.t / t.dur);
   for (const f of flashes) L(f.x, f.y, f.r, f.life / f.max);
@@ -1367,6 +1455,8 @@ function renderLights() {
   for (const h of hazards) G(h.x, h.y, 18, 'rgba(255,80,80,1)', 0.6);
   for (const f of flashes) if (f.color) G(f.x, f.y, f.r * 0.6, f.color, 0.4 * (f.life / f.max));
   if (game.boss) G(game.boss.x, game.boss.y, 120, game.boss.glow || 'rgba(120,70,255,1)', 0.35);
+  let eliteGlows = 0;
+  for (const e of enemies) if (e.elite && eliteGlows++ < 12) G(e.x, e.y, e.r * 2.4, 'rgba(255,200,60,1)', 0.35);
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
 }
@@ -1479,7 +1569,24 @@ function eyes(x, y, sep, r, look, color = '#fff') {
   }
 }
 
+/** Elites wear a gold halo that flares red just before they fire. */
+function drawEliteHalo(e) {
+  const warn = e.shootT !== undefined && e.shootT < 0.4 && game.state === 'playing';
+  ctx.save();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = warn ? '#ff4d5e' : '#ffd54a';
+  ctx.globalAlpha = warn ? 0.9 : 0.55 + Math.sin(e.t * 5) * 0.2;
+  ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 5 + (warn ? Math.sin(e.t * 40) * 1.5 : 0), 0, TAU); ctx.stroke();
+  // little crown
+  ctx.globalAlpha = 1; ctx.fillStyle = '#ffd54a'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1.5;
+  const y = e.y - e.r - 9;
+  ctx.beginPath(); ctx.moveTo(e.x - 7, y + 5); ctx.lineTo(e.x - 7, y - 2); ctx.lineTo(e.x - 3.5, y + 1.5); ctx.lineTo(e.x, y - 4);
+  ctx.lineTo(e.x + 3.5, y + 1.5); ctx.lineTo(e.x + 7, y - 2); ctx.lineTo(e.x + 7, y + 5); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
 function drawEnemy(e) {
+  if (e.elite) drawEliteHalo(e);
   const look = Math.atan2(player.y - e.y, player.x - e.x);
   ctx.save(); ctx.translate(e.x, e.y);
   if (e.stun > 0) { ctx.rotate(Math.sin(e.t * 20) * 0.15); }
@@ -1665,6 +1772,8 @@ function drawHUD() {
     ctx.fillStyle = '#ff6b81'; heartPath(ctx, 22, 12, 18); ctx.fill();
     txt(`× ${player.hp}`, 38, 28, 16, '#fff');
   }
+  // Fines collected this run
+  txt(`🪙 ${game.fines}`, 14, 48, 13, '#ffd54a');
   // Score + combo
   txt(Math.floor(game.score).toLocaleString(), W - 16, 32, 24, '#fff', 'right');
   const m = comboMult();
@@ -1675,8 +1784,13 @@ function drawHUD() {
   }
   // Wave info
   const left = enemies.length + telegraphs.length + spawnQueue.length;
-  txt(`WAVE ${game.wave}`, W / 2, 26, 18, '#e8d9b0', 'center');
-  if (game.state === 'playing' && !game.boss) txt(`${left} disturbance${left === 1 ? '' : 's'} left`, W / 2, 44, 11, 'rgba(232,217,176,0.8)', 'center');
+  if (isStory()) {
+    txt(`ROOM ${game.wave}/${ROOMS_PER_WING}`, W / 2, 26, 18, game.diff && game.diff.kind !== 'normal' ? '#ffd54a' : '#e8d9b0', 'center');
+    if (game.state === 'playing' && !game.boss) txt(`${short(wingDef().name, 18)} · ${left} left`, W / 2, 44, 11, 'rgba(232,217,176,0.8)', 'center');
+  } else {
+    txt(`WAVE ${game.wave}`, W / 2, 26, 18, '#e8d9b0', 'center');
+    if (game.state === 'playing' && !game.boss) txt(`${left} disturbance${left === 1 ? '' : 's'} left`, W / 2, 44, 11, 'rgba(232,217,176,0.8)', 'center');
+  }
   // Cooldowns
   const dashReady = player.dashStock > 0;
   const kDash = dashReady ? 1 : clamp(1 - player.dashCd / stats.dashCd, 0, 1), kShhh = clamp(1 - player.shhhT / stats.shhhCd, 0, 1);
@@ -1766,12 +1880,106 @@ function drawStick() {
 // ======================================================================
 // DOM screens, settings, leaderboard
 // ======================================================================
-const SCREENS = ['title', 'howto', 'settings', 'leaderboard', 'upgrade', 'pause', 'gameover', 'codex'];
-let settingsReturn = 'title';
+const SCREENS = ['title', 'howto', 'settings', 'leaderboard', 'upgrade', 'pause', 'gameover', 'codex', 'story', 'shop'];
+let settingsReturn = 'title', shopReturn = 'title', currentScreen = 'title';
 function showScreen(id) {
   for (const s of SCREENS) $('#' + s).hidden = s !== id;
+  currentScreen = id;
   document.body.classList.toggle('in-game', id === null);
+  if (id === 'title') renderFineBadges();
 }
+
+// ---- Late fees UI: fines balance, Renovations shop, story wing select ----
+function renderFineBadges() {
+  for (const el of document.querySelectorAll('.fine-balance')) el.textContent = `🪙 ${progress.fines.toLocaleString()} fines`;
+  for (const el of document.querySelectorAll('.fine-count')) el.textContent = progress.fines ? `· ${progress.fines.toLocaleString()}` : '';
+}
+
+function renderShop() {
+  renderFineBadges();
+  const list = $('#shopList');
+  list.textContent = '';
+  for (const r of RENOVATIONS) {
+    const lvl = level(progress, r.id), cost = nextCost(progress, r.id);
+    const li = document.createElement('li');
+    li.className = 'reno' + (lvl ? ' owned' : '');
+    const ic = document.createElement('span'); ic.className = 'icon'; ic.textContent = r.icon;
+    const body = document.createElement('div');
+    const name = document.createElement('strong'); name.textContent = r.name;
+    const gain = document.createElement('small'); gain.textContent = r.gain;
+    const lv = document.createElement('small'); lv.className = 'lvl'; lv.textContent = r.max > 1 ? `${pips(lvl, r.max)}  ${lvl}/${r.max}` : lvl ? 'Owned' : 'One-time';
+    body.append(name, gain, lv);
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'buy'; b.dataset.reno = r.id;
+    b.textContent = cost === null ? '✓ Max' : `🪙 ${cost.toLocaleString()}`;
+    b.disabled = cost === null || !canBuy(progress, r.id);
+    if (cost !== null && !b.disabled) b.classList.add('affordable');
+    b.addEventListener('click', () => {
+      if (!canBuy(progress, r.id)) return;
+      progress = buy(progress, r.id); saveProgress();
+      sound.play('upgrade'); toast(`${r.icon} ${r.name} ${level(progress, r.id) > 1 ? `level ${level(progress, r.id)}` : 'built'}!`);
+      renderShop();
+      const again = document.querySelector(`#shopList button[data-reno="${r.id}"]`);
+      if (again && !again.disabled) again.focus();
+    });
+    li.append(ic, body, b);
+    list.appendChild(li);
+  }
+}
+
+let selectedWing = 1;
+/** The first unlocked wing you haven't cleared yet (or the last unlocked one). */
+function defaultWing() {
+  for (let w = 1; w <= progress.unlocked; w++) if (!progress.cleared.includes(w)) return w;
+  return progress.unlocked;
+}
+function wingStatus(w) {
+  if (w > progress.unlocked) return 'Locked';
+  if (progress.cleared.includes(w)) return '✓ Cleared';
+  const best = progress.best[w];
+  return best ? `Best: room ${best}/${ROOMS_PER_WING}` : 'New';
+}
+function renderStory() {
+  renderFineBadges();
+  if (selectedWing > progress.unlocked) selectedWing = progress.unlocked;
+  const grid = $('#wingGrid');
+  grid.textContent = '';
+  WINGS.forEach((def, i) => {
+    const w = i + 1, locked = w > progress.unlocked;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'wing' + (locked ? ' locked' : '') + (progress.cleared.includes(w) ? ' cleared' : '') + (w === selectedWing ? ' selected' : '');
+    b.dataset.wing = String(w);
+    b.disabled = locked;
+    b.innerHTML = '<span class="icon"></span><span class="num"></span><strong></strong><small></small>';
+    b.querySelector('.icon').textContent = locked ? '🔒' : def.icon;
+    b.querySelector('.num').textContent = String(w);
+    b.querySelector('strong').textContent = def.name;
+    b.querySelector('small').textContent = wingStatus(w);
+    b.addEventListener('click', () => { selectedWing = w; renderStory(); $('#btnEnterWing').focus(); });
+    grid.appendChild(b);
+  });
+  const def = WINGS[selectedWing - 1];
+  if (progress.unlocked < WINGS.length) $('#wingLock').textContent = `🔒 Clear ${WINGS[progress.unlocked - 1].name} to unlock ${WINGS[progress.unlocked].name}.`;
+  else $('#wingLock').textContent = '';
+  $('#wingName').textContent = `${def.icon} Wing ${selectedWing}: ${def.name}`;
+  $('#wingBlurb').textContent = def.blurb;
+  const d1 = difficulty(selectedWing, 1);
+  $('#wingInfo').textContent = selectedWing === 1
+    ? '10 rooms · room 5 is elite · a Rogue Author waits in room 10'
+    : `Enemies ×${d1.hpMult.toFixed(2)} tougher · ${Math.round(d1.eliteChance * 100)}% elites${d1.deathBurst ? ' · elites burst into pages' : ''}`;
+  $('#btnEnterWing').textContent = `▶ Enter ${def.name}`;
+}
+
+/** Bank the run's fines once (game over, wing cleared, or quitting mid-run). */
+function bankRun() {
+  if (game.banked) return game.banked;
+  const res = recordRun(progress, { fines: game.fines, mode: game.mode, wing: game.wingN, room: game.wave, cleared: game.wingCleared });
+  progress = res.progress; saveProgress();
+  game.banked = res;
+  return res;
+}
+const inRun = () => ['playing', 'paused', 'upgrade', 'waveclear', 'dying'].includes(game.state);
 
 function setSetting(k, v) {
   settings[k] = v;
@@ -1799,7 +2007,13 @@ document.addEventListener('click', (e) => {
   if (!b) return;
   sound.init(); sound.play('click');
   const act = b.dataset.act;
-  if (act === 'play' || act === 'again') startRun();
+  if (act === 'play') startRun('endless');
+  else if (act === 'again') startRun(game.mode, game.wingN);
+  else if (act === 'story') { selectedWing = defaultWing(); renderStory(); showScreen('story'); }
+  else if (act === 'enterwing') startRun('story', selectedWing);
+  else if (act === 'nextwing') startRun('story', Math.min(WINGS.length, game.wingN + 1));
+  else if (act === 'shop') { shopReturn = currentScreen || 'title'; renderShop(); showScreen('shop'); }
+  else if (act === 'shopback') { if (shopReturn === 'story') renderStory(); showScreen(shopReturn); }
   else if (act === 'fullscreen') toggleFullscreen();
   else if (act === 'howto') showScreen('howto');
   else if (act === 'codex') { renderCodex(); showScreen('codex'); }
@@ -1807,7 +2021,11 @@ document.addEventListener('click', (e) => {
   else if (act === 'leaderboard') { showScreen('leaderboard'); loadLeaderboard($('#lbList')); }
   else if (act === 'back') showScreen(game.state === 'paused' ? settingsReturn : 'title');
   else if (act === 'resume') resume();
-  else if (act === 'quit' || act === 'menu') { game.state = 'title'; sound.setIntensity(0); sound.setMuffled(false); clearWorld(); player = makePlayer(); showScreen('title'); }
+  else if (act === 'quit' || act === 'menu') {
+    // Quitting mid-run still banks what you earned: every run counts.
+    if (act === 'quit' && inRun()) { const res = bankRun(); if (res.banked) setTimeout(() => toast(`🪙 +${res.banked} fines banked`), 50); }
+    game.state = 'title'; sound.setIntensity(0); sound.setMuffled(false); clearWorld(); player = makePlayer(); showScreen('title');
+  }
 });
 
 async function toggleFullscreen() {
@@ -1844,16 +2062,25 @@ async function loadLeaderboard(list, highlight = null) {
 
 const BEST_KEY = 'overdue.best.v1';
 function showGameOver() {
+  const story = isStory(), won = story && game.wingCleared;
+  const res = bankRun();
   game.state = 'gameover';
   sound.setMuffled(true);
+  if (won) sound.play('wave');
   const score = Math.floor(game.score);
+  // Personal best + Hall of Fame stay endless-only, so the numbers keep meaning the same thing.
   const best = loadJSON(BEST_KEY);
-  const isBest = score > (best.score || 0);
+  const isBest = !story && score > (best.score || 0);
   if (isBest) saveJSON(BEST_KEY, { score, wave: game.wave });
+  $('#goTitle').textContent = won ? `${wingDef().name}: cleared!` : 'Shift over';
   $('#goStats').innerHTML = '';
+  const fineLine = `+${res.banked.toLocaleString()} 🪙${res.firstClear ? ' (first clear!)' : ''}`;
   const rows = [
+    ...(story ? [['Wing', `${game.wingN} · ${wingDef().name}`], ['Room reached', won ? `${ROOMS_PER_WING}/${ROOMS_PER_WING} ✓` : `${game.wave}/${ROOMS_PER_WING}`]] : []),
+    ['Fines banked', fineLine], ['Fines to spend', `${progress.fines.toLocaleString()} 🪙`],
+    ...(res.unlockedWing ? [['Unlocked', `🔓 Wing ${res.unlockedWing}: ${WINGS[res.unlockedWing - 1].name}`]] : []),
     ['Score', score.toLocaleString() + (isBest ? ' ★ new personal best' : '')],
-    ['Wave reached', game.wave], ['Disturbances shushed', game.kills], ['Best combo', game.bestCombo],
+    ...(story ? [] : [['Wave reached', game.wave]]), ['Disturbances shushed', game.kills], ['Best combo', game.bestCombo],
     ['Time on shift', `${Math.floor(game.playTime / 60)}m ${Math.floor(game.playTime % 60)}s`],
     ['Perks', Object.keys(game.owned).length ? Object.entries(game.owned).map(([k, v]) => `${(UPGRADES.find((u) => u.id === k) || { name: k }).name}${v > 1 ? ' ×' + v : ''}`).join(', ') : 'none'],
   ];
@@ -1863,12 +2090,18 @@ function showGameOver() {
     $('#goStats').append(dt, dd);
   }
   const form = $('#scoreForm');
-  form.hidden = false;
-  $('#submitMsg').textContent = '';
+  form.hidden = story;
+  $('#submitMsg').textContent = story ? 'Story runs aren’t ranked. Endless shift scores go to the Hall of Fame.' : '';
+  const nextBtn = $('#btnNextWing');
+  nextBtn.hidden = !(won && game.wingN < WINGS.length);
+  if (!nextBtn.hidden) nextBtn.textContent = `▶ Wing ${game.wingN + 1}: ${WINGS[game.wingN].name}`;
+  $('#btnAgain').textContent = story ? (won ? '↻ Replay wing' : '↻ Retry wing') : '↻ Another shift';
+  $('#btnAgain').classList.toggle('primary', nextBtn.hidden);
   $('#nameInput').value = loadJSON('overdue.name.v1').name || '';
+  $('#goBoard').hidden = story;
   showScreen('gameover');
-  loadLeaderboard($('#goList'));
-  if (!touch.enabled) $('#nameInput').focus();
+  if (!story) loadLeaderboard($('#goList'));
+  if (!touch.enabled) (story ? (nextBtn.hidden ? $('#btnAgain') : nextBtn) : $('#nameInput')).focus();
 }
 
 $('#scoreForm').addEventListener('submit', async (e) => {
@@ -1945,6 +2178,9 @@ if (DEBUG) {
   window.__overdue = {
     game, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, enemies, get content() { return content; },
     startRun, startWave, killAll: () => { for (const e of [...enemies]) killEnemy(e); spawnQueue.length = 0; telegraphs.length = 0; },
+    get progress() { return progress; }, setFines: (n) => { progress = { ...progress, fines: n }; saveProgress(); renderFineBadges(); },
+    unlockAll: () => { progress = { ...progress, unlocked: WINGS.length }; saveProgress(); },
+
     god: () => { player.hp = 999; stats.maxHp = 999; },
     grant: (id) => { const u = UPGRADES.find((x) => x.id === id); game.owned[id] = (game.owned[id] || 0) + 1; u.apply(stats, player); },
     showUpgrades, setRenews: (n) => { game.renews = n; }, die: () => { player.hp = 1; player.inv = 0; hurtPlayer(player.x + 1, player.y); },

@@ -36,7 +36,12 @@ npm run build   # dist/overdue.html (single file) + dist/version.json; this is e
   forces everyone to re-add. Don't change them casually.
 - **Saved data must survive updates.** These localStorage keys are player data; never rename or reshape
   without a migration: `overdue.settings.v1`, `overdue.best.v1`, `overdue.name.v1`,
-  `overdue.halloffame.v1`, `overdue.codex.v1`.
+  `overdue.halloffame.v1`, `overdue.codex.v1`, `overdue.progress.v1` (fines, Renovations, story unlocks;
+  `normalizeProgress()` in src/meta.js repairs old or partial saves).
+- **Difficulty only goes up:** in story mode every room is harder than the one before it, and every wing harder
+  than the previous wing at the same room. `test/story-meta.test.js` enforces this; keep it passing when tuning.
+- **Endless mode stays as it was** (same waves for the same seed, Hall of Fame scores stay comparable). Story
+  runs aren't ranked. Renovations apply to both modes.
 
 ## Lessons learned (each became a QA check)
 | What slipped | Rule |

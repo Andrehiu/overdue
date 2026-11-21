@@ -289,3 +289,59 @@ body.portrait #upgrade > :last-child { margin-bottom: 0; }
   background: var(--teal); color: #08221f; border-color: var(--teal); font-weight: bold; font-size: .85em; white-space: nowrap;
   box-shadow: 0 .4em 1.2em rgba(0, 0, 0, .5); }
 body.in-game #updateBar { opacity: .85; font-size: .7em; }
+
+/* =====================================================================
+   Story wings + Renovations (late fees)
+   ===================================================================== */
+/* Title: main modes stacked, secondary menu as a 2x2 grid so the title still fits short screens */
+.menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .4em; }
+.menu-grid button { padding-left: .6em; padding-right: .6em; }
+.shop-btn { border-color: rgba(255, 213, 74, .55); }
+.fine-count { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+/* Wing select: tiles in a 5x2 grid (2 columns on portrait phones) */
+.wing-grid { --tile: rgba(255, 255, 255, .05); --tile-done: rgba(155, 231, 220, .12); --tile-pick: rgba(255, 213, 74, .16);
+  display: grid; grid-template-columns: repeat(5, minmax(0, 9.5em)); gap: .45em; width: 100%; justify-content: center; }
+.wing-grid .wing { position: relative; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; align-items: center;
+  column-gap: .45em; text-align: left; padding: .45em .6em; background: var(--tile); min-width: 0; }
+.wing-grid .wing .icon { grid-row: 1 / 3; font-size: 1.5em; line-height: 1; }
+.wing-grid .wing .num { position: absolute; top: .2em; right: .45em; font-size: .65em; color: var(--muted); }
+.wing-grid .wing strong { font-size: .8em; color: var(--ink); line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: .8em; }
+.wing-grid .wing small { font-size: .65em; color: var(--muted); line-height: 1.2; }
+.wing-grid .wing.cleared { background: var(--tile-done); border-color: rgba(155, 231, 220, .5); }
+.wing-grid .wing.cleared small { color: var(--teal); }
+.wing-grid .wing.selected { background: var(--tile-pick); border-color: var(--accent); }
+.wing-grid .wing.locked { opacity: .45; cursor: not-allowed; }
+.wing-grid .wing:disabled { cursor: not-allowed; }
+.wing-detail { max-width: 36em; min-height: 4.5em; }
+.wing-detail h3 { margin: .2em 0 .1em; color: var(--accent); }
+.wing-detail p { margin: .15em auto; }
+body.portrait .wing-grid { grid-template-columns: 1fr 1fr; }
+
+/* Renovations shop */
+.balance { margin: 0; font-size: 1.15em; font-weight: bold; color: var(--accent); }
+.shop-list { --row: rgba(255, 255, 255, .04); --row-owned: rgba(255, 213, 74, .08);
+  list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 22em)); gap: .4em .6em; justify-content: center; }
+.shop-list .reno { display: flex; align-items: center; gap: .6em; padding: .4em .6em; border-radius: 6px; background: var(--row); text-align: left; }
+.shop-list .reno.owned { background: var(--row-owned); }
+.shop-list .icon { font-size: 1.5em; width: 1.4em; text-align: center; }
+.shop-list .reno > div { display: grid; gap: .05em; flex: 1; min-width: 0; }
+.shop-list strong { color: var(--ink); font-size: .85em; }
+.shop-list small { color: var(--muted); font-size: .72em; }
+.shop-list small.lvl { color: var(--violet); letter-spacing: .08em; }
+.shop-list .buy { white-space: nowrap; font-size: .8em; padding: .35em .7em; min-width: 5.5em; }
+.shop-list .buy.affordable { border-color: var(--accent); color: var(--accent); }
+.shop-list .buy:disabled { cursor: not-allowed; }
+body.portrait .shop-list { grid-template-columns: 1fr; width: 100%; }
+@media (max-height: 640px) { .shop-list, .wing-grid { font-size: .92em; } }
+
+/* 4-card hands (Bigger Card Catalogue): slimmer cards so a row still fits */
+.cards:has(> .card-wrap:nth-child(4)) .card { width: 11.5em; }
+.cards.dealing .card-wrap:nth-child(4) { animation-delay: .21s; }
+body.portrait .cards:has(> .card-wrap:nth-child(4)) .card { width: 100%; padding-top: .7em; padding-bottom: 1.1em; }
+.wing-grid .wing:disabled:hover { transform: none; background: var(--tile); border-color: rgba(243, 234, 210, .25); }
+#wingLock:empty { display: none; }
+/* End-of-run buttons wrap; on phones the main action gets its own full-width row */
+#gameover .menu.row { flex-wrap: wrap; }
+body.portrait #gameover .menu.row > .primary:not([hidden]) { flex-basis: 100%; }
+body.portrait #gameover .menu.row > .primary:not([hidden]) ~ .primary { flex-basis: auto; }

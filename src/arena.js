@@ -78,11 +78,11 @@ function overlapsSafe(x, y, w, h) {
 
 /**
  * Generate a symmetric library floor: shelves are placed in the left half and mirrored.
- * Deterministic for a given (seed, wave).
+ * Deterministic for a given (seed, wave). `shelvesPerHalf` overrides the density (story wings).
  */
-export function generateArena(seed, wave) {
+export function generateArena(seed, wave, shelvesPerHalf = null) {
   const rng = new Rng(hashString(`arena:${seed}:${wave}`));
-  const perHalf = Math.min(2 + Math.floor((wave + 1) / 2), 6);
+  const perHalf = shelvesPerHalf ?? Math.min(2 + Math.floor((wave + 1) / 2), 6);
   for (let attempt = 0; attempt < 40; attempt++) {
     const solid = new Uint8Array(COLS * ROWS);
     const shelves = [];

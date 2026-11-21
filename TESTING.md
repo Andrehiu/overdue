@@ -10,10 +10,11 @@ look at the screenshots) notices.
 |---|---|---|
 | Unit | All `node:test` suites (arenas, pathfinding, waves, perks, previews, versioning) | 0 failures |
 | Screens: iPhone portrait, iPhone landscape, iPad landscape, desktop | Title fully visible · arena fills screen · menu text readable · version label · run starts · perk cards render with plain text · Masterwork at 3/3 · pause + build strip · boss spawns · game-over text readable · score saves · Codex opens · **no page/console errors · no failed requests** | Fill ≥ 75% of screen; menu text luminance > 0.5; card title luminance < 0.3 |
-| Performance | Wave-15 boss, ~25 perks + Masterworks, phone viewport | Game speed ≥ 0.85x, ≥ 50 fps (CI: ≥ 0.75x, fps not judged), books in flight ≤ 110 |
+| Story + late fees (every device) | Renovations shop readable · buying spends fines and saves · wing select (10 wings, only wing 1 open) · story room starts · 4-card hand fits the screen · elite room is all elites · room-10 boss · clearing wing 1 unlocks wing 2 | as listed |
+| Performance | Wave-15 boss, ~25 perks + Masterworks, phone viewport; story wing 10 room 9 (elites shooting) | Game speed ≥ 0.85x, ≥ 50 fps (CI: ≥ 0.75x, fps not judged), books in flight ≤ 110 |
 | Privacy | Secrets and email addresses in tracked files **and commit messages**; your private terms if `.qa-private-terms` exists | No hits |
 
-Output: `qa-report/report.md` plus screenshots per device (`iphone-1-title.png` … `-7-codex.png`, `perf-late-boss.png`).
+Output: `qa-report/report.md` plus screenshots per device (`iphone-1-title.png` … `-13-wing-cleared.png`, `perf-late-boss.png`, `perf-story-late.png`).
 Options: `npm run qa -- --only=perf` (or `unit`, `screens`, `security`, comma-separated) · `--ci` relaxes perf for slow machines.
 
 ## Checklist by type of change
@@ -23,6 +24,11 @@ Options: `npm run qa -- --only=perf` (or `unit`, `screens`, `security`, comma-se
 - [ ] Play a run to wave 6+ yourself (or with `?debug=1`: `__overdue.startWave(n)`, `grant(id)`, `god()`)
 - [ ] New perk: its card shows a plain "gain" line, a level (●○○) and a combo hint where relevant
 - [ ] Note the difficulty change in the commit message (what got easier or harder, by how much)
+
+### Story / late fees balance
+- [ ] `npm test`: the "every room harder" and "every wing harder" tests still pass
+- [ ] Try a late wing with `?debug=1`: `__overdue.unlockAll()`, `__overdue.startRun('story', 8)`, `__overdue.startWave(9)`
+- [ ] Renovation prices: a wing-1 run that dies in room 6 should still afford the cheapest Renovation (25 fines)
 
 ### Visual / UI / CSS
 - [ ] Look at **title, perks, pause, game over and Codex** screenshots on **iPhone and desktop**, not just

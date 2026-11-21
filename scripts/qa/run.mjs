@@ -136,6 +136,48 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     await tap('[data-act=codex]'); await page.waitForTimeout(300);
     await shot(page, `${name}-7-codex`);
     record(area, 'codex opens', /of \d+ discovered/.test(await page.textContent('#codexProgress')));
+
+    // Late fees (A): the Renovations shop spends fines and the upgrade sticks
+    await tap('#codex [data-act=back]'); await page.waitForTimeout(250);
+    await page.evaluate(() => __overdue.setFines(1000));
+    await tap('#title [data-act=shop]'); await page.waitForTimeout(300);
+    await shot(page, `${name}-8-shop`);
+    const shopLum = await page.evaluate(`(${LUM})(getComputedStyle(document.querySelector('#shopList strong')).color)`);
+    record(area, 'shop text readable', shopLum > 0.5, `luminance ${shopLum.toFixed(2)}`);
+    await tap('#shopList button[data-reno=catalogue]'); await page.waitForTimeout(200);
+    const bought = await page.evaluate(() => ({ lvl: __overdue.progress.reno.catalogue, fines: __overdue.progress.fines, saved: JSON.parse(localStorage.getItem('overdue.progress.v1')).reno.catalogue }));
+    record(area, 'Renovation bought and saved', bought.lvl === 1 && bought.saved === 1 && bought.fines === 700, JSON.stringify(bought));
+
+    // Story wings (C): wing select, a room, a 4-card hand, an elite room, then clearing the wing unlocks the next
+    await tap('#shop [data-act=shopback]'); await page.waitForTimeout(250);
+    await tap('#title [data-act=story]'); await page.waitForTimeout(300);
+    await shot(page, `${name}-9-story`);
+    const tiles = await page.$$eval('#wingGrid .wing', (bs) => bs.map((b) => b.disabled));
+    record(area, 'wing select: 10 wings, only wing 1 open', tiles.length === 10 && !tiles[0] && tiles.slice(1).every(Boolean), `${tiles.filter((d) => !d).length} open`);
+    await tap('#btnEnterWing'); await page.waitForTimeout(300);
+    await page.evaluate(() => __overdue.god()); await page.waitForTimeout(1800);
+    await shot(page, `${name}-10-story-room`);
+    record(area, 'story room starts', await page.evaluate(() => __overdue.game.mode === 'story' && __overdue.game.state === 'playing'));
+    const clearRoom = () => page.evaluate(async () => {
+      const O = __overdue;
+      for (let i = 0; i < 60 && O.game.state === 'playing'; i++) { O.killAll(); await new Promise((r) => setTimeout(r, 100)); }
+    });
+    await clearRoom(); await page.waitForTimeout(2600);
+    const hand = await page.evaluate(() => ({ state: __overdue.game.state, title: document.querySelector('#upgradeTitle').textContent,
+      cards: [...document.querySelectorAll('#cards .card')].map((c) => { const r = c.getBoundingClientRect(); return { l: r.left, r: r.right }; }) }));
+    await shot(page, `${name}-11-story-perks`);
+    record(area, 'room clear offers 4 cards', hand.state === 'upgrade' && hand.cards.length === 4 && /Room 1\/10/.test(hand.title), `${hand.cards.length} cards · ${hand.title}`);
+    const vw = await page.evaluate(() => innerWidth);
+    record(area, '4 cards fit on screen', hand.cards.every((c) => c.l >= -1 && c.r <= vw + 1));
+    await page.evaluate(() => { __overdue.startWave(5); __overdue.god(); }); await page.waitForTimeout(2600);
+    await shot(page, `${name}-12-elite-room`);
+    record(area, 'elite room spawns elites', await page.evaluate(() => __overdue.enemies.length > 0 && __overdue.enemies.filter((e) => e.type !== 'worm').every((e) => e.elite)));
+    await page.evaluate(() => { __overdue.startWave(10); __overdue.god(); }); await page.waitForTimeout(3600);
+    record(area, 'room 10 boss spawns', await page.evaluate(() => __overdue.enemies.some((e) => e.type === 'boss')));
+    await clearRoom(); await page.waitForTimeout(3400);
+    await shot(page, `${name}-13-wing-cleared`);
+    const won = await page.evaluate(() => ({ title: document.querySelector('#goTitle').textContent, unlocked: __overdue.progress.unlocked, next: !document.querySelector('#btnNextWing').hidden }));
+    record(area, 'clearing wing 1 unlocks wing 2', /cleared/i.test(won.title) && won.unlocked === 2 && won.next, JSON.stringify(won));
   } catch (e) {
     record(area, 'flow completed', false, e.message.split('\n')[0]);
   }
@@ -175,6 +217,17 @@ if (want('perf')) {
   record('perf', `late boss game speed ≥ ${PERF.sim}x`, avg('sim') >= PERF.sim, `${avg('sim').toFixed(2)}x (samples ${samples.map((s) => s.sim.toFixed(2)).join(', ')})`);
   if (PERF.fps) record('perf', `late boss fps ≥ ${PERF.fps}`, avg('fps') >= PERF.fps, `${avg('fps').toFixed(0)} fps`);
   record('perf', 'books in flight capped', Math.max(...samples.map((s) => s.books)) <= 110, `max ${Math.max(...samples.map((s) => s.books))}`);
+  // Story late game: wing 10 room 9, a crowd of elites firing fans of pages.
+  await page.evaluate(() => { const O = __overdue; O.unlockAll(); O.startRun('story', 10); O.startWave(9); O.god(); });
+  await page.waitForTimeout(5000);
+  const story = await page.evaluate(async () => {
+    const O = __overdue, t0 = performance.now(), sim0 = O.game.playTime; let frames = 0;
+    await new Promise((res) => { const tick = (now) => { frames++; if (now - t0 < 2000) requestAnimationFrame(tick); else res(); }; requestAnimationFrame(tick); });
+    return { sim: (O.game.playTime - sim0) / ((performance.now() - t0) / 1000), fps: frames / 2, hazards: O.counts().hazards };
+  });
+  await shot(page, 'perf-story-late');
+  record('perf', `story wing 10 game speed ≥ ${PERF.sim}x`, story.sim >= PERF.sim, `${story.sim.toFixed(2)}x · ${story.hazards} pages in flight`);
+  if (PERF.fps) record('perf', `story wing 10 fps ≥ ${PERF.fps}`, story.fps >= PERF.fps, `${story.fps.toFixed(0)} fps`);
   await ctx.close();
 }
 await browser.close();
