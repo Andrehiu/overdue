@@ -8,7 +8,7 @@ import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
 import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect } from './util.js';
-import { PLAYER } from './palette.js';
+import { PLAYER, bookLook } from './palette.js';
 import { SoundEngine } from './audio.js';
 import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, difficulty, composeRoom, layoutSeed, roomReward } from './story.js';
 import { PROGRESS_KEY, RENOVATIONS, normalizeProgress, applyRenovations, runBonuses, recordRun, level, nextCost, canBuy, buy } from './meta.js';
@@ -796,11 +796,14 @@ function spawnBook(x, y, a, extra = {}) {
   const book = game.ammo || pickBook();
   books.push({ x, y, vx: Math.cos(a) * stats.projSpeed, vy: Math.sin(a) * stats.projSpeed,
     r: 6, life: stats.bookLife, rot: a, dmgMult: 1, scale: 1, spin: (Math.random() < 0.5 ? -1 : 1) * 14, bounces: stats.bounces, pierce: stats.pierce,
-    wraps: stats.wraps, child: false, hit: new Set(), color: PLAYER.book, title: book.title, ...extra });
+    wraps: stats.wraps, child: false, hit: new Set(), color: PLAYER.book, title: book.title,
+    look: extra.color || extra.child ? null : currentLook, ...extra });
 }
 
+let currentLook = bookLook({});
 function fire() {
   const p = player, n = stats.projectiles;
+  currentLook = bookLook(game.owned); // perks change how books look (cheap: a few flags per throw)
   p.throws++;
   for (let i = 0; i < n; i++) {
     const a = p.aim + (i - (n - 1) / 2) * stats.spread + (Math.random() - 0.5) * 0.04;
@@ -1497,7 +1500,7 @@ function render() {
   for (const k of pickups) drawPickup(k);
   for (const e of enemies) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(e.x + 3, e.y + e.r * 0.8, e.r * 0.9, e.r * 0.4, 0, 0, TAU); ctx.fill(); }
   for (let i = enemies.length - 1; i >= 0; i--) drawEnemy(enemies[i]);
-  for (const b of books) drawBook(b.x, b.y, b.rot, b.color, b.scale || 1);
+  for (const b of books) drawThrownBook(b);
   if (game.state !== 'title' && game.state !== 'gameover' && !(game.state === 'dying' && game.deathT < 1.5)) {
     for (const o of orbiterPositions()) drawBook(o.x, o.y, o.a * 2, PLAYER.orbit, 1.1);
     drawPlayer();
@@ -1526,6 +1529,40 @@ function render() {
   if (game.state === 'playing' || game.state === 'waveclear' || game.state === 'dying') drawHUD();
   if (touch.enabled && touch.moveId !== null) drawStick();
   if (!touch.enabled && mouse.seen && (game.state === 'playing' || game.state === 'waveclear')) drawCrosshair();
+}
+
+/** A thrown book wearing its perk traits (see bookLook in palette.js). Rect-only drawing: 100+ can fly at once. */
+function drawThrownBook(b) {
+  const L = b.look;
+  if (!L || L.plain) return drawBook(b.x, b.y, b.rot, b.color, b.scale || 1);
+  const s = L.size * (b.scale || 1);
+  ctx.save(); ctx.translate(b.x, b.y);
+  ctx.rotate(L.pointed ? Math.atan2(b.vy, b.vx) : b.rot);
+  const back = -7 * s;
+  if (L.trail) { // Dewey: teal dots, longer per level
+    ctx.fillStyle = PLAYER.trail;
+    for (let i = 1, n = 2 + L.trail * 2; i <= n; i++) { ctx.globalAlpha = 1 - 0.8 * i / (n + 1); ctx.fillRect(back - i * 6, -2 + Math.sin(i * 1.7 + game.time * 9) * 1.5, 4, 4); }
+    ctx.globalAlpha = 1;
+  }
+  if (L.streak) { // Speed Reader: motion streak, longer per level
+    ctx.fillStyle = PLAYER.streak;
+    ctx.globalAlpha = 0.4; ctx.fillRect(back - 9 * L.streak, -3, 9 * L.streak, 6);
+    ctx.globalAlpha = 0.75; ctx.fillRect(back - 4 * L.streak, -2, 4 * L.streak, 4);
+    ctx.globalAlpha = 1;
+  }
+  if (L.ribbon) { // Bouncy Bookmark: gold ribbon flapping behind
+    const w = Math.sin(game.time * 22 + b.spin) * 1.5;
+    ctx.fillStyle = PLAYER.ribbon; ctx.fillRect(back - 6, 3 * s + w * 0.5, 8, 2); ctx.fillRect(back - 10, 4 * s + w, 5, 2);
+  }
+  ctx.scale(s, s);
+  if (L.glint) { // Plot Twist: arrowhead
+    ctx.fillStyle = PLAYER.glint; ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(7, -4.5); ctx.lineTo(7, 4.5); ctx.fill();
+  }
+  ctx.fillStyle = b.color; ctx.fillRect(-7, -5, 14, 10);
+  ctx.fillStyle = '#f3ead2'; ctx.fillRect(-5, -4, 11, 8);
+  ctx.fillStyle = b.color; ctx.fillRect(-7, -5, 3, 10);
+  if (L.crack) { ctx.fillStyle = PLAYER.crack; ctx.fillRect(-6.6, -4.5, 1.6, 3); ctx.fillRect(-5.6, -1.5, 1.6, 3); ctx.fillRect(-6.6, 1.5, 1.6, 3); }
+  ctx.restore();
 }
 
 function drawBook(x, y, rot, color, scale) {

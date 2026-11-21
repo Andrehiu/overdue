@@ -55,6 +55,10 @@ Or play online at **https://andrehiu.github.io/overdue/**. On a phone, use **Sha
   - **The perk screen**: cards are styled as library catalogue index cards and state plainly what each one gives you. A card is marked when it would complete a combo with a perk you already own, and NEW the first time you ever see it. You can **Banish** one perk per run, a "Your build" strip shows what you own, and cards ignore taps for half a second so a thumb that's still steering can't pick one by accident.
   - **Library Codex**: a title-screen collection of every combo and Masterwork you've discovered.
   - **Masterworks**: every perk tops out at 3/3. Taking it to 3/3 unlocks its Masterwork, a one-time card with outsized power. For example Hardcover leads to Leather-Bound Tome (every 5th throw is a giant tome that pierces everything) and Quiet Please leads to Absolute Silence (SHHH! freezes the whole library).
+- **Readable at a glance:**
+  - your books are always library blue, and enemy pages are always red;
+  - perks change how your books look: Hardcover makes them bigger, Bouncy Bookmark adds a gold ribbon, Speed Reader a motion streak, Dewey a teal homing trail, Plot Twist an arrowhead and Spine Breaker a glowing cracked spine, and these stack;
+  - perk cards name their combo partners, the pause screen lists **combos in reach**, and the Codex shows every combo's recipe.
 - **Scoring:** a combo multiplier up to ×4 and a flawless-wave bonus.
 - **Layouts:** a new mirror-symmetric library each wave. The arena is tall on phones held upright and wide everywhere else.
 - **Pathfinding:** enemies route around the shelves using a shared Dijkstra flow field.

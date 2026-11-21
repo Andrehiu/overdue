@@ -34,15 +34,15 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/backend.js` | 84 | Score storage. The game is fully static, so there are two places a Hall of Fame can live: |
 | `src/catalogue.js` | 140 | Built-in book catalogue: the titles you throw and the authors bosses are named after. |
 | `src/flowfield.js` | 102 | Dijkstra flow field: one search from the player gives every enemy a path around the shelves. |
-| `src/main.js` | 2254 | OVERDUE! — Night Shift at the Meme Library |
+| `src/main.js` | 2291 | OVERDUE! — Night Shift at the Meme Library |
 | `src/meta.js` | 99 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
-| `src/palette.js` | 29 | Projectile colours. Pure module (no DOM), unit-tested. |
+| `src/palette.js` | 52 | Projectile colours. Pure module (no DOM), unit-tested. |
 | `src/story.js` | 97 | Story mode: ten handmade library wings, unlocked in order. Pure module (no DOM) so it is unit-tested. |
 | `src/upgrades.js` | 232 | Perks offered between waves. Pure data + a seeded roller (no DOM), so it is unit-tested. |
 | `src/util.js` | 77 | Small, dependency-free helpers shared by the game and its unit tests. |
 | `src/version.js` | 22 | Which build of the game is running. The build script injects the real values |
 | `src/waves.js` | 59 | Budget-based wave composer. Pure + seeded => every run with the same seed plays the same waves. |
-| `test/game-logic.test.js` | 298 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
+| `test/game-logic.test.js` | 312 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
 | `test/story-meta.test.js` | 130 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
 | `scripts/qa/run.mjs` | 294 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 43 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
@@ -82,10 +82,10 @@ NEIGH:4 · canStep:44 · computeFlowField:54 · lineOfSight:91
 - **Run / wave flow** (235–530): keepAwake:239 · startRun:245 · clearWorld:266 · startWave:272 · bannerQueue:295 · banner:296 · waveCleared:301 · showUpgrades:328 · KIND_LABEL:340 · codex:344 · saveCodex:345 · cardsArmed:349 · currentChoices:351 · rollOpts:352 · renderCards:354 · renderBuild:431 · renderReach:461 · renderCodex:479 · pause:503 · resume:513 · die:520
 - **Spawning** (531–613): DEF:534 · hpScaleNow:545 · makeEnemy:546 · spawnPoint:565 · updateSpawning:575 · materialise:593
 - **Effects helpers** (614–642): shake:617 · addLight:620 · floatText:624 · particle:627 · burst:628 · pages:636
-- **Update** (643–1329): step:646 · moveInput:678 · nearestEnemy:690 · updatePlayer:699 · collideWorld:776 · spawnBook:789 · fire:802 · abilityReady:822 · inkBurst:833 · nextToShelf:847 · doShhh:855 · updateFlow:892 · seek:903 · updateEnemies:915 · bossAI:1004 · shootHazard:1057 · fan:1062 · radial:1063 · damageEnemy:1065 · killEnemy:1094 · buzz:1136 · hurtPlayer:1141 · updateBooks:1175 · orbiterPositions:1248 · updateOrbiters:1257 · updateHazards:1271 · updateRings:1284 · updatePickups:1297 · updateParticles:1314
-- **Rendering** (1330–1921): BOOK_PALETTE:1333 · buildBackground:1335 · lampPositions:1423 · lightSprite:1431 · glowCache:1437 · glowSprite:1438 · renderLights:1447 · render:1486 · drawBook:1531 · drawPlayer:1539 · rim:1582 · eyes:1587 · drawEliteHalo:1595 · drawEnemy:1610 · drawBoss:1688 · drawTelegraph:1722 · drawPickup:1730 · hazardSprite:1743 · drawHazards:1751 · drawRing:1768 · drawParticles:1775 · heartPath:1788 · FONT:1798 · txt:1799 · drawHUD:1805 · cooldown:1877 · btnCache:1893 · setTouchButton:1894 · drawCrosshair:1906 · drawStick:1915
-- **DOM screens, settings, leaderboard** (1922–2190): SCREENS:1925 · showScreen:1927 · renderFineBadges:1935 · renderShop:1940 · defaultWing:1974 · wingStatus:1978 · renderStory:1984 · bankRun:2017 · inRun:2024 · setSetting:2048 · toast:2062 · toggleFullscreen:2095 · loadLeaderboard:2105 · showGameOver:2128
-- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2191–2254): frame:2196 · checkForUpdate:2217
+- **Update** (643–1332): step:646 · moveInput:678 · nearestEnemy:690 · updatePlayer:699 · collideWorld:776 · spawnBook:789 · fire:804 · abilityReady:825 · inkBurst:836 · nextToShelf:850 · doShhh:858 · updateFlow:895 · seek:906 · updateEnemies:918 · bossAI:1007 · shootHazard:1060 · fan:1065 · radial:1066 · damageEnemy:1068 · killEnemy:1097 · buzz:1139 · hurtPlayer:1144 · updateBooks:1178 · orbiterPositions:1251 · updateOrbiters:1260 · updateHazards:1274 · updateRings:1287 · updatePickups:1300 · updateParticles:1317
+- **Rendering** (1333–1958): BOOK_PALETTE:1336 · buildBackground:1338 · lampPositions:1426 · lightSprite:1434 · glowCache:1440 · glowSprite:1441 · renderLights:1450 · render:1489 · drawThrownBook:1535 · drawBook:1568 · drawPlayer:1576 · rim:1619 · eyes:1624 · drawEliteHalo:1632 · drawEnemy:1647 · drawBoss:1725 · drawTelegraph:1759 · drawPickup:1767 · hazardSprite:1780 · drawHazards:1788 · drawRing:1805 · drawParticles:1812 · heartPath:1825 · FONT:1835 · txt:1836 · drawHUD:1842 · cooldown:1914 · btnCache:1930 · setTouchButton:1931 · drawCrosshair:1943 · drawStick:1952
+- **DOM screens, settings, leaderboard** (1959–2227): SCREENS:1962 · showScreen:1964 · renderFineBadges:1972 · renderShop:1977 · defaultWing:2011 · wingStatus:2015 · renderStory:2021 · bankRun:2054 · inRun:2061 · setSetting:2085 · toast:2099 · toggleFullscreen:2132 · loadLeaderboard:2142 · showGameOver:2165
+- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2228–2291): frame:2233 · checkForUpdate:2254
 
 ## src/meta.js
 
@@ -93,7 +93,7 @@ geo:12 · list:13 · RENOVATIONS:16 · renoById:32 · int:34 · normalizeProgres
 
 ## src/palette.js
 
-PLAYER:7 · ENEMY:16 · hueOf:19 · isEnemyHue:28
+PLAYER:7 · ENEMY:22 · hueOf:25 · isEnemyHue:34 · bookLook:45
 
 ## src/story.js
 
@@ -138,6 +138,7 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 - 263: version label shows version, commit and date; dev builds say so
 - 269: everything the player throws stays out of the red/pink reserved for enemies
 - 281: combo partners and combos in reach explain what pairs with what
+- 299: perk art: each perk adds one trait, they stack, and normal books stay plain
 
 ## test/story-meta.test.js
 

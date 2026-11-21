@@ -11,6 +11,12 @@ export const PLAYER = {
   volley: '#8f7bff',   // Silent Reading ring of books (combo)
   orbit: '#8f7bff',    // Audiobook Orbit
   wrapped: '#9be7dc',  // Interdimensional Loan: came back through a wall
+  // Perk traits drawn on normal books (shape/trail/attachment, never a new body colour)
+  ribbon: '#d4a72c',   // Bouncy Bookmark: gold ribbon trailing behind
+  streak: '#8cbeff',   // Speed Reader: motion streak
+  trail: '#9be7dc',    // Dewey Decimal Guidance: teal dotted homing trail
+  glint: '#ffffff',    // Plot Twist: white arrowhead (pierce)
+  crack: '#ffd54a',    // Spine Breaker: glowing cracked spine
 };
 
 export const ENEMY = { page: '#ff3b4e' };
@@ -25,4 +31,21 @@ export function hueOf(hex) {
 }
 
 /** Hues reserved for enemies: pinks, reds and orange-reds (270°..40°, wrapping through 0°). */
-export const isEnemyHue = (hex) => { const h = hueOf(hex); return h >= 270 || h < 40; };
+export function isEnemyHue(hex) {
+  const n = parseInt(hex.slice(1), 16), c = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  if (Math.max(...c) - Math.min(...c) < 40) return false; // whites and greys belong to nobody
+  const h = hueOf(hex);
+  return h >= 270 || h < 40;
+}
+
+/**
+ * How a normal thrown book looks, from the perks you own. Each perk adds one trait; they stack.
+ * Hardcover makes the book look bigger (visual only, the hitbox is unchanged).
+ */
+export function bookLook(owned = {}) {
+  const L = { size: 1 + 0.15 * (owned.hardcover || 0), ribbon: !!owned.bookmark, streak: owned.speedreader || 0,
+    trail: owned.dewey || 0, glint: !!owned.plottwist, crack: !!owned.spinebreaker };
+  L.pointed = L.ribbon || L.streak > 0 || L.trail > 0 || L.glint; // directional traits: fly nose-first, no spin
+  L.plain = !L.pointed && !L.crack && L.size === 1;
+  return L;
+}

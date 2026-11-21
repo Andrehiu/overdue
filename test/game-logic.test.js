@@ -295,3 +295,17 @@ test('combo partners and combos in reach explain what pairs with what', async ()
   // Every combo recipe is two real perks
   for (const c of UPGRADES.filter((u) => u.kind === 'combo')) assert.ok(c.requires.every((r) => byId(r)?.kind === 'perk'));
 });
+
+test('perk art: each perk adds one trait, they stack, and normal books stay plain', async () => {
+  const { bookLook } = await load('palette');
+  assert.ok(bookLook({}).plain);
+  assert.ok(!bookLook({}).pointed, 'plain books still spin');
+  assert.ok(Math.abs(bookLook({ hardcover: 3 }).size - 1.45) < 1e-9, 'Hardcover grows the book 15% per level');
+  for (const [id, trait] of [['bookmark', 'ribbon'], ['speedreader', 'streak'], ['dewey', 'trail'], ['plottwist', 'glint'], ['spinebreaker', 'crack']]) {
+    const L = bookLook({ [id]: 1 });
+    assert.ok(L[trait] && !L.plain, `${id} shows ${trait}`);
+  }
+  assert.ok(bookLook({ dewey: 3 }).trail > bookLook({ dewey: 1 }).trail, 'Dewey trail grows per level');
+  const all = bookLook({ hardcover: 3, bookmark: 1, speedreader: 2, dewey: 1, plottwist: 1, spinebreaker: 1 });
+  assert.ok(all.ribbon && all.streak && all.trail && all.glint && all.crack && all.pointed, 'traits stack');
+});
