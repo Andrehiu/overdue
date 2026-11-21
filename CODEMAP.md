@@ -34,7 +34,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/backend.js` | 84 | Score storage. The game is fully static, so there are two places a Hall of Fame can live: |
 | `src/catalogue.js` | 140 | Built-in book catalogue: the titles you throw and the authors bosses are named after. |
 | `src/flowfield.js` | 102 | Dijkstra flow field: one search from the player gives every enemy a path around the shelves. |
-| `src/main.js` | 2195 | OVERDUE! — Night Shift at the Meme Library |
+| `src/main.js` | 2209 | OVERDUE! — Night Shift at the Meme Library |
 | `src/meta.js` | 99 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
 | `src/story.js` | 97 | Story mode: ten handmade library wings, unlocked in order. Pure module (no DOM) so it is unit-tested. |
 | `src/upgrades.js` | 213 | Perks offered between waves. Pure data + a seeded roller (no DOM), so it is unit-tested. |
@@ -82,9 +82,9 @@ NEIGH:4 · canStep:44 · computeFlowField:54 · lineOfSight:91
 - **Spawning** (509–591): DEF:512 · hpScaleNow:523 · makeEnemy:524 · spawnPoint:543 · updateSpawning:553 · materialise:571
 - **Effects helpers** (592–620): shake:595 · addLight:598 · floatText:602 · particle:605 · burst:606 · pages:614
 - **Update** (621–1307): step:624 · moveInput:656 · nearestEnemy:668 · updatePlayer:677 · collideWorld:754 · spawnBook:767 · fire:780 · abilityReady:800 · inkBurst:811 · nextToShelf:825 · doShhh:833 · updateFlow:870 · seek:881 · updateEnemies:893 · bossAI:982 · shootHazard:1035 · fan:1040 · radial:1041 · damageEnemy:1043 · killEnemy:1072 · buzz:1114 · hurtPlayer:1119 · updateBooks:1153 · orbiterPositions:1226 · updateOrbiters:1235 · updateHazards:1249 · updateRings:1262 · updatePickups:1275 · updateParticles:1292
-- **Rendering** (1308–1885): BOOK_PALETTE:1311 · buildBackground:1313 · lampPositions:1401 · lightSprite:1409 · glowCache:1415 · glowSprite:1416 · renderLights:1425 · render:1464 · drawBook:1509 · drawPlayer:1517 · rim:1560 · eyes:1565 · drawEliteHalo:1573 · drawEnemy:1588 · drawBoss:1666 · drawTelegraph:1700 · drawPickup:1708 · drawHazard:1720 · drawRing:1732 · drawParticles:1739 · heartPath:1752 · FONT:1762 · txt:1763 · drawHUD:1769 · cooldown:1841 · btnCache:1857 · setTouchButton:1858 · drawCrosshair:1870 · drawStick:1879
-- **DOM screens, settings, leaderboard** (1886–2131): SCREENS:1889 · showScreen:1891 · renderFineBadges:1899 · renderShop:1904 · defaultWing:1938 · wingStatus:1942 · renderStory:1948 · bankRun:1981 · inRun:1988 · setSetting:1990 · toast:2004 · toggleFullscreen:2037 · loadLeaderboard:2047 · showGameOver:2070
-- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2132–2195): frame:2137 · checkForUpdate:2158
+- **Rendering** (1308–1899): BOOK_PALETTE:1311 · buildBackground:1313 · lampPositions:1401 · lightSprite:1409 · glowCache:1415 · glowSprite:1416 · renderLights:1425 · render:1464 · drawBook:1509 · drawPlayer:1517 · rim:1560 · eyes:1565 · drawEliteHalo:1573 · drawEnemy:1588 · drawBoss:1666 · drawTelegraph:1700 · drawPickup:1708 · hazardSprite:1721 · drawHazards:1729 · drawRing:1746 · drawParticles:1753 · heartPath:1766 · FONT:1776 · txt:1777 · drawHUD:1783 · cooldown:1855 · btnCache:1871 · setTouchButton:1872 · drawCrosshair:1884 · drawStick:1893
+- **DOM screens, settings, leaderboard** (1900–2145): SCREENS:1903 · showScreen:1905 · renderFineBadges:1913 · renderShop:1918 · defaultWing:1952 · wingStatus:1956 · renderStory:1962 · bankRun:1995 · inRun:2002 · setSetting:2004 · toast:2018 · toggleFullscreen:2051 · loadLeaderboard:2061 · showGameOver:2084
+- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2146–2209): frame:2151 · checkForUpdate:2172
 
 ## src/meta.js
 

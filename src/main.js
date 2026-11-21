@@ -1480,7 +1480,7 @@ function render() {
     for (const o of orbiterPositions()) drawBook(o.x, o.y, o.a * 2, '#b48cff', 1.1);
     drawPlayer();
   }
-  for (const h of hazards) drawHazard(h);
+  drawHazards();
   for (const g of rings) drawRing(g);
   drawParticles();
 
@@ -1716,17 +1716,31 @@ function drawPickup(k) {
   }
 }
 
-/** Enemy pages: solid red with a dark outline and a pulsing hot rim, so they never read as your books. */
-function drawHazard(h) {
-  const pulse = 0.5 + 0.5 * Math.sin(game.time * 14 + h.rot);
-  ctx.save(); ctx.translate(h.x, h.y);
+/** Enemy pages: solid red with a dark outline and a pulsing hot rim, so they never read as your books.
+ *  Drawn as a batch (one stroke for every rim, one pre-rendered sprite per page): a late boss puts 100+ on screen. */
+const hazardSprite = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 32; // 2x for HiDPI
+  const g = c.getContext('2d'); g.scale(2, 2); g.translate(8, 8);
+  g.fillStyle = '#120a06'; g.fillRect(-6.5, -7.5, 13, 15);
+  g.fillStyle = '#ff3b4e'; g.fillRect(-5, -6, 10, 12);
+  g.fillStyle = '#ffd0d5'; g.fillRect(-3, -3, 6, 1.6); g.fillRect(-3, 0.5, 6, 1.6);
+  return c;
+})();
+function drawHazards() {
+  if (!hazards.length) return;
+  const pulse = 0.5 + 0.5 * Math.sin(game.time * 14);
   ctx.strokeStyle = `rgba(255,60,80,${0.35 + pulse * 0.4})`; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(0, 0, 9 + pulse * 1.5, 0, TAU); ctx.stroke();
-  ctx.rotate(h.rot);
-  ctx.fillStyle = OUTLINE; ctx.fillRect(-6.5, -7.5, 13, 15);
-  ctx.fillStyle = '#ff3b4e'; ctx.fillRect(-5, -6, 10, 12);
-  ctx.fillStyle = '#ffd0d5'; ctx.fillRect(-3, -3, 6, 1.6); ctx.fillRect(-3, 0.5, 6, 1.6);
-  ctx.restore();
+  ctx.beginPath();
+  const r = 9 + pulse * 1.5;
+  for (const h of hazards) { ctx.moveTo(h.x + r, h.y); ctx.arc(h.x, h.y, r, 0, TAU); }
+  ctx.stroke();
+  const base = ctx.getTransform();
+  for (const h of hazards) {
+    const c = Math.cos(h.rot), s = Math.sin(h.rot);
+    ctx.setTransform(base.a * c, base.b + base.a * s, -base.d * s, base.d * c, base.a * h.x + base.e, base.d * h.y + base.f);
+    ctx.drawImage(hazardSprite, -8, -8, 16, 16);
+  }
+  ctx.setTransform(base);
 }
 
 function drawRing(g) {
