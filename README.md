@@ -48,10 +48,13 @@ The thrown books and the boss names come from `src/catalogue.js`. Edit that file
 ## Develop
 
 ```bash
-npm install          # only dev dependency: esbuild (for the single-file build)
+npm install          # dev dependencies: esbuild (build) and Playwright (QA)
 npm test             # unit tests for the pure game logic
-npm run build        # dist/overdue.html — the whole game in one ~70 KB file
+npm run qa           # full QA: every screen on phone/tablet/desktop, perf budget, privacy scan
+npm run build        # dist/overdue.html: the whole game in one file (this is what deploys)
 ```
+
+How to test changes: see **TESTING.md**. Rules for working on the project (people and AI sessions): see **CLAUDE.md**.
 
 ```
 index.html          page shell + menus

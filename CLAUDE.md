@@ -1,0 +1,57 @@
+# CLAUDE.md: how to work on OVERDUE!
+
+Claude Code reads this file automatically at the start of every session. Follow it. If a rule here
+conflicts with a request, ask the owner, don't silently pick one.
+
+## What this is
+A static, phone-first arcade roguelite (HTML canvas + ES modules, no server). The live site is
+GitHub Pages: https://andrehiu.github.io/overdue/ (auto-deployed from `main`). See README.md for the code map.
+
+## Commands
+```bash
+npm run dev     # local play at http://localhost:5173 (add ?debug=1 for test hooks)
+npm test        # unit tests for the pure game modules (fast)
+npm run qa      # FULL QA: unit tests + every screen on phone/tablet/desktop + perf budget + privacy scan
+npm run build   # dist/overdue.html (single file) + dist/version.json; this is exactly what deploys
+```
+
+## Definition of done (every change)
+1. Work on a branch: `claude/<short-topic>`. One task per session/branch.
+2. `npm run qa` passes. **Open the screenshots in `qa-report/`** (title, perks, game over at least),
+   because several bugs here were only visible by eye.
+3. Follow the checklist in **TESTING.md** for the kind of change you made.
+4. Release: bump `"version"` in package.json for anything players will notice (patch = fix, minor = feature).
+5. Ship: fast-forward `main` to your branch (`git push origin HEAD:main`) only when the owner asked to ship.
+6. **Never say "live" until the "Deploy to GitHub Pages" run for that commit is green.** If it fails with
+   "Fetching artifact metadata failed", that's a GitHub hiccup: re-run the workflow and check again.
+7. Players see the new version on next open; the title screen shows `v<version> · <commit>`.
+
+## Product rules (owner decisions, don't change without asking)
+- **Phone first.** Portrait iPhone is the main target; iPad and desktop must also fill the screen.
+- **Keep the dynamic lighting** (dark room, lamp pools, lantern) as it is.
+- **Auto-aim deliberately ignores line of sight.** Firing into shelves is a feature (and feeds Spine Breaker).
+- **Perk cards speak plainly:** "just the gain" (e.g. "+50% damage"). Never show internal units (px, rad/s).
+- Perks stack to 3/3; 3/3 unlocks that perk's Masterwork. Combos ("Collected Works") unlock from pairs.
+- The app icon and name ("Overdue!") are baked in when players add to Home Screen; changing them
+  forces everyone to re-add. Don't change them casually.
+- **Saved data must survive updates.** These localStorage keys are player data; never rename or reshape
+  without a migration: `overdue.settings.v1`, `overdue.best.v1`, `overdue.name.v1`,
+  `overdue.halloffame.v1`, `overdue.codex.v1`.
+
+## Lessons learned (each became a QA check)
+| What slipped | Rule |
+|---|---|
+| Card colours were defined on `:root` and turned every menu dark-on-dark | Scope component tokens to the component; QA checks menu text contrast |
+| A deploy was reported live but had failed | Check the Pages run is green before saying live |
+| Late boss ran at 0.4x speed (hit-stop chained on every hit) | Perf budget: wave-15 boss with a stacked build ≥ 0.85x speed, ≥ 50 fps |
+| A privacy scan checked files but not commit messages | QA scans files *and* commit messages |
+| Flow-field heap compared float64 keys to a Float32Array | Pure logic stays in pure modules with unit tests |
+
+## Privacy and security
+- Never put the owner's personal details (email, full name) in code, docs or commit messages.
+- `.qa-private-terms` (gitignored, one term per line) lets `npm run qa` scan for them locally.
+- No secrets exist or are needed: the game is static. Keep it that way.
+
+## Also exists
+- A claude.ai-hosted copy (shared Hall of Fame) is built with `npm run build -- --fragment` and
+  republished from a Claude session; it doesn't update from `main` automatically.

@@ -7,10 +7,14 @@
   "scripts": {
     "dev": "node scripts/serve.mjs",
     "test": "node --test test/*.test.js",
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/build.mjs",
+    "qa": "node scripts/qa/run.mjs"
   },
   "devDependencies": {
-    "esbuild": "0.24.2"
+    "esbuild": "0.24.2",
+    "playwright": "^1.63.0"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  }
 }

@@ -4,6 +4,13 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+    # Docs/QA-only changes don't redeploy: a redeploy changes the commit shown in-game and would
+    # prompt every player with a pointless "update available".
+    paths-ignore:
+      - '**.md'
+      - 'scripts/qa/**'
+      - '.github/workflows/ci.yml'
+      - '.gitignore'
   workflow_dispatch:
 permissions:
   contents: read
