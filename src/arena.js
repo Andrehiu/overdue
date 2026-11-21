@@ -82,7 +82,16 @@ function overlapsSafe(x, y, w, h) {
  * Generate a symmetric library floor: shelves are placed in the left half and mirrored.
  * Deterministic for a given (seed, wave). `shelvesPerHalf` overrides the density (story wings).
  */
-export function generateArena(seed, wave, shelvesPerHalf = null) {
+export function generateArena(seed, wave, shelvesPerHalf = null, shape = 'scatter') {
+  if (shape && shape !== 'scatter') {
+    const a = shapedArena(seed, wave, shelvesPerHalf, shape);
+    if (a) return a;
+  }
+  return scatterArena(seed, wave, shelvesPerHalf);
+}
+
+/** The original generator (endless mode and the 'scatter' shape). Layouts must never change. */
+function scatterArena(seed, wave, shelvesPerHalf) {
   const rng = new Rng(hashString(`arena:${seed}:${wave}`));
   const perHalf = shelvesPerHalf ?? Math.min(2 + Math.floor((wave + 1) / 2), 6);
   let best = null;
@@ -112,14 +121,131 @@ export function generateArena(seed, wave, shelvesPerHalf = null) {
     }
     if (isConnected(solid) && (!best || shelves.length > best.shelves.length)) {
       const rects = shelves.map((s) => ({ x: s.x * CELL, y: s.y * CELL, w: s.w * CELL, h: s.h * CELL }));
-      best = { seed, wave, shelves, rects, solid };
+      best = { seed, wave, shape: 'scatter', shelves, rects, solid };
     }
     // Wide aisles can make a crowded request not fit; if so keep retrying for the fullest layout,
     // and settle for fewer shelves rather than an empty room.
     if (best && best.shelves.length >= perHalf * 2) break;
   }
-  return best || { seed, wave, shelves: [], rects: [], solid: new Uint8Array(COLS * ROWS) };
+  return best || { seed, wave, shape: 'scatter', shelves: [], rects: [], solid: new Uint8Array(COLS * ROWS) };
 }
+
+// ---- Room shapes (story wings). Each shape lists candidate shelves for the LEFT half in priority
+// order; they are placed greedily (mirrored to the right) while they keep the 2-cell aisles, the spawn
+// zone clear and the floor connected. Taking the first N of a fixed list means a denser room always
+// contains every shelf of a sparser one (same shape, same seed).
+export const SHAPES = ['scatter', 'aisles', 'pillars', 'maze', 'reading', 'bridge'];
+
+function shuffled(rng, list) {
+  const a = list.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = rng.int(0, i); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+const SHAPE_GEN = {
+  // Long parallel rows (library stacks), each with a cross-gap at the mirror seam and sometimes one more.
+  aisles(rng, perHalf) {
+    const half = COLS >> 1, n = Math.floor((ROWS - 2) / 3), slack = (ROWS - 4) - (3 * (n - 1) + 1);
+    const off = rng.int(0, slack);
+    const rows = [];
+    for (let i = 0; i < n; i++) {
+      const y = 2 + off + 3 * i;
+      const end = y >= SAFE.y0 - 0 && y <= SAFE.y1 ? SAFE.x0 - 2 : half - 2; // last cell of the half-row
+      const len = end - 2 + 1;
+      const segs = [];
+      if (len >= 10 && rng.chance(0.55)) {
+        const g = rng.int(4, len - 6); // cross-gap of 2 cells
+        segs.push([2, g], [g + 3, len - g - 2]);
+      } else segs.push([2, len]);
+      rows.push(segs.map(([x, w]) => ({ x, y, w, h: 1 })));
+    }
+    return { cands: shuffled(rng, rows).flat(), target: perHalf * 2 };
+  },
+  // Open hall: a regular grid of 1x1 or 2x2 pillars, checkerboard first.
+  pillars(rng, perHalf) {
+    const half = COLS >> 1, s = rng.chance(0.5) ? 1 : 2, pitch = s + 3;
+    const ox = rng.int(0, 1), oy = rng.int(0, 1);
+    const a = [], b = [];
+    for (let j = 0, y = 2 + oy; y + s <= ROWS - 2; j++, y += pitch)
+      for (let i = 0, x = 2 + ox; x + s <= half - 1; i++, x += pitch) ((i + j) % 2 ? b : a).push({ x, y, w: s, h: s });
+    return { cands: [...shuffled(rng, a), ...shuffled(rng, b)], target: s === 1 ? perHalf * 2 : perHalf + 1 };
+  },
+  // Short bars of alternating direction on a loose lattice: corridors that turn.
+  maze(rng, perHalf) {
+    const half = COLS >> 1, cands = [];
+    for (let y = 2; y <= ROWS - 4; y += 5) for (let x = 2; x <= half - 4; x += 5) {
+      const horiz = ((x - 2) / 5 + (y - 2) / 5) % 2 === 0 ? rng.chance(0.75) : rng.chance(0.25);
+      const len = rng.int(3, 4);
+      const jx = rng.int(0, 1), jy = rng.int(0, 1);
+      cands.push(horiz ? { x: x + jx, y: y + 1 + jy, w: len, h: 1 } : { x: x + 1 + jx, y: y + jy, w: 1, h: len });
+    }
+    return { cands: shuffled(rng, cands), target: perHalf + 1 };
+  },
+  // Reading room: a ring around the spawn rug with openings top, bottom and at the four corners,
+  // plus a few shelves outside it.
+  reading(rng, perHalf) {
+    const half = COLS >> 1, xl = SAFE.x0 - 2, yt = SAFE.y0 - 2, yb = SAFE.y1 + 2;
+    const ring = [
+      { x: xl, y: yt, w: half - 1 - xl, h: 1 },           // top bar
+      { x: xl, y: yb, w: half - 1 - xl, h: 1 },           // bottom bar
+      { x: xl, y: yt + 3, w: 1, h: yb - yt - 5 },         // side bar
+    ];
+    const out = [];
+    for (let i = 0; i < 14; i++) {
+      const horiz = rng.chance(0.4), w = horiz ? rng.int(3, 4) : 1, h = horiz ? 1 : rng.int(3, 5);
+      out.push({ x: rng.int(2, Math.max(2, xl - 2 - w)), y: rng.int(2, ROWS - 2 - h), w, h });
+    }
+    return { cands: [...ring, ...out], target: 3 + Math.max(0, perHalf - 2) };
+  },
+  // Two long shelf walls split the floor into a centre and two sides, joined by 2-3 wide gaps each.
+  bridge(rng, perHalf) {
+    const half = COLS >> 1, wx = rng.int(4, 6), gaps = rng.int(2, 3), gw = 2;
+    const top = 2, bottom = ROWS - 2; // wall spans rows [top, bottom)
+    const room = bottom - top - gaps * gw, segs = gaps + 1;
+    const cuts = Array.from({ length: segs }, (_, i) => Math.floor(room / segs) + (i < room % segs ? 1 : 0));
+    if (rng.chance(0.5)) cuts.reverse();
+    const wall = [];
+    let y = top;
+    for (const l of cuts) { wall.push({ x: wx, y, w: 1, h: l }); y += l + gw; }
+    const extra = [];
+    for (let i = 0; i < 12; i++) {
+      const horiz = rng.chance(0.6), w = horiz ? rng.int(3, 5) : 1, h = horiz ? 1 : rng.int(2, 4);
+      extra.push({ x: rng.int(wx + 3, Math.max(wx + 3, half - 1 - w)), y: rng.int(2, ROWS - 2 - h), w, h });
+    }
+    return { cands: [...wall, ...extra], target: wall.length + Math.max(0, perHalf - 1) };
+  },
+};
+
+function shapedArena(seed, wave, shelvesPerHalf, shape) {
+  const gen = SHAPE_GEN[shape];
+  if (!gen) return null;
+  const rng = new Rng(hashString(`arena:${seed}:${wave}:${shape}`));
+  const perHalf = shelvesPerHalf ?? Math.min(2 + Math.floor((wave + 1) / 2), 6);
+  const { cands, target } = gen(rng, perHalf);
+  const half = COLS >> 1;
+  const solid = new Uint8Array(COLS * ROWS);
+  const shelves = [];
+  const stamp = (x, y, w, h, v) => { for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) solid[idx(xx, yy)] = v; };
+  let placed = 0;
+  for (const c of cands) {
+    if (placed >= target) break;
+    const { x, y, w, h } = c;
+    if (w < 1 || h < 1 || x < AISLE || y < AISLE || x + w > half - 1 || y + h > ROWS - AISLE || overlapsSafe(x, y, w, h)) continue;
+    let blocked = false;
+    for (let yy = y - AISLE; yy < y + h + AISLE && !blocked; yy++)
+      for (let xx = x - AISLE; xx < x + w + AISLE; xx++) if (solid[idx(xx, yy)]) { blocked = true; break; }
+    if (blocked) continue;
+    const mx = COLS - x - w;
+    stamp(x, y, w, h, 1); stamp(mx, y, w, h, 1);
+    if (!isConnected(solid)) { stamp(x, y, w, h, 0); stamp(mx, y, w, h, 0); continue; }
+    shelves.push({ x, y, w, h }, { x: mx, y, w, h });
+    placed++;
+  }
+  if (!shelves.length) return null; // fall back to scatter rather than an empty room
+  const rects = shelves.map((s) => ({ x: s.x * CELL, y: s.y * CELL, w: s.w * CELL, h: s.h * CELL }));
+  return { seed, wave, shape, shelves, rects, solid };
+}
+
 
 /** Free cells on the outer ring, used as enemy entry points. */
 export function edgeCells(solid) {

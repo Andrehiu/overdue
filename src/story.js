@@ -7,33 +7,34 @@
 //   - room to room inside a wing (more enemies, tougher, faster, more elites, faster pages);
 //   - wing to wing at the same room (every multiplier steps up, new enemy mixes, bosses learn patterns).
 import { baseBudget, composeWave } from './waves.js';
+import { hashString } from './util.js';
 
 export const ROOMS_PER_WING = 10;
 export const ELITE_ROOM = 5;
 export const BOSS_ROOM = 10;
 
 // weights: enemy mix · unlockShift: enemy types arrive earlier · density: extra shelves per half
-// gapMult: < 1 means less breathing room between spawn groups · eliteBonus: extra elite chance
+// shapes: the room layouts this wing uses (see arena.js) · gapMult: < 1 means less breathing room between spawn groups · eliteBonus: extra elite chance
 export const WINGS = [
-  { id: 'frontdesk', icon: '🛎️', name: 'Front Desk', blurb: 'Where every shift begins. Dust bunnies and overdue notices.',
+  { id: 'frontdesk', shapes: ['scatter', 'reading'], icon: '🛎️', name: 'Front Desk', blurb: 'Where every shift begins. Dust bunnies and overdue notices.',
     weights: { golem: 0.6 }, floorHue: 25, rug: '#4a1622' },
-  { id: 'children', icon: '🧸', name: "Children's Wing", blurb: 'Small readers, big messes. Bunnies everywhere.',
+  { id: 'children', shapes: ['pillars', 'scatter'], icon: '🧸', name: "Children's Wing", blurb: 'Small readers, big messes. Bunnies everywhere.',
     weights: { bunny: 2.4, patron: 0.6 }, floorHue: 38, rug: '#1f3d5a' },
-  { id: 'periodicals', icon: '📰', name: 'Periodicals', blurb: 'Paper storms: swarms of overdue notices.',
+  { id: 'periodicals', shapes: ['aisles', 'scatter'], icon: '📰', name: 'Periodicals', blurb: 'Paper storms: swarms of overdue notices.',
     weights: { notice: 2.6 }, gapMult: 0.9, floorHue: 18, rug: '#2c3a1d' },
-  { id: 'reference', icon: '📖', name: 'Reference Section', blurb: 'Loud patrons shout from behind the encyclopedias.',
+  { id: 'reference', shapes: ['reading', 'pillars'], icon: '📖', name: 'Reference Section', blurb: 'Loud patrons shout from behind the encyclopedias.',
     weights: { patron: 2.2 }, unlockShift: 1, floorHue: 30, rug: '#3b1f4a' },
-  { id: 'stacks', icon: '📚', name: 'The Stacks', blurb: 'Tight aisles. Bookworms burrow between the shelves.',
+  { id: 'stacks', shapes: ['aisles', 'maze'], icon: '📚', name: 'The Stacks', blurb: 'Tight aisles. Bookworms burrow between the shelves.',
     weights: { worm: 2.2 }, unlockShift: 1, density: 2, floorHue: 22, rug: '#4a3216' },
-  { id: 'archive', icon: '🗄️', name: 'Archive', blurb: 'Late Fee Golems guard the old ledgers. Rich in fines.',
+  { id: 'archive', shapes: ['maze', 'bridge'], icon: '🗄️', name: 'Archive', blurb: 'Late Fee Golems guard the old ledgers. Rich in fines.',
     weights: { golem: 2.4 }, unlockShift: 3, floorHue: 210, rug: '#24324a' },
-  { id: 'studyhall', icon: '✏️', name: 'Study Hall', blurb: "Everyone's here, and nobody is quiet.",
+  { id: 'studyhall', shapes: ['pillars', 'aisles'], icon: '✏️', name: 'Study Hall', blurb: "Everyone's here, and nobody is quiet.",
     unlockShift: 3, gapMult: 0.85, floorHue: 28, rug: '#4a1f1f' },
-  { id: 'vault', icon: '💎', name: 'Rare Books Vault', blurb: 'Elite collectors who fight back. Fines galore.',
+  { id: 'vault', shapes: ['reading', 'maze'], icon: '💎', name: 'Rare Books Vault', blurb: 'Elite collectors who fight back. Fines galore.',
     weights: { golem: 1.6 }, unlockShift: 4, eliteBonus: 0.08, floorHue: 270, rug: '#3a2050' },
-  { id: 'maproom', icon: '🗺️', name: 'Map Room', blurb: 'Wide open floor and nowhere to hide from the crowd.',
+  { id: 'maproom', shapes: ['pillars'], icon: '🗺️', name: 'Map Room', blurb: 'Wide open floor and nowhere to hide from the crowd.',
     unlockShift: 5, density: -2, gapMult: 0.8, floorHue: 160, rug: '#173d38' },
-  { id: 'restricted', icon: '🔒', name: 'The Restricted Section', blurb: 'The last door. Everything that was banned is awake.',
+  { id: 'restricted', shapes: ['maze', 'bridge', 'aisles'], icon: '🔒', name: 'The Restricted Section', blurb: 'The last door. Everything that was banned is awake.',
     unlockShift: 5, eliteBonus: 0.1, gapMult: 0.85, floorHue: 0, rug: '#3d0d14' },
 ];
 
@@ -87,6 +88,22 @@ export function composeRoom(wing, room, rng) {
 
 /** Seed for a room's shelf layout: the same every time you play it, like a handmade level. */
 export const layoutSeed = (wing, room) => 7919 * wing + 104729 * room;
+
+const forcedRoom = (room) => room === ELITE_ROOM || room === BOSS_ROOM;
+
+/**
+ * Which layout shape a story room uses. Fixed per wing + room. Elite and boss rooms take the wing's
+ * most open shape (pillars, else reading, else scatter); other rooms never repeat the previous room's shape.
+ */
+export function roomShape(wing, room) {
+  const list = (WINGS[wing - 1] || WINGS[0]).shapes;
+  if (forcedRoom(room)) return ['pillars', 'reading'].find((x) => list.includes(x)) || 'scatter';
+  const start = hashString(`shape:${layoutSeed(wing, room)}`) % list.length;
+  const prev = room > 1 ? roomShape(wing, room - 1) : null;
+  const next = forcedRoom(room + 1) ? roomShape(wing, room + 1) : null;
+  const order = list.map((_, i) => list[(start + i) % list.length]);
+  return order.find((x) => x !== prev && x !== next) || order.find((x) => x !== prev) || order[0];
+}
 
 /** Fines (🪙) for clearing a room. First clears of a wing pay a one-time bonus on top. */
 export function roomReward(wing, room) {

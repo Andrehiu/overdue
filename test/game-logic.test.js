@@ -318,7 +318,7 @@ const shelfGap = (a, b) => Math.max(a.x - (b.x + b.w), b.x - (a.x + a.w), a.y - 
 
 test('aisles are at least 2 cells (60 px) wide in every room, on every screen shape, and never empty', async () => {
   const A = await load('arena');
-  const { WINGS, ROOMS_PER_WING, difficulty, layoutSeed } = await load('story');
+  const { WINGS, ROOMS_PER_WING, difficulty, layoutSeed, roomShape } = await load('story');
   const shapes = [[32, 18], [18, 32], [28, 20], [20, 28], ...[0.5, 1, 1.4, 2].map((a) => A.gridForAspect(a))];
   const check = (a, label) => {
     assert.ok(a.shelves.length > 0, `${label}: has shelves`);
@@ -336,7 +336,7 @@ test('aisles are at least 2 cells (60 px) wide in every room, on every screen sh
       A.setGrid(cols, rows);
       for (let seed = 1; seed <= 20; seed++) for (let wave = 1; wave <= 30; wave++) check(A.generateArena(seed, wave), `${cols}x${rows} endless seed ${seed} wave ${wave}`);
       for (let w = 1; w <= WINGS.length; w++) for (let r = 1; r <= ROOMS_PER_WING; r++) {
-        check(A.generateArena(layoutSeed(w, r), r, difficulty(w, r).shelvesPerHalf), `${cols}x${rows} story wing ${w} room ${r}`);
+        check(A.generateArena(layoutSeed(w, r), r, difficulty(w, r).shelvesPerHalf, roomShape(w, r)), `${cols}x${rows} story wing ${w} room ${r}`);
       }
     }
   } finally { A.setOrientation(false); }
@@ -394,4 +394,57 @@ test('cornerAssist + wall collision lets a circle walk past a corner it clips', 
     pushCircleOutOfRect(p, r, rect);
   }
   assert.ok(p.x > 200, `got past the shelf (x=${p.x})`);
+});
+
+test('scatter layouts are byte-identical to the pre-shapes generator (endless stays as it was)', async () => {
+  const { createHash } = await import('node:crypto');
+  const A = await load('arena');
+  // sha256 over endless seeds 1-20 x waves 1-30, captured from the v1.4.0 generator.
+  const expected = {
+    '32x18': '38a12670b7f5bced59cca3c0d354c700c637cdf81a256934dbb488ba38ff314d',
+    '28x20': '0a351cb2c6041bcd686f377a48f40542e1aa839af2f792e2505884481edf6c08',
+    '28x21': 'f6f95a470ea3223f681f09476f5fbd6c52304149bfc898f5c13f955fffdb80a2',
+  };
+  try {
+    for (const [cols, rows] of [[32, 18], [28, 20], A.gridForAspect(4 / 3)]) {
+      A.setGrid(cols, rows);
+      const plain = createHash('sha256'), named = createHash('sha256');
+      for (let s = 1; s <= 20; s++) for (let w = 1; w <= 30; w++) {
+        plain.update(Buffer.from(A.generateArena(s, w).solid));
+        named.update(Buffer.from(A.generateArena(s, w, null, 'scatter').solid));
+      }
+      assert.equal(plain.digest('hex'), expected[`${cols}x${rows}`], `${cols}x${rows} endless layouts unchanged`);
+      assert.equal(named.digest('hex'), expected[`${cols}x${rows}`], `${cols}x${rows} 'scatter' = default`);
+    }
+  } finally { A.setOrientation(false); }
+});
+
+test('every room shape keeps the rules: connected, clear spawn, 2-cell aisles, open edges, denser = more shelf', async () => {
+  const A = await load('arena');
+  const grids = [[32, 18], [28, 20], A.gridForAspect(4 / 3), A.gridForAspect(1.6)];
+  try {
+    for (const [cols, rows] of grids) {
+      A.setGrid(cols, rows);
+      for (const shape of A.SHAPES) for (let seed = 1; seed <= 12; seed++) {
+        let prevCells = 0;
+        for (let d = 1; d <= 7; d++) {
+          const label = `${cols}x${rows} ${shape} seed ${seed} density ${d}`;
+          const a = A.generateArena(seed * 977, (seed % 10) + 1, d, shape);
+          assert.deepEqual(a.solid, A.generateArena(seed * 977, (seed % 10) + 1, d, shape).solid, `${label}: deterministic`);
+          assert.ok(a.shelves.length > 0, `${label}: not empty`);
+          if (shape !== 'scatter') assert.equal(a.shape, shape, `${label}: no fallback`);
+          assert.ok(A.isConnected(a.solid), `${label}: connected`);
+          for (let y = A.SAFE.y0; y <= A.SAFE.y1; y++) for (let x = A.SAFE.x0; x <= A.SAFE.x1; x++) assert.equal(a.solid[A.idx(x, y)], 0, `${label}: spawn clear`);
+          for (const s of a.shelves) assert.ok(s.x >= A.AISLE && s.y >= A.AISLE && cols - s.x - s.w >= A.AISLE && rows - s.y - s.h >= A.AISLE, `${label}: wall aisle`);
+          for (let i = 0; i < a.shelves.length; i++) for (let j = i + 1; j < a.shelves.length; j++) assert.ok(shelfGap(a.shelves[i], a.shelves[j]) >= A.AISLE, `${label}: shelves ${i}/${j} too close`);
+          const edge = A.edgeCells(a.solid);
+          const sides = new Set(edge.map(([x, y]) => (y === 0 ? 't' : y === rows - 1 ? 'b' : x === 0 ? 'l' : 'r')));
+          assert.ok(edge.length >= 12 && sides.size >= 3, `${label}: edge entry points`);
+          const cells = a.solid.reduce((s, v) => s + v, 0);
+          if (shape !== 'scatter') assert.ok(cells >= prevCells, `${label}: denser never has fewer shelf cells`);
+          prevCells = cells;
+        }
+      }
+    }
+  } finally { A.setOrientation(false); }
 });

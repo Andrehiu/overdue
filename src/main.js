@@ -10,7 +10,7 @@ import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, combo
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist } from './util.js';
 import { PLAYER, bookLook } from './palette.js';
 import { SoundEngine } from './audio.js';
-import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, difficulty, composeRoom, layoutSeed, roomReward } from './story.js';
+import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
 import { PROGRESS_KEY, RENOVATIONS, normalizeProgress, applyRenovations, runBonuses, recordRun, level, nextCost, canBuy, buy } from './meta.js';
 
 // ======================================================================
@@ -285,7 +285,7 @@ function startWave(n) {
   clearWorld();
   game.diff = isStory() ? difficulty(game.wingN, n) : null;
   // Story rooms keep the same shelf layout every time you play them, like handmade levels.
-  arena = isStory() ? generateArena(layoutSeed(game.wingN, n), n, game.diff.shelvesPerHalf) : generateArena(game.seed, n);
+  arena = isStory() ? generateArena(layoutSeed(game.wingN, n), n, game.diff.shelvesPerHalf, roomShape(game.wingN, n)) : generateArena(game.seed, n);
   buildBackground();
   flowCell = -1;
   player.x = W / 2; player.y = H / 2; player.vx = player.vy = 0;
