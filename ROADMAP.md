@@ -6,6 +6,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-22 | Rare Books option C; SHHH resets each story room (endless unchanged) | Owner playtest: wing 4 cleared easily, elite door not scary; SHHH should be fresh per room |
 | 2026-11-21 | Story doors (v1.7.0) with the planner's default numbers; balance to be tuned after the owner plays | Owner: turn 10 fixed rooms into a route you plan |
 | 2026-11-21 | Story rooms get shapes per wing; endless keeps today's generator | Owner: "every room feels the same"; endless must stay comparable |
 | 2026-11-21 | Remove all meme book-title text (banner, kill pop-ups), keep author-named bosses | Owner |
@@ -29,6 +30,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 | 1.5.0 | **Build strip:** owned perks as chips with short names, combo partner glows, tap a chip for details | Shipped 2026-11-21 (live, b6e745d), incl. reset note kept on short screens |
 | 1.6.0 | **Room shapes per story wing:** aisles, pillars, maze, reading room, bridge (+ today's scatter); 2–3 per wing; rooms 5/10 open; endless layouts unchanged | Shipped 2026-11-22 with 1.7.0 (7ebfdad) |
 | 1.7.0 | **Pick your next door** (story): 2 doors after rooms 1–3 and 6–8: 💰 Rare Books (+0.5 elite share, ×2 fines), ☕ Break Room (heal 1, ×0.5 fines min 3), 🎲 Mystery Shelf (cursed book or bonus perk); 🚪 Stacks replaces Break Room at full HP | Shipped 2026-11-22 (7ebfdad); owner balance-testing. Balance bot: `npm run balance` |
+| 1.7.1 | **Balance fixes:** Rare Books option C (+30% enemies; from wing 4 elites +50% HP, fire 30% faster), SHHH ready each story room, Mystery bonus-pick label, end-screen buttons never cover text | In progress: coder "Overdue · v1.7.1 balance fixes". Handoff: `docs/handoffs/1.7.1-balance-fixes.md` |
 | — | **Bigger map (parked):** ~40×24 cells (1.7× floor), camera follows the player with a dead zone; light layer screen-sized (same look; owner OK needed since CLAUDE.md says keep lighting); auto-aim only on screen; spawns just off-screen; edge arrows for off-screen enemies; perf budget must hold. Build behind `?bigmap=1` first | Parked: 1.3.1 fixed the cramped feeling. Revisit only if it comes back |
 
 ### 1.3.1 phone checklist (wing 1, rooms 1–10)
