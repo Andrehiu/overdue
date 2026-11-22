@@ -6,6 +6,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-22 | Arena follows the phone's aspect up to ~2.2:1 so phones fill the screen; 16:9 and iPad grids unchanged | Owner saw black side bars on iPhone |
 | 2026-11-22 | Teach perks just-in-time (learn as you go), not a tutorial run | Owner: players don't understand perks |
 | 2026-11-22 | Second-finger aiming becomes a floating joystick (drag to aim), not aim-at-finger | Owner: pressing all over the screen to shoot left makes no sense |
 | 2026-11-22 | Mobile only (option A): desktop unsupported and dropped from QA, code kept; iPad + gamepad stay. How to play becomes a simple touch-first list (no WASD/mouse) | Owner: "stick with a mobile game moving forward" |
@@ -43,6 +44,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 | 1.10.1 | **Mobile only:** desktop QA target removed (iPad mini added to full screens), touch-first How to play (no WASD/mouse; one line on 2nd-finger aiming), outdated boss text fixed | Shipped 2026-11-22 with 1.10.2 (49a845a) |
 | 1.10.2 | **Aim joystick:** second finger becomes a floating aim stick (drag direction, deadzone), drawn like the move stick; also overrides auto-aim while deflected | Shipped 2026-11-22 (49a845a; Pages deploy green on 3rd attempt) |
 | 1.11.0 | **Learn perks as you go:** one-time tips (stack to 3/3, combos), Masterwork previews at 2/3, UNLOCKED + reason on special cards, level-up pips, Perks box in How to play, "Show tips again" (new key `overdue.tips.v1`) | Merged on top of 1.10.2, QA green (63 unit, 57–60 fps); awaiting owner "ship" |
+| 1.11.1 | **Fill the screen:** arena widens to the phone's shape (no black side bars; iPhones were at 81–88% fill), title fits on iPad mini / iPad Safari, QA fill ≥ 95% + more phone sizes + rotation checks | In progress: coder "Overdue · v1.11.1 fill screen". Handoff: `docs/handoffs/1.11.1-fill-screen.md` |
 | — | **Bigger map (parked):** ~40×24 cells (1.7× floor), camera follows the player with a dead zone; light layer screen-sized (same look; owner OK needed since CLAUDE.md says keep lighting); auto-aim only on screen; spawns just off-screen; edge arrows for off-screen enemies; perf budget must hold. Build behind `?bigmap=1` first | Parked: 1.3.1 fixed the cramped feeling. Revisit only if it comes back |
 
 ### 1.3.1 phone checklist (wing 1, rooms 1–10)
