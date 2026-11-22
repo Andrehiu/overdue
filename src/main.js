@@ -2131,7 +2131,14 @@ function fitPinnedRow(scr) {
   const fit = () => {
     const w = Math.max(0, ...[...scr.children].filter((c) => c !== row && !c.hidden && c.offsetParent !== null).map((c) => c.getBoundingClientRect().width));
     // 12em floor so a very narrow block can't squash the buttons into a column of slivers
-    row.style.maxWidth = w ? `max(${Math.ceil(w)}px, 12em)` : '';
+    // Short screens (phones): the row is one compact line as wide as the screen; the column cap applies to taller screens only.
+    const short = matchMedia('(max-height: 640px)').matches;
+    // Taller screens keep the column cap, unless the buttons would have to wrap: then the row grows to one line.
+    const btns = [...row.children].filter((b) => !b.hidden && b.offsetParent !== null);
+    const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+    const one = btns.reduce((a, b) => a + b.getBoundingClientRect().width, 0) + gap * Math.max(0, btns.length - 1);
+    const nowrap = getComputedStyle(row).flexWrap === 'nowrap';
+    row.style.maxWidth = w && !short ? `max(${Math.ceil(w)}px, 12em${nowrap ? `, ${Math.ceil(one)}px` : ''})` : '';
   };
   fit();
   if (pinnedObservers.has(scr) || typeof ResizeObserver === 'undefined') return;

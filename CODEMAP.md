@@ -36,7 +36,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/catalogue.js` | 140 | Built-in book catalogue: the titles you throw and the authors bosses are named after. |
 | `src/doors.js` | 65 | Story doors: after most rooms you pick the next room from 2 doors. Pure module (no DOM) so it is unit-tested. |
 | `src/flowfield.js` | 102 | Dijkstra flow field: one search from the player gives every enemy a path around the shelves. |
-| `src/main.js` | 2474 | OVERDUE! — Night Shift at the Meme Library |
+| `src/main.js` | 2481 | OVERDUE! — Night Shift at the Meme Library |
 | `src/meta.js` | 99 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
 | `src/palette.js` | 52 | Projectile colours. Pure module (no DOM), unit-tested. |
 | `src/story.js` | 123 | Story mode: ten handmade library wings, unlocked in order. Pure module (no DOM) so it is unit-tested. |
@@ -48,7 +48,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/doors.test.js` | 118 | Story doors (v1.7.0): pure rules, no DOM. |
 | `test/game-logic.test.js` | 508 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
 | `test/story-meta.test.js` | 179 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
-| `scripts/qa/run.mjs` | 518 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
+| `scripts/qa/run.mjs` | 522 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 43 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
 | `scripts/codemap.mjs` | 113 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
@@ -92,8 +92,8 @@ NEIGH:4 · canStep:44 · computeFlowField:54 · lineOfSight:91
 - **Effects helpers** (766–794): shake:769 · addLight:772 · floatText:776 · particle:779 · burst:780 · pages:788
 - **Update** (795–1491): step:798 · moveInput:832 · nearestEnemy:845 · updatePlayer:855 · collideWorld:936 · spawnBook:949 · fire:964 · abilityReady:985 · inkBurst:996 · nextToShelf:1010 · doShhh:1018 · updateFlow:1055 · seek:1066 · updateEnemies:1078 · bossAI:1167 · shootHazard:1220 · fan:1225 · radial:1226 · damageEnemy:1228 · killEnemy:1257 · buzz:1298 · hurtPlayer:1303 · updateBooks:1337 · orbiterPositions:1410 · updateOrbiters:1419 · updateHazards:1433 · updateRings:1446 · updatePickups:1459 · updateParticles:1476
 - **Rendering** (1492–2111): BOOK_PALETTE:1495 · buildBackground:1497 · lampPositions:1585 · lightSprite:1593 · glowCache:1599 · glowSprite:1600 · renderLights:1609 · render:1648 · drawThrownBook:1694 · drawBook:1727 · drawPlayer:1735 · rim:1778 · eyes:1783 · drawEliteHalo:1791 · drawEnemy:1806 · drawBoss:1884 · drawTelegraph:1918 · drawPickup:1926 · hazardSprite:1939 · drawHazards:1947 · drawRing:1964 · drawParticles:1971 · heartPath:1984 · FONT:1994 · txt:1995 · drawHUD:2001 · cooldown:2067 · btnCache:2083 · setTouchButton:2084 · drawCrosshair:2096 · drawStick:2105
-- **DOM screens, settings, leaderboard** (2112–2400): SCREENS:2115 · showScreen:2117 · pinnedObservers:2127 · fitPinnedRow:2128 · renderFineBadges:2144 · renderShop:2149 · defaultWing:2183 · wingStatus:2187 · renderStory:2193 · bankRun:2226 · inRun:2233 · setSetting:2257 · toast:2271 · toggleFullscreen:2304 · loadLeaderboard:2314 · showGameOver:2337
-- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2401–2474): frame:2406 · checkForUpdate:2428
+- **DOM screens, settings, leaderboard** (2112–2407): SCREENS:2115 · showScreen:2117 · pinnedObservers:2127 · fitPinnedRow:2128 · renderFineBadges:2151 · renderShop:2156 · defaultWing:2190 · wingStatus:2194 · renderStory:2200 · bankRun:2233 · inRun:2240 · setSetting:2264 · toast:2278 · toggleFullscreen:2311 · loadLeaderboard:2321 · showGameOver:2344
+- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2408–2481): frame:2413 · checkForUpdate:2435
 
 ## src/meta.js
 
@@ -190,7 +190,7 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 
 ## scripts/qa/run.mjs
 
-results:24 · record:25 · want:29 · sh:32 · TYPES:47 · TARGETS:57 · shot:64 · PINNED_CHECK:72 · md:505
+results:24 · record:25 · want:29 · sh:32 · TYPES:47 · TARGETS:57 · shot:64 · PINNED_CHECK:72 · md:509
 
 ## scripts/build.mjs
 
