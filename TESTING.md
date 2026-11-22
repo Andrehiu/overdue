@@ -20,12 +20,12 @@ look at the screenshots) notices.
 Output: `qa-report/report.md` plus screenshots per device (`iphone-landscape-1-title.png` … `-13-wing-cleared.png`, `perf-late-boss.png`, `perf-story-late.png`). Fit-only targets produce the layout screenshots only (title, perks, build strip, doors, game over, wing cleared, menus).
 
 ### How long it takes, and what runs where
-Typical `npm run qa`: **about 5 minutes on a 4-core machine** (was ~11 when all 7 sizes ran the whole flow one after another).
+Typical `npm run qa`: **about 3 minutes on a 4-core machine** (median 170 s over 3 runs; was ~11 min / 661 s when all 7 sizes ran the whole flow one after another). On a slower or 2-core machine expect 5+ minutes.
 Why it is faster: (1) most bugs here were layout/fit bugs on one size, which don't need the whole gameplay flow on every size, so only the 3 targets above run the full flow; (2) independent flows (targets, menus, rotation, shapes) run **in parallel browser contexts, 4 at a time** (`--jobs=N`, default min(4, CPUs)); (3) **perf always runs alone**, after the parallel part, so fps numbers stay comparable.
 
 Options:
 - `--only=perf` (or `unit`, `screens`, `menus`, `shapes`, `security`, comma-separated) still works.
-- `--full`: run the full flow on **every** size. Use it for releases that change gameplay screens or flow (new screens, perk/door/game-over logic), or when a fit-only target fails and you need to see what happened earlier in the flow. Takes ~8–9 minutes.
+- `--full`: run the full flow on **every** size. Use it for releases that change gameplay screens or flow (new screens, perk/door/game-over logic), or when a fit-only target fails and you need to see what happened earlier in the flow. Takes ~3.5–4 minutes (216 s measured).
 - `--jobs=1`: run everything one at a time (slowest, most stable; use it if a flow only fails when the machine is busy).
 - `--ci`: relaxed perf for slow machines.
 

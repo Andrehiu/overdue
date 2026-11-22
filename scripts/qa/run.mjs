@@ -290,7 +290,8 @@ async function screensFlow(name, opts, full) {
     await shot(page, `${name}-8-shop`);
     const shopLum = await page.evaluate(`(${LUM})(getComputedStyle(document.querySelector('#shopList strong')).color)`);
     record(area, 'shop text readable', shopLum > 0.5, `luminance ${shopLum.toFixed(2)}`);
-    if (full) {
+    // (both tiers buy it: the Catalogue renovation is what makes the story hand 4 cards)
+    {
     await tap('#shopList button[data-reno=catalogue]'); await page.waitForTimeout(200);
     const bought = await page.evaluate(() => ({ lvl: __overdue.progress.reno.catalogue, fines: __overdue.progress.fines, saved: JSON.parse(localStorage.getItem('overdue.progress.v1')).reno.catalogue }));
     record(area, 'Renovation bought and saved', bought.lvl === 1 && bought.saved === 1 && bought.fines === 700, JSON.stringify(bought));
