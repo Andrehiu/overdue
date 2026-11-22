@@ -267,6 +267,12 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     await page.waitForTimeout(700);
     await page.locator('#doorCards .door').click(); await page.waitForTimeout(300);
     record(area, 'Break Room never heals above max', await page.evaluate(() => __overdue.player.hp === 5));
+    const intro = await page.evaluate(() => { const O = __overdue; O.startWave(1); return { sub: O.game.bannerSub, want: O.WINGS ? O.WINGS[O.game.wingN - 1].intro : null }; });
+    record(area, 'story room 1 banner shows the wing intro', !!intro.sub && intro.sub !== 'Front Desk' && intro.sub.length > 10, intro.sub);
+    await page.evaluate(() => { const O = __overdue; O.stats.maxHp = 5; O.player.hp = 5; O.game.wave = 5; O.nextRoom(); }); await page.waitForTimeout(600);
+    const d5 = await page.evaluate(() => ({ state: __overdue.game.state, n: document.querySelectorAll('#doorCards .door').length }));
+    record(area, 'a 2-door screen appears after room 5', d5.state === 'doors' && d5.n === 2, JSON.stringify(d5));
+    await page.evaluate(() => { __overdue.startWave(1); });
     // v1.7.1: SHHH is ready at the start of every story room; endless keeps its cooldown
     const shhhStory = await page.evaluate(() => { const O = __overdue; O.player.shhhT = 9; O.startWave(2); return O.player.shhhT; });
     record(area, 'story: SHHH ready at the start of the next room', shhhStory === 0, `shhhT ${shhhStory}`);
@@ -289,9 +295,13 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     await page.evaluate(() => { const O = __overdue; for (const id of ['trilogy', 'trilogy', 'dewey', 'speedreader', 'interlibrary', 'hardcover', 'hardcover', 'hardcover', 'extendedloan', 'footnotes']) O.grant(id); O.startWave(10); O.god(); });
     await page.waitForTimeout(3600);
     record(area, 'room 10 boss spawns', await page.evaluate(() => __overdue.enemies.some((e) => e.type === 'boss')));
+    const taunt = await page.evaluate(() => __overdue.texts.filter((t) => /: /.test(t.text) && t.size >= 12).map((t) => t.text));
+    record(area, 'story boss shows its taunt', taunt.length > 0, taunt.join(' | '));
     await clearRoom(); await page.waitForTimeout(3400);
     await shot(page, `${name}-13-wing-cleared`);
     const won = await page.evaluate(() => ({ title: document.querySelector('#goTitle').textContent, unlocked: __overdue.progress.unlocked, next: !document.querySelector('#btnNextWing').hidden }));
+    const cl = await page.evaluate(() => { const e = document.querySelector('#goSub'); return { t: e.textContent, vis: !e.hidden }; });
+    record(area, 'wing-cleared screen shows the cleared line', cl.vis && cl.t.length > 10, cl.t);
     record(area, 'clearing wing 1 unlocks wing 2', /cleared/i.test(won.title) && won.unlocked === 2 && won.next, JSON.stringify(won));
     const btns = await page.$$eval('#gameover .menu.row button:not([hidden])', (bs) => bs.map((b) => { const r = b.getBoundingClientRect(); return { t: b.textContent.trim(), ok: r.top >= 0 && r.bottom <= innerHeight + 1 && r.left >= 0 && r.right <= innerWidth + 1 }; }));
     record(area, 'end-screen buttons on screen with a big build', btns.length >= 3 && btns.every((b) => b.ok), btns.filter((b) => !b.ok).map((b) => b.t).join(', ') || `${btns.length} buttons visible`);

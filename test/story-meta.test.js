@@ -163,7 +163,16 @@ test('even the worst door route (cheapest door every time) still affords the che
     assert.ok(worst >= cheapest, `seed ${seed}: worst route earned ${worst}, cheapest Renovation ${cheapest}`);
     assert.ok(best >= worst);
   }
+  // The door after room 5 only shapes room 6, which is paid after the room-6 checkpoint this test covers (rooms 1-5).
+  assert.equal(doorOffer(1, 1, 5, {}).length, 2);
   // Break Room never pays less than 3 fines, in any wing.
   for (let w = 1; w <= 10; w++) for (let r = 1; r <= 10; r++) assert.ok(doorReward(w, r, 'rest') >= Math.min(3, roomReward(w, r)));
   assert.ok(DOORS.rare && DOORS.rest);
+});
+
+test('every wing has an intro, taunt and cleared line, each 1-60 characters', async () => {
+  const { WINGS } = await load('story');
+  for (const w of WINGS) for (const k of ['intro', 'taunt', 'cleared']) {
+    assert.ok(typeof w[k] === 'string' && w[k].length > 0 && w[k].length <= 60, `${w.id}.${k}: ${w[k]}`);
+  }
 });

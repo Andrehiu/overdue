@@ -135,6 +135,11 @@ test('catalogue has books and authors for every title', async () => {
     assert.ok(b.title && b.title.length <= 80, `title: ${b.title}`);
     assert.ok(authors.has(b.author), `unknown author: ${b.author}`);
   }
+  // v1.8.0: original parody authors only, no real people, animals or characters
+  assert.equal(CATALOGUE.authors.length, 10);
+  const banned = ['Doge Shibe', 'Grumpy', 'Rick Astley', 'Astley', 'Boromir', 'Nyan', 'Success Kid', 'Distracted Boyfriend', 'Dog With Coffee', 'Harambe', 'Stonks Guy'];
+  const all = [...CATALOGUE.authors.map((a) => a.name), ...CATALOGUE.books.map((b) => b.title + ' ' + b.author)].join('\n');
+  for (const w of banned) assert.ok(!all.includes(w), `old name still present: ${w}`);
 });
 
 test('combo cards unlock from their two perks and always take the first slot', async () => {

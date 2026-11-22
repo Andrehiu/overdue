@@ -301,7 +301,7 @@ function startWave(n) {
   if (isStory()) player.shhhT = 0;   // story: SHHH is ready at the start of every room (endless keeps its cooldown)
   if (isStory()) {
     const kind = game.diff.kind;
-    banner(`ROOM ${n}/${ROOMS_PER_WING}`, kind === 'boss' ? 'A rogue author approaches…' : kind === 'elite' ? '★ Elite room: they fight back' : DOORS[game.door]?.banner || wingDef().name);
+    banner(`ROOM ${n}/${ROOMS_PER_WING}`, kind === 'boss' ? 'A rogue author approaches…' : kind === 'elite' ? '★ Elite room: they fight back' : n === 1 ? wingDef().intro : DOORS[game.door]?.banner || wingDef().name);
   } else banner(`WAVE ${n}`, n % 5 === 0 ? 'A rogue author approaches…' : '');
   sound.setIntensity(1); sound.setMuffled(false);
   game.state = 'playing';
@@ -757,6 +757,7 @@ function materialise(type, x, y, elite = false) {
       glow: `hsla(${hue}, 80%, 60%, 1)`, bar: `hsl(${hue} 65% 55%)` });
     game.boss = e;
     banner(`ROGUE AUTHOR`, e.name);
+    if (isStory()) floatText(x, y + 60, `${e.name}: ${wingDef().taunt}`, '#ffe9a8', 13, 2.5);
     sound.play('boss'); sound.setIntensity(2);
     shake(0.7);
   } else makeEnemy(type, x, y, elite ? { elite: true } : {});
@@ -2345,6 +2346,7 @@ function showGameOver() {
   const isBest = !story && score > (best.score || 0);
   if (isBest) saveJSON(BEST_KEY, { score, wave: game.wave });
   $('#goTitle').textContent = won ? `${wingDef().name}: cleared!` : 'Shift over';
+  $('#goSub').textContent = won ? wingDef().cleared : ''; $('#goSub').hidden = !won;
   $('#goStats').innerHTML = '';
   const fineLine = `+${res.banked.toLocaleString()} 🪙${res.firstClear ? ' (first clear!)' : ''}`;
   const rows = [
@@ -2458,7 +2460,7 @@ if (DEBUG) {
     god: () => { player.hp = 999; stats.maxHp = 999; },
     grant: (id) => { const u = UPGRADES.find((x) => x.id === id); game.owned[id] = (game.owned[id] || 0) + 1; u.apply(stats, player); },
     showCards: (ids) => renderCards(ids.map(byId)),
-    showUpgrades, showDoors, get door() { return game.door; },
+    showUpgrades, showDoors, nextRoom, texts, get door() { return game.door; },
     // ---- balance bot (scripts/balance.mjs): drives the sim headless, faster than real time ----
     actions, hazards, STEP, get W() { return W; }, get H() { return H; }, isSolid: (x, y) => isSolidPx(arena.solid, x, y),
     get choices() { return currentChoices; }, get doors() { return currentDoors; },

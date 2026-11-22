@@ -34,7 +34,7 @@ Or play online at **https://andrehiu.github.io/overdue/**. On a phone, use **Sha
     - elites burst into pages when they die (from wing 4);
     - bosses learn a new pattern every 3 wings.
 
-    **Pick your next door:** after most rooms you choose the next room from two doors: 💰 Rare Books (more enemies and elites, double fines; from wing 4 the elites are tougher and fire faster), ☕ Break Room (heal a heart, fewer fines), 🎲 Mystery Shelf (a cursed book or a bonus perk when you clear it), or 🚪 The Stacks (a plain room, offered instead of Break Room when you're at full health). Doors never make enemies weaker. Endless mode has no doors.
+    **Pick your next door:** after most rooms you choose the next room from two doors: 💰 Rare Books (more enemies and elites, double fines; from wing 4 the elites are tougher and fire faster), ☕ Break Room (heal a heart, fewer fines), 🎲 Mystery Shelf (a cursed book or a bonus perk when you clear it), or 🚪 The Stacks (a plain room, offered instead of Break Room when you're at full health). Doors never make enemies weaker. There is a door after the elite room too (room 5 to 6). Each wing opens with a one-line intro, its Rogue Author taunts you when they appear in room 10, and clearing the wing shows a closing line. Endless mode has no doors or story lines.
 
     Each wing has its own enemy mix, shelf density, floor and rug. Shelf layouts are the same every time you play a room.
   - **Endless shift:** the original wave mode with the Hall of Fame. It plays exactly as before.

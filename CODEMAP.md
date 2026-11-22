@@ -29,26 +29,26 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 
 | File | Lines | What it is |
 |---|---|---|
-| `index.html` | 202 | Page shell: menus and screens as `<section id>` |
+| `index.html` | 203 | Page shell: menus and screens as `<section id>` |
 | `src/arena.js` | 332 | Procedural, mirrored library layouts on a grid. Pure module (no DOM) so it is unit-testable. |
 | `src/audio.js` | 166 | 100% procedural audio: every sound effect and the adaptive soundtrack are synthesised |
 | `src/backend.js` | 84 | Score storage. The game is fully static, so there are two places a Hall of Fame can live: |
 | `src/catalogue.js` | 140 | Built-in book catalogue: the titles you throw and the authors bosses are named after. |
-| `src/doors.js` | 66 | Story doors: after most rooms you pick the next room from 2 doors. Pure module (no DOM) so it is unit-tested. |
+| `src/doors.js` | 65 | Story doors: after most rooms you pick the next room from 2 doors. Pure module (no DOM) so it is unit-tested. |
 | `src/flowfield.js` | 102 | Dijkstra flow field: one search from the player gives every enemy a path around the shelves. |
-| `src/main.js` | 2472 | OVERDUE! — Night Shift at the Meme Library |
+| `src/main.js` | 2474 | OVERDUE! — Night Shift at the Meme Library |
 | `src/meta.js` | 99 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
 | `src/palette.js` | 52 | Projectile colours. Pure module (no DOM), unit-tested. |
-| `src/story.js` | 113 | Story mode: ten handmade library wings, unlocked in order. Pure module (no DOM) so it is unit-tested. |
+| `src/story.js` | 123 | Story mode: ten handmade library wings, unlocked in order. Pure module (no DOM) so it is unit-tested. |
 | `src/upgrades.js` | 248 | Perks offered between waves. Pure data + a seeded roller (no DOM), so it is unit-tested. |
 | `src/util.js` | 110 | Small, dependency-free helpers shared by the game and its unit tests. |
 | `src/version.js` | 22 | Which build of the game is running. The build script injects the real values |
 | `src/waves.js` | 59 | Budget-based wave composer. Pure + seeded => every run with the same seed plays the same waves. |
 | `test/balance.test.js` | 81 | Balance bot (v1.7.1 tooling): pure helpers only, no browser. See scripts/balance-lib.mjs. |
-| `test/doors.test.js` | 117 | Story doors (v1.7.0): pure rules, no DOM. |
-| `test/game-logic.test.js` | 503 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
-| `test/story-meta.test.js` | 170 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
-| `scripts/qa/run.mjs` | 508 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
+| `test/doors.test.js` | 118 | Story doors (v1.7.0): pure rules, no DOM. |
+| `test/game-logic.test.js` | 508 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
+| `test/story-meta.test.js` | 179 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
+| `scripts/qa/run.mjs` | 518 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 43 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
 | `scripts/codemap.mjs` | 113 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
@@ -75,7 +75,7 @@ CATALOGUE:3
 
 ## src/doors.js
 
-DOORS:11 · POOL:21 · FIXED_AFTER:22 · doorOffer:25 · applyDoor:37 · doorReward:49 · mysteryPrize:60
+DOORS:11 · POOL:21 · FIXED_AFTER:22 · doorOffer:25 · applyDoor:36 · doorReward:48 · mysteryPrize:59
 
 ## src/flowfield.js
 
@@ -88,12 +88,12 @@ NEIGH:4 · canStep:44 · computeFlowField:54 · lineOfSight:91
 - **Input: keyboard + mouse, touch (virtual stick), gamepad** (98–224): keys:101 · actions:102 · mouse:103 · touch:104 · pad:105 · toLogical:107 · onKeyPress:123 · endPointer:168 · enableTouch:177 · pollGamepad:191 · onPadPress:207
 - **World state** (225–250): game:228 · rng:240 · spawnQueue:241 · enemies:242 · makePlayer:244 · comboMult:249
 - **Run / wave flow** (251–681): keepAwake:255 · startRun:261 · clearWorld:282 · startWave:288 · bannerQueue:312 · banner:313 · waveCleared:318 · resolveMystery:347 · showUpgrades:360 · afterPick:376 · nextRoom:381 · currentDoors:390 · showDoors:391 · chooseDoor:419 · KIND_LABEL:432 · codex:436 · saveCodex:437 · cardsArmed:441 · currentChoices:443 · rollOpts:444 · renderCards:446 · renderBuild:526 · pop:557 · closeBuildPop:558 · openBuildPop:562 · renderReach:612 · renderCodex:630 · pause:654 · resume:664 · die:671
-- **Spawning** (682–764): DEF:685 · hpScaleNow:696 · makeEnemy:697 · spawnPoint:716 · updateSpawning:726 · materialise:744
-- **Effects helpers** (765–793): shake:768 · addLight:771 · floatText:775 · particle:778 · burst:779 · pages:787
-- **Update** (794–1490): step:797 · moveInput:831 · nearestEnemy:844 · updatePlayer:854 · collideWorld:935 · spawnBook:948 · fire:963 · abilityReady:984 · inkBurst:995 · nextToShelf:1009 · doShhh:1017 · updateFlow:1054 · seek:1065 · updateEnemies:1077 · bossAI:1166 · shootHazard:1219 · fan:1224 · radial:1225 · damageEnemy:1227 · killEnemy:1256 · buzz:1297 · hurtPlayer:1302 · updateBooks:1336 · orbiterPositions:1409 · updateOrbiters:1418 · updateHazards:1432 · updateRings:1445 · updatePickups:1458 · updateParticles:1475
-- **Rendering** (1491–2110): BOOK_PALETTE:1494 · buildBackground:1496 · lampPositions:1584 · lightSprite:1592 · glowCache:1598 · glowSprite:1599 · renderLights:1608 · render:1647 · drawThrownBook:1693 · drawBook:1726 · drawPlayer:1734 · rim:1777 · eyes:1782 · drawEliteHalo:1790 · drawEnemy:1805 · drawBoss:1883 · drawTelegraph:1917 · drawPickup:1925 · hazardSprite:1938 · drawHazards:1946 · drawRing:1963 · drawParticles:1970 · heartPath:1983 · FONT:1993 · txt:1994 · drawHUD:2000 · cooldown:2066 · btnCache:2082 · setTouchButton:2083 · drawCrosshair:2095 · drawStick:2104
-- **DOM screens, settings, leaderboard** (2111–2398): SCREENS:2114 · showScreen:2116 · pinnedObservers:2126 · fitPinnedRow:2127 · renderFineBadges:2143 · renderShop:2148 · defaultWing:2182 · wingStatus:2186 · renderStory:2192 · bankRun:2225 · inRun:2232 · setSetting:2256 · toast:2270 · toggleFullscreen:2303 · loadLeaderboard:2313 · showGameOver:2336
-- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2399–2472): frame:2404 · checkForUpdate:2426
+- **Spawning** (682–765): DEF:685 · hpScaleNow:696 · makeEnemy:697 · spawnPoint:716 · updateSpawning:726 · materialise:744
+- **Effects helpers** (766–794): shake:769 · addLight:772 · floatText:776 · particle:779 · burst:780 · pages:788
+- **Update** (795–1491): step:798 · moveInput:832 · nearestEnemy:845 · updatePlayer:855 · collideWorld:936 · spawnBook:949 · fire:964 · abilityReady:985 · inkBurst:996 · nextToShelf:1010 · doShhh:1018 · updateFlow:1055 · seek:1066 · updateEnemies:1078 · bossAI:1167 · shootHazard:1220 · fan:1225 · radial:1226 · damageEnemy:1228 · killEnemy:1257 · buzz:1298 · hurtPlayer:1303 · updateBooks:1337 · orbiterPositions:1410 · updateOrbiters:1419 · updateHazards:1433 · updateRings:1446 · updatePickups:1459 · updateParticles:1476
+- **Rendering** (1492–2111): BOOK_PALETTE:1495 · buildBackground:1497 · lampPositions:1585 · lightSprite:1593 · glowCache:1599 · glowSprite:1600 · renderLights:1609 · render:1648 · drawThrownBook:1694 · drawBook:1727 · drawPlayer:1735 · rim:1778 · eyes:1783 · drawEliteHalo:1791 · drawEnemy:1806 · drawBoss:1884 · drawTelegraph:1918 · drawPickup:1926 · hazardSprite:1939 · drawHazards:1947 · drawRing:1964 · drawParticles:1971 · heartPath:1984 · FONT:1994 · txt:1995 · drawHUD:2001 · cooldown:2067 · btnCache:2083 · setTouchButton:2084 · drawCrosshair:2096 · drawStick:2105
+- **DOM screens, settings, leaderboard** (2112–2400): SCREENS:2115 · showScreen:2117 · pinnedObservers:2127 · fitPinnedRow:2128 · renderFineBadges:2144 · renderShop:2149 · defaultWing:2183 · wingStatus:2187 · renderStory:2193 · bankRun:2226 · inRun:2233 · setSetting:2257 · toast:2271 · toggleFullscreen:2304 · loadLeaderboard:2314 · showGameOver:2337
+- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2401–2474): frame:2406 · checkForUpdate:2428
 
 ## src/meta.js
 
@@ -105,7 +105,7 @@ PLAYER:7 · ENEMY:22 · hueOf:25 · isEnemyHue:34 · bookLook:45
 
 ## src/story.js
 
-WINGS:18 · roomKind:41 · difficulty:47 · threat:75 · composeRoom:80 · layoutSeed:89 · forcedRoom:91 · roomShape:97 · roomReward:108 · firstClearBonus:112
+WINGS:18 · roomKind:51 · difficulty:57 · threat:85 · composeRoom:90 · layoutSeed:99 · forcedRoom:101 · roomShape:107 · roomReward:118 · firstClearBonus:122
 
 ## src/upgrades.js
 
@@ -135,11 +135,11 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 
 - 8: door offers are deterministic per (seed, wing, room) and never two of the same type
 - 22: The Stacks only replaces Break Room, and only at full health
-- 32: rooms 4 and 9 show one fixed door, room 5 and room 10 show none
-- 44: doors never make a room easier, and Rare Books adds exactly +0.5 elite share (capped at 1)
-- 69: door fines: Rare ×2, Break Room halved (rounded up, min 3), the others normal
-- 81: Mystery Shelf: deterministic, only unowned unbanned cursed books, otherwise a bonus perk
-- 101: Rare Books (v1.7.1): strictly harder in every wing and room; the bite starts at wing 4
+- 32: rooms 4 and 9 show one fixed door, room 5 shows a normal 2-door choice, room 10 none
+- 45: doors never make a room easier, and Rare Books adds exactly +0.5 elite share (capped at 1)
+- 70: door fines: Rare ×2, Break Room halved (rounded up, min 3), the others normal
+- 82: Mystery Shelf: deterministic, only unowned unbanned cursed books, otherwise a bonus perk
+- 102: Rare Books (v1.7.1): strictly harder in every wing and room; the bite starts at wing 4
 
 ## test/game-logic.test.js
 
@@ -153,25 +153,25 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 - 104: regression: flow field reaches every free cell on generated arenas
 - 116: portrait arenas (phones) are connected, symmetric and keep the spawn zone clear
 - 130: catalogue has books and authors for every title
-- 140: combo cards unlock from their two perks and always take the first slot
-- 158: cursed books are one-time, and Lights Out needs lighting on
-- 170: rebalance: no single core perk more than doubles output at level 1
-- 179: every stackable perk tops out at 3/3 and leads to exactly one Masterwork
-- 200: perk cards preview changes in plain player terms
-- 216: cards say just the gain, hint at combos, and Banish keeps perks out of the pool
-- 232: home-screen app: manifest icons exist and the Pages deploy ships them
-- 245: arena shape fits the screen: phones, iPads, laptops, desktops
-- 264: version label shows version, commit and date; dev builds say so
-- 270: everything the player throws stays out of the red/pink reserved for enemies
-- 282: combo partners and combos in reach explain what pairs with what
-- 300: perk art: each perk adds one trait, they stack, and normal books stay plain
-- 319: aisles are at least 2 cells (60 px) wide in every room, on every screen shape, and never empty
-- 347: cornerAssist slides the player around a clipped shelf corner, but not off a head-on face
-- 388: cornerAssist + wall collision lets a circle walk past a corner it clips
-- 401: every perk has a short name for the build strip, and buildChips links combo partners
-- 420: scatter layouts are byte-identical to the pre-shapes generator (endless stays as it was)
-- 443: every room shape keeps the rules: connected, clear spawn, no passage under 2 cells, open edges, denser = more shelf
-- 477: reading rooms have four openings and bridge walls are continuous but for 2-3 gaps
+- 145: combo cards unlock from their two perks and always take the first slot
+- 163: cursed books are one-time, and Lights Out needs lighting on
+- 175: rebalance: no single core perk more than doubles output at level 1
+- 184: every stackable perk tops out at 3/3 and leads to exactly one Masterwork
+- 205: perk cards preview changes in plain player terms
+- 221: cards say just the gain, hint at combos, and Banish keeps perks out of the pool
+- 237: home-screen app: manifest icons exist and the Pages deploy ships them
+- 250: arena shape fits the screen: phones, iPads, laptops, desktops
+- 269: version label shows version, commit and date; dev builds say so
+- 275: everything the player throws stays out of the red/pink reserved for enemies
+- 287: combo partners and combos in reach explain what pairs with what
+- 305: perk art: each perk adds one trait, they stack, and normal books stay plain
+- 324: aisles are at least 2 cells (60 px) wide in every room, on every screen shape, and never empty
+- 352: cornerAssist slides the player around a clipped shelf corner, but not off a head-on face
+- 393: cornerAssist + wall collision lets a circle walk past a corner it clips
+- 406: every perk has a short name for the build strip, and buildChips links combo partners
+- 425: scatter layouts are byte-identical to the pre-shapes generator (endless stays as it was)
+- 448: every room shape keeps the rules: connected, clear spawn, no passage under 2 cells, open edges, denser = more shelf
+- 482: reading rooms have four openings and bridge walls are continuous but for 2-3 gaps
 
 ## test/story-meta.test.js
 
@@ -186,10 +186,11 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 - 122: a lost wing-1 run that reaches room 6 still affords the cheapest Renovation
 - 131: every wing has room shapes; elite and boss rooms are open; shapes do not repeat back to back
 - 148: even the worst door route (cheapest door every time) still affords the cheapest Renovation by room 6
+- 173: every wing has an intro, taunt and cleared line, each 1-60 characters
 
 ## scripts/qa/run.mjs
 
-results:24 · record:25 · want:29 · sh:32 · TYPES:47 · TARGETS:57 · shot:64 · PINNED_CHECK:72 · md:495
+results:24 · record:25 · want:29 · sh:32 · TYPES:47 · TARGETS:57 · shot:64 · PINNED_CHECK:72 · md:505
 
 ## scripts/build.mjs
 
