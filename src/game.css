@@ -430,6 +430,8 @@ body.portrait .reach-row { grid-template-columns: 1fr; }
   .screen > .menu.row:last-child .coin, #gameover .menu.row button .coin { display: none; }
   #title { gap: .3em; }
   #title .tag, #title .touch-hint { margin: 0; }
+  #title .touch-hint { font-size: .72em; line-height: 1.2; }
+  #title #source, #title .version-label { margin: 0; font-size: .7em; }
 }
 /* v1.11.1: mid-height screens (iPad mini 744px, iPad Safari 740px): the title must fit without scrolling */
 @media (min-height: 641px) and (max-height: 800px) {
