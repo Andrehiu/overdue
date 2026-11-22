@@ -7,7 +7,7 @@ import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
 import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips, buildChips } from './upgrades.js';
-import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist, aimSource } from './util.js';
+import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist, aimSource, aimStick } from './util.js';
 import { PLAYER, bookLook } from './palette.js';
 import { SoundEngine } from './audio.js';
 import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
@@ -101,7 +101,7 @@ addEventListener('resize', () => {
 const keys = new Set();
 const actions = { dash: false, shhh: false };
 const mouse = { x: W / 2, y: H / 2, down: false, seen: false };
-const touch = { enabled: false, moveId: null, mx0: 0, my0: 0, mx: 0, my: 0, aimId: null, ax: 0, ay: 0 };
+const touch = { enabled: false, moveId: null, mx0: 0, my0: 0, mx: 0, my: 0, aimId: null, ax0: 0, ay0: 0, ax: 0, ay: 0, dead: 10, aimed: false };
 const pad = { connected: false, mx: 0, my: 0, ax: 0, ay: 0, fire: false, prev: [] };
 
 function toLogical(e) {
@@ -146,7 +146,7 @@ canvas.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     enableTouch();
     if (touch.moveId === null) { touch.moveId = e.pointerId; touch.mx0 = touch.mx = p.x; touch.my0 = touch.my = p.y; }
-    else if (touch.aimId === null) { touch.aimId = e.pointerId; touch.ax = p.x; touch.ay = p.y; }
+    else if (touch.aimId === null) { touch.aimId = e.pointerId; touch.ax0 = touch.ax = p.x; touch.ay0 = touch.ay = p.y; touch.dead = 10 * W / canvas.getBoundingClientRect().width; } // aim stick: origin = where the finger lands; deadzone ~10 CSS px
     try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic or stale pointer */ }
     return;
   }
@@ -262,6 +262,7 @@ function startRun(mode = 'endless', wing = 1) {
   sound.init();
   keepAwake();
   applyLayout();
+  touch.aimed = false;
   game.seed = (Math.random() * 1e9) | 0;
   rng = new Rng(game.seed);
   const bonus = runBonuses(progress);
@@ -276,7 +277,7 @@ function startRun(mode = 'endless', wing = 1) {
   const head = bonus.startPerks ? rollUpgrades(rng, game.owned, bonus.startPerks, rollOpts({ noSpecial: true })) : [];
   for (const u of head) { game.owned[u.id] = (game.owned[u.id] || 0) + 1; u.apply(stats, player); }
   startWave(1);
-  if (touch.enabled && settings.autoaim === false) setTimeout(() => toast('Auto-aim off: hold a second finger to aim and throw'), head.length ? 1700 : 0);
+  if (touch.enabled && settings.autoaim === false) setTimeout(() => toast('Auto-aim off: drag a second finger to aim and throw'), head.length ? 1700 : 0);
   if (head.length) toast(`🎒 Head Start: ${head.map((u) => u.name).join(' + ')}`);
 }
 
@@ -879,10 +880,12 @@ function updatePlayer(dt) {
   else p.lastMoveT = Math.max(0, (p.lastMoveT || 0) - dt);
   // Aim: gamepad stick > touch aim > auto-aim (touch/gamepad, setting; the bot always) > mouse. See aimSource() in util.js.
   let firing = false;
-  const src = aimSource({ autoaim: settings.autoaim !== false, bot: !!botInput, touchEnabled: touch.enabled, touchAiming: touch.aimId !== null,
+  const stick = touch.aimId !== null ? aimStick(touch.ax0, touch.ay0, touch.ax, touch.ay, touch.dead) : { deflected: false, angle: 0 };
+  if (stick.deflected) touch.aimed = true;
+  const src = aimSource({ autoaim: settings.autoaim !== false, bot: !!botInput, touchEnabled: touch.enabled, touchAiming: stick.deflected,
     padConnected: pad.connected, padStick: !!(pad.ax || pad.ay), mouseSeen: mouse.seen });
   if (src === 'pad') { p.aim = Math.atan2(pad.ay, pad.ax); firing = pad.fire; }
-  else if (src === 'touch') { p.aim = Math.atan2(touch.ay - p.y, touch.ax - p.x); firing = true; }
+  else if (src === 'touch') { p.aim = stick.angle; firing = true; }
   else if (src === 'auto') {
     const t = nearestEnemy(p.x, p.y, PORTRAIT ? 600 : 460);
     if (t) {
@@ -894,7 +897,8 @@ function updatePlayer(dt) {
     firing = mouse.down;
   }
   if (pad.fire) firing = true;
-  if (settings.autofire && enemies.length) firing = true;
+  // auto-fire with auto-aim off keeps throwing in the last stick direction, but only once the stick has been deflected this run
+  if (settings.autofire && enemies.length && (src !== 'none' || !touch.enabled || touch.aimed)) firing = true;
   if (game.state !== 'playing') firing = false;
 
   p.inv = Math.max(0, p.inv - dt);
@@ -1713,6 +1717,7 @@ function render() {
   }
   if (game.state === 'playing' || game.state === 'waveclear' || game.state === 'dying') drawHUD();
   if (touch.enabled && touch.moveId !== null) drawStick();
+  if (touch.enabled && touch.aimId !== null) drawAimStick();
   if (!touch.enabled && mouse.seen && (game.state === 'playing' || game.state === 'waveclear')) drawCrosshair();
 }
 
@@ -2134,6 +2139,20 @@ function drawStick() {
   ctx.beginPath(); ctx.arc(touch.mx0, touch.my0, 45, 0, TAU); ctx.stroke();
   const dx = touch.mx - touch.mx0, dy = touch.my - touch.my0, d = Math.hypot(dx, dy), k = d > 45 ? 45 / d : 1;
   ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(touch.mx0 + dx * k, touch.my0 + dy * k, 18, 0, TAU); ctx.fill();
+}
+
+/** The aim stick: same ring + knob as the move stick, in library blue, with a tick on the ring showing the aim direction. */
+function drawAimStick() {
+  const { ax0: x0, ay0: y0 } = touch, dx = touch.ax - x0, dy = touch.ay - y0, d = Math.hypot(dx, dy), k = d > 45 ? 45 / d : 1;
+  const on = d > touch.dead;
+  ctx.strokeStyle = on ? 'rgba(125,190,255,0.75)' : 'rgba(125,190,255,0.4)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(x0, y0, 45, 0, TAU); ctx.stroke();
+  ctx.fillStyle = on ? 'rgba(125,190,255,0.6)' : 'rgba(125,190,255,0.35)';
+  ctx.beginPath(); ctx.arc(x0 + dx * k, y0 + dy * k, 18, 0, TAU); ctx.fill();
+  if (on) {
+    const a = Math.atan2(dy, dx), c = Math.cos(a), s = Math.sin(a);
+    ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x0 + c * 66, y0 + s * 66); ctx.lineTo(x0 + c * 80, y0 + s * 80); ctx.stroke();
+  }
 }
 
 // ======================================================================

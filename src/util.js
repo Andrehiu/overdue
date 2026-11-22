@@ -110,13 +110,22 @@ export function cornerAssist(obj, before, r, rect, maxSlip = 8, maxStep = maxSli
 
 /**
  * Which source steers the throw this frame (pure, so it is unit-tested).
- *  'pad'   right stick held · 'touch' a second finger is down · 'auto' nearest-enemy aim · 'mouse' follow the cursor
+ *  'pad'   right stick held · 'touch' the aim stick is deflected (touchAiming) · 'auto' nearest-enemy aim · 'mouse' follow the cursor
  *  'none'  auto-aim is off and nothing is being aimed: don't aim, don't throw (touch / gamepad only)
  * `autoaim` is the player's setting; the balance bot always auto-aims.
  */
 export function aimSource({ autoaim, bot, touchEnabled, touchAiming, padConnected, padStick, mouseSeen }) {
   if (padConnected && padStick) return 'pad';
-  if (touchAiming) return 'touch';
+  if (touchAiming) return 'touch'; // touchAiming = the aim stick is deflected past its deadzone (see aimStick)
   if (touchEnabled || bot || (padConnected && !mouseSeen)) return (autoaim || bot) ? 'auto' : 'none';
   return 'mouse';
+}
+
+/**
+ * The floating aim stick (v1.10.2), pure so it is unit-tested. The drag vector from where the finger landed (ox, oy) to where it is now
+ * (x, y) is the aim: `deflected` once it is longer than `dead`, `angle` = atan2 of the drag. Where the player stands is irrelevant.
+ */
+export function aimStick(ox, oy, x, y, dead) {
+  const dx = x - ox, dy = y - oy;
+  return { deflected: Math.hypot(dx, dy) > dead, angle: Math.atan2(dy, dx) };
 }
