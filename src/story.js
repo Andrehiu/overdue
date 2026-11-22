@@ -73,7 +73,7 @@ export function difficulty(wing, room) {
  * Elites count as ~2.2 enemies (more HP, and they shoot); bosses add their HP.
  */
 export function threat(d) {
-  return (d.budget * d.hpMult * (1 + 1.2 * d.eliteChance) + d.bossHp / 4) * d.speedMult * d.hazardSpeed;
+  return (d.budget * d.hpMult * (1 + 1.2 * d.eliteChance * (d.eliteHpMult || 1)) + d.bossHp / 4) * d.speedMult * d.hazardSpeed;
 }
 
 /** The spawn list for a story room. Layout seeds are fixed per wing+room; spawns vary with the run seed. `d` = difficulty with a door applied. */

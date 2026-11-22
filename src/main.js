@@ -298,6 +298,7 @@ function startWave(n) {
   game.waveT = 0; game.noHitWave = true; game.boss = null;
   game.ammo = pickBook(); game.ammoT = 0;
   player.dashStock = stats.dashCharges; player.dashCd = 0; player.amnesty = stats.amnesty;
+  if (isStory()) player.shhhT = 0;   // story: SHHH is ready at the start of every room (endless keeps its cooldown)
   if (isStory()) {
     const kind = game.diff.kind;
     banner(`ROOM ${n}/${ROOMS_PER_WING}`, kind === 'boss' ? 'A rogue author approaches…' : kind === 'elite' ? '★ Elite room: they fight back' : DOORS[game.door]?.banner || wingDef().name);
@@ -365,7 +366,7 @@ function showUpgrades() {
   game.pickIsBonus = bonus;
   const choices = rollUpgrades(rng, game.owned, game.cards || 3, rollOpts());
   if (!choices.length) return bonus ? showUpgrades() : nextRoom();
-  $('#upgradeTitle').textContent = bonus ? '🎲 Mystery Shelf — bonus perk' : isStory() ? `Room ${game.wave}/${ROOMS_PER_WING} cleared — choose a perk` : `Wave ${game.wave} cleared — choose a perk`;
+  $('#upgradeTitle').textContent = bonus ? '🎲 Mystery Shelf: bonus perk!' : isStory() ? `Room ${game.wave}/${ROOMS_PER_WING} cleared — choose a perk` : `Wave ${game.wave} cleared — choose a perk`;
   renderCards(choices);
   showScreen('upgrade');
   if (!touch.enabled) $('#cards button').focus();
@@ -704,7 +705,7 @@ function makeEnemy(type, x, y, extra = {}) {
     score: d.score, t: Math.random() * 10, stun: 0, flash: 0, dead: false, leader: null, atkT: 1.5 + Math.random() * 1.5, orbitHit: 0, ...extra };
   // Elites: bigger, ~2.2x HP, worth double, and they fire aimed pages (story mode).
   if (e.elite) {
-    e.hp = e.maxHp = Math.max(2, Math.round(e.hp * 2.2));
+    e.hp = e.maxHp = Math.max(2, Math.round(e.hp * 2.2 * (game.diff?.eliteHpMult || 1)));
     e.r = Math.round(e.r * 1.25); e.score *= 2;
     e.shootT = 1.2 + Math.random() * (game.diff ? game.diff.eliteShootEvery : 3);
   }
@@ -2118,6 +2119,24 @@ function showScreen(id) {
   closeBuildPop();
   document.body.classList.toggle('in-game', id === null);
   if (id === 'title') renderFineBadges();
+  if (id) fitPinnedRow(document.getElementById(id));
+}
+
+/** The pinned bottom button row is never wider than the content column above it (the widest block on that screen); buttons wrap. */
+const pinnedObservers = new WeakMap();
+function fitPinnedRow(scr) {
+  const row = scr?.querySelector(':scope > .menu.row:last-child');
+  if (!row) return;
+  const fit = () => {
+    const w = Math.max(0, ...[...scr.children].filter((c) => c !== row && !c.hidden && c.offsetParent !== null).map((c) => c.getBoundingClientRect().width));
+    // 12em floor so a very narrow block can't squash the buttons into a column of slivers
+    row.style.maxWidth = w ? `max(${Math.ceil(w)}px, 12em)` : '';
+  };
+  fit();
+  if (pinnedObservers.has(scr) || typeof ResizeObserver === 'undefined') return;
+  const ro = new ResizeObserver(fit);
+  for (const c of scr.children) if (c !== row) ro.observe(c);
+  pinnedObservers.set(scr, ro);
 }
 
 // ---- Late fees UI: fines balance, Renovations shop, story wing select ----
