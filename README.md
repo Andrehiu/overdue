@@ -2,7 +2,7 @@
 
 The library is closed. The books are not. You're the night librarian: throw books, dash through danger and **SHHH!** the chaos back into silence.
 
-A free arcade roguelite for phone and desktop. It's fully static: no server, no database, no build step needed to play.
+A free arcade roguelite for iPhone and iPad, played in landscape. Desktop may work but isn't supported or tested. It's fully static: no server, no database, no build step needed to play.
 
 ## Play
 
@@ -80,7 +80,7 @@ The thrown books and the boss names come from `src/catalogue.js`. Edit that file
 ```bash
 npm install          # dev dependencies: esbuild (build) and Playwright (QA)
 npm test             # unit tests for the pure game logic
-npm run qa           # full QA: every screen on phone/tablet/desktop, perf budget, privacy scan
+npm run qa           # full QA: every screen on iPhone/iPad, perf budget, privacy scan
 npm run build        # dist/overdue.html: the whole game in one file (this is what deploys)
 ```
 

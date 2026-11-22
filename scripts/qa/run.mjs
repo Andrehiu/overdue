@@ -1,7 +1,7 @@
 // OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners).
 //
 // Tests exactly what ships: builds the site, stages it like the GitHub Pages deploy,
-// then drives it in Chromium on phone, tablet and desktop. Writes qa-report/report.md
+// then drives it in Chromium on iPhone and iPad (mobile only). Writes qa-report/report.md
 // plus screenshots, prints a summary, and exits non-zero if anything fails.
 //
 // Each check exists because something real slipped through once (see TESTING.md).
@@ -57,7 +57,7 @@ const URL0 = `http://localhost:${server.address().port}/?debug=1`;
 const TARGETS = [
   ['iphone-landscape', devices['iPhone 13 landscape']],
   ['ipad-landscape', devices['iPad Pro 11 landscape']],
-  ['desktop', { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 }],
+  ['ipad-mini-landscape', { ...devices['iPad Pro 11 landscape'], viewport: { width: 1133, height: 744 } }],
 ];
 
 const browser = await chromium.launch();
@@ -381,7 +381,7 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
 }
 
 // ---------------------------------------------------------------- 3a. menu buttons are always on screen (v1.4.2)
-if (want('menus')) for (const [name, opts] of [...TARGETS, ['ipad-mini-landscape', { viewport: { width: 1133, height: 744 }, deviceScaleFactor: 1 }]]) {
+if (want('menus')) for (const [name, opts] of TARGETS) {
   const ctx = await browser.newContext(opts);
   const page = await ctx.newPage();
   const area = `menus/${name}`;
@@ -405,12 +405,19 @@ if (want('menus')) for (const [name, opts] of [...TARGETS, ['ipad-mini-landscape
     for (const [id, act, back] of [['howto', 'howto', 'back'], ['settings', 'settings', 'back'], ['leaderboard', 'leaderboard', 'back'],
       ['codex', 'codex', 'back'], ['story', 'story', 'back'], ['shop', 'shop', 'shopback']]) {
       await page.click(`#title [data-act=${act}]`); await page.waitForTimeout(350);
-      if (id === 'codex' || id === 'shop') await shot(page, `${name}-menu-${id}`);
+      if (id === 'codex' || id === 'shop' || id === 'howto') await shot(page, `${name}-menu-${id}`);
       const bad = await check(id);
       record(area, `${id}: bottom buttons on screen`, !bad.length, bad.join(', '));
-      if (['codex', 'shop', 'settings'].includes(id)) {
+      if (['codex', 'shop', 'settings', 'howto'].includes(id)) {
         const ov = await page.evaluate(`(${PINNED_CHECK})('${id}')`);
         record(area, `${id}: pinned row covers nothing and fits the column`, !ov.length, ov.join('; '));
+      }
+      if (id === 'howto') {
+        const txt = await page.textContent('#howto');
+        record(area, 'howto: no keyboard/mouse terms', !/WASD|Arrows|click|Space|Shift|Esc\b/i.test(txt), (txt.match(/WASD|Arrows|click|Space|Shift|Esc\b/i) || [''])[0]);
+        record(area, 'howto: mentions second-finger option and controller line', /second finger/.test(txt) && /Controller: left stick/.test(txt));
+        const hl = await page.evaluate(`(${LUM})(getComputedStyle(document.querySelector('#howto .controls dd')).color)`);
+        record(area, 'howto: text readable', hl > 0.5, `luminance ${hl.toFixed(2)}`);
       }
       await page.click(`#${id} [data-act=${back}]`); await page.waitForTimeout(250);
     }

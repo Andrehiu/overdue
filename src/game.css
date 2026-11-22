@@ -478,3 +478,4 @@ body.portrait .reach-row { grid-template-columns: 1fr; }
   .doors .door .icon { font-size: 2em; margin-top: .1em; }
 }
 body.portrait .doors { flex-direction: column; align-items: center; }
+

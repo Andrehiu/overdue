@@ -29,7 +29,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 
 | File | Lines | What it is |
 |---|---|---|
-| `index.html` | 204 | Page shell: menus and screens as `<section id>` |
+| `index.html` | 208 | Page shell: menus and screens as `<section id>` |
 | `src/arena.js` | 332 | Procedural, mirrored library layouts on a grid. Pure module (no DOM) so it is unit-testable. |
 | `src/audio.js` | 166 | 100% procedural audio: every sound effect and the adaptive soundtrack are synthesised |
 | `src/backend.js` | 84 | Score storage. The game is fully static, so there are two places a Hall of Fame can live: |
@@ -48,14 +48,14 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/doors.test.js` | 125 | Story doors (v1.7.0): pure rules, no DOM. |
 | `test/game-logic.test.js` | 523 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
 | `test/story-meta.test.js` | 247 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
-| `scripts/qa/run.mjs` | 566 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
+| `scripts/qa/run.mjs` | 573 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 43 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
 | `scripts/codemap.mjs` | 113 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
 
 ## index.html
 
-Screens: title:23 · howto:44 · settings:69 · leaderboard:91 · upgrade:97 · doors:105 · pause:111 · codex:122 · story:132 · shop:149 · gameover:157
+Screens: title:23 · howto:44 · settings:73 · leaderboard:95 · upgrade:101 · doors:109 · pause:115 · codex:126 · story:136 · shop:153 · gameover:161
 
 ## src/arena.js
 
@@ -196,7 +196,7 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 
 ## scripts/qa/run.mjs
 
-results:24 · record:25 · want:29 · sh:32 · TYPES:47 · TARGETS:57 · shot:64 · PINNED_CHECK:72 · md:553
+results:24 · record:25 · want:29 · sh:32 · TYPES:47 · TARGETS:57 · shot:64 · PINNED_CHECK:72 · md:560
 
 ## scripts/build.mjs
 
