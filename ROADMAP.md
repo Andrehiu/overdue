@@ -3,6 +3,38 @@
 The plan and the owner's decisions, kept current by the planner session. **Planners: read this after CLAUDE.md.**
 Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <topic>`; their prompts are saved in `docs/handoffs/`.
 
+## Handover note (2026-11-22, from "Overdue · planning" to "Overdue · planning 2")
+**State:** v1.11.2 is live (`0e037ea`, shipped with the QA trim). Nothing is merged-but-unshipped and no coder is running.
+The planner's working branch is `claude/brave-galileo-jyg38o` (equal to `main` plus docs). Work for a new release goes on a new
+coder branch from `origin/main`, then the planner merges into its own working branch, runs QA and ships with `git push origin HEAD:main`
+only when the owner says "ship".
+
+**How this owner works (learned over 13 releases):**
+- Prefers short replies with tables, a clear recommendation, then "say X to ship". Asks "what's next" often; offer 3–5 options + a pick.
+- Usually says "ship when ready / if all good" → you may ship after your own review + green QA, then confirm the Pages deploy.
+- Plays on an **iPhone in landscape** (also an iPad). Their screenshots are the best bug reports; measure before guessing.
+- Usage credits are OFF; plan limits apply. Keep sessions lean; batch small things.
+
+**Gotchas:**
+- Pages deploys often fail with GitHub-side "Deployment failed, try again later" / "Fetching artifact metadata failed": re-run
+  (`mcp__github__actions_run_trigger` rerun_workflow_run); it has always gone green by the 3rd attempt. Never say "live" before green.
+- The auto-mode classifier once blocked `git push origin HEAD:main`; an explicit owner "push X to main" unblocked it.
+- Coders' containers sometimes have a stale local `main` or no `node_modules`: handoffs say "start from origin/main"; QA needs `npm ci`.
+- Merges: expect `package.json` version and `CODEMAP.md` conflicts every time (take the newer version, `npm run codemap`); when two
+  coders both add tests in the same spot, keep both. Re-run QA after every merge.
+- Watch coders weakening rule tests (e.g. 1.9.0 relaxed a budget sub-check: acceptable only because `threat` stayed strict).
+- QA: `npm run qa` ≈ 3 min (full flow on iPhone 13 / iPad / iPad mini, fit-only on 4 more sizes, parallel); `--full` ≈ 3.5 min.
+  Flaky checks get fixed (deterministic `stepN` + counters), never ignored.
+
+**Next for the new planner:**
+1. Regenerate the **Room Atlas** (private artifact https://claude.ai/artifact/5kXSXFYFDShVAGw81fPhzS) for 7-room wings and the
+   wider phone grids (it still shows v1.6.0's 10-room layouts). Method: ad-hoc Playwright script in the scratchpad screenshotting
+   every story room at iPhone 13 Home Screen size (844x390) with `?debug=1` hooks (`unlockAll`, `startRun('story', w)`, `startWave(r)`,
+   `killAll`, `game.bannerT = 0`), images embedded as data URIs, republished to the same URL.
+2. Wait for the owner's playtest notes (see "Waiting on owner playtest" under Next ideas), then a **balance pass** (bot:
+   `npm run balance -- --runs=20`).
+3. Then the owner's pick among: Daily Shift, Rescue rooms, weapon types (all in Next ideas / parked).
+
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
@@ -45,7 +77,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 | 1.10.2 | **Aim joystick:** second finger becomes a floating aim stick (drag direction, deadzone), drawn like the move stick; also overrides auto-aim while deflected | Shipped 2026-11-22 (49a845a; Pages deploy green on 3rd attempt) |
 | 1.11.0 | **Learn perks as you go:** one-time tips (stack to 3/3, combos), Masterwork previews at 2/3, UNLOCKED + reason on special cards, level-up pips, Perks box in How to play, "Show tips again" (new key `overdue.tips.v1`) | Shipped 2026-11-22 with 1.11.1 (416b4d4) |
 | 1.11.1 | **Fill the screen:** arena widens to the phone's shape (no black side bars; iPhones were at 81–88% fill), title fits on iPad mini / iPad Safari, QA fill ≥ 95% + more phone sizes + rotation checks | Shipped 2026-11-22 (416b4d4) |
-| 1.11.2 | **Polish:** door key numbers off the icons; touching shelves draw as one solid wall (bridge/maze/reading) | Merged, full QA green (64 unit, 0 failures, 53–60 fps); awaiting owner "ship" |
+| 1.11.2 | **Polish:** door key numbers off the icons; touching shelves draw as one solid wall (bridge/maze/reading) | Shipped 2026-11-22 (0e037ea) with the QA trim |
 | — | **QA trim** (tooling): full flow on 3 devices, fit-only on 4, parallel contexts; target ~5 min | Merged: QA 11 min → 3 min (full flow on 3 devices, fit-only on 4, parallel); `--full` ~3.5 min |
 | — | **Bigger map (parked):** ~40×24 cells (1.7× floor), camera follows the player with a dead zone; light layer screen-sized (same look; owner OK needed since CLAUDE.md says keep lighting); auto-aim only on screen; spawns just off-screen; edge arrows for off-screen enemies; perf budget must hold. Build behind `?bigmap=1` first | Parked: 1.3.1 fixed the cramped feeling. Revisit only if it comes back |
 
