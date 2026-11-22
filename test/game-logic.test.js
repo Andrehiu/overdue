@@ -249,11 +249,11 @@ test('home-screen app: manifest icons exist and the Pages deploy ships them', as
 
 test('arena shape fits the screen: phones, iPads, laptops, desktops', async () => {
   const A = await load('arena');
-  const cases = [[1920 / 1080, 32, 18], [1180 / 820, 28, 20], [2.4, 32, 18]];
+  const cases = [[1920 / 1080, 32, 18], [1180 / 820, 28, 20], [2.4, 36, 16], [2.0, 34, 17], [1.78, 32, 18]];
   for (const [aspect, c, r] of cases) assert.deepEqual(A.gridForAspect(aspect), [c, r], `aspect ${aspect}`);
   for (let a = 0.3; a <= 3; a += 0.01) { const [c, r] = A.gridForAspect(a); assert.ok(r <= c, `landscape only: aspect ${a.toFixed(2)} gave ${c}x${r}`); }
   try {
-    for (const aspect of [0.46, 0.69, 0.75, 1.0, 1.33, 1.42, 1.6, 1.78, 2.2]) {
+    for (const aspect of [0.46, 0.69, 0.75, 1.0, 1.33, 1.42, 1.6, 1.78, 1.9, 2.0, 2.1, 2.2, 2.5]) {
       const [cols, rows] = A.gridForAspect(aspect);
       assert.equal(cols % 2, 0, 'even columns for mirror symmetry');
       A.setGrid(cols, rows);
@@ -324,7 +324,7 @@ const shelfGap = (a, b) => Math.max(a.x - (b.x + b.w), b.x - (a.x + a.w), a.y - 
 test('aisles are at least 2 cells (60 px) wide in every room, on every screen shape, and never empty', async () => {
   const A = await load('arena');
   const { WINGS, ROOMS_PER_WING, difficulty, layoutSeed, roomShape } = await load('story');
-  const shapes = [[32, 18], [18, 32], [28, 20], [20, 28], ...[0.5, 1, 1.4, 2].map((a) => A.gridForAspect(a))];
+  const shapes = [[32, 18], [18, 32], [28, 20], [20, 28], ...[0.5, 1, 1.4, 2, 2.05, 2.17, 2.2].map((a) => A.gridForAspect(a))];
   const check = (a, label) => {
     assert.ok(a.shelves.length > 0, `${label}: has shelves`);
     assert.ok(A.isConnected(a.solid), `${label}: connected`);
@@ -448,7 +448,7 @@ test('scatter layouts are byte-identical to the pre-shapes generator (endless st
 test('every room shape keeps the rules: connected, clear spawn, no passage under 2 cells, open edges, denser = more shelf', async () => {
   const A = await load('arena');
   const { computeFlowField } = await load('flowfield');
-  const grids = [[32, 18], [28, 20], A.gridForAspect(4 / 3), A.gridForAspect(1.6)];
+  const grids = [[32, 18], [28, 20], A.gridForAspect(4 / 3), A.gridForAspect(1.6), A.gridForAspect(2.17), A.gridForAspect(2.0), A.gridForAspect(2.2)];
   try {
     for (const [cols, rows] of grids) {
       A.setGrid(cols, rows);
@@ -482,7 +482,7 @@ test('every room shape keeps the rules: connected, clear spawn, no passage under
 test('reading rooms have four openings and bridge walls are continuous but for 2-3 gaps', async () => {
   const A = await load('arena');
   try {
-    for (const [cols, rows] of [[32, 18], [28, 20], A.gridForAspect(4 / 3)]) {
+    for (const [cols, rows] of [[32, 18], [28, 20], A.gridForAspect(4 / 3), A.gridForAspect(2.17), A.gridForAspect(2.0)]) {
       A.setGrid(cols, rows);
       for (let seed = 1; seed <= 10; seed++) {
         const r = A.generateArena(seed * 31, 5, 3, 'reading');

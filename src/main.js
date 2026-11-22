@@ -2528,7 +2528,7 @@ requestAnimationFrame(frame);
 // Test hooks (only with ?debug) — used by the automated Playwright smoke test.
 if (DEBUG) {
   window.__overdue = {
-    game, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, enemies, get content() { return content; },
+    game, grid: () => `${COLS}x${ROWS}`, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, enemies, get content() { return content; },
     startRun, startWave, setSurviveT: (t) => { game.surviveT = t; }, killAll: () => { for (const e of [...enemies]) killEnemy(e); spawnQueue.length = 0; telegraphs.length = 0; },
     get progress() { return progress; }, setFines: (n) => { progress = { ...progress, fines: n }; saveProgress(); renderFineBadges(); },
     unlockAll: () => { progress = { ...progress, unlocked: WINGS.length }; saveProgress(); },

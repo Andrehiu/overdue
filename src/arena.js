@@ -27,16 +27,29 @@ export function setOrientation(portrait) { setGrid(portrait ? 18 : 32, portrait 
 
 /**
  * Pick an arena shape that matches the screen, so there are no big black bars:
- * 16:9 desktop -> 32x18, iPad landscape -> 28x20. Narrower screens get the 4:3 shape (letterboxed).
+ * 16:9 desktop -> 32x18, iPad landscape -> 28x20. Narrower screens get the 4:3 shape (letterboxed); wider ones (phones) widen up to ~2.2:1.
  * Keeps roughly the same number of cells (same amount of room to play) and an even column count.
  */
 export function gridForAspect(aspect) {
-  const a = clamp(aspect || 16 / 9, 4 / 3, 32 / 18); // landscape only since v1.4.0: never a portrait grid
+  const a = clamp(aspect || 16 / 9, 4 / 3, WIDE_MAX); // landscape only since v1.4.0: never a portrait grid
+  if (a > 32 / 18) { // phones (~2:1 to 2.2:1): follow the screen's shape so there are no side bars (v1.11.1)
+    let best = null; // within 2.5% of the screen's shape, keep the cell count nearest today's 576
+    for (const rows of [16, 17, 18]) {
+      const cols = clamp(Math.round((rows * a) / 2) * 2, 32, 40);
+      const miss = Math.abs(cols / rows / a - 1);
+      const cost = (miss > 0.025 ? 1000 : 0) + Math.abs(cols * rows - 576) + miss * 100;
+      if (!best || cost < best.cost) best = { cols, rows, cost };
+    }
+    return [best.cols, best.rows];
+  }
   let rows = Math.round(Math.sqrt(576 / a));
   let cols = Math.round((rows * a) / 2) * 2;
   cols = clamp(cols, 18, 32); rows = clamp(rows, 18, 32);
   return [cols, rows];
 }
+
+/** Widest screen shape the arena follows (iPhone landscape is about 2.0 to 2.17). */
+const WIDE_MAX = 2.2;
 
 export const idx = (cx, cy) => cy * COLS + cx;
 

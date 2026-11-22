@@ -58,7 +58,25 @@ const TARGETS = [
   ['iphone-landscape', devices['iPhone 13 landscape']],
   ['ipad-landscape', devices['iPad Pro 11 landscape']],
   ['ipad-mini-landscape', { ...devices['iPad Pro 11 landscape'], viewport: { width: 1133, height: 744 } }],
+  // v1.11.1: more phone sizes (Safari with browser bars, smallest, biggest) and a mid-height iPad Safari
+  ['iphone-se-landscape', { ...devices['iPhone 13 landscape'], viewport: { width: 667, height: 331 }, screen: { width: 667, height: 375 } }],
+  ['iphone-13-safari-landscape', { ...devices['iPhone 13 landscape'], viewport: { width: 750, height: 342 } }],
+  ['iphone-15-pro-max-landscape', { ...devices['iPhone 13 landscape'], viewport: { width: 932, height: 430 }, screen: { width: 932, height: 430 } }],
+  ['ipad-safari-landscape', { ...devices['iPad Pro 11 landscape'], viewport: { width: 1180, height: 740 } }],
 ];
+const FILL_MIN = 0.95;
+// v1.11.1: how much of the screen the stage covers, plus whether the title fits without scrolling
+const FILL_JS = () => { const st = document.getElementById('stage').getBoundingClientRect(); return (st.width * st.height) / (innerWidth * innerHeight); };
+const TITLE_FIT_JS = () => {
+  const t = document.getElementById('title'), bad = [];
+  if (t.scrollHeight > t.clientHeight + 2) bad.push(`scrolls: ${t.scrollHeight} > ${t.clientHeight}`);
+  for (const el of t.querySelectorAll('h1, p:not([hidden]), button')) {
+    if (!el.offsetParent || !el.getClientRects().length) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width && (r.top < -1 || r.bottom > innerHeight + 1 || r.left < -1 || r.right > innerWidth + 1)) bad.push(`${(el.className || el.tagName).toString().slice(0, 16)} outside`);
+  }
+  return bad;
+};
 
 const browser = await chromium.launch();
 const shot = (page, name) => page.screenshot({ path: join(OUT, `${name}.png`) });
@@ -114,7 +132,9 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
       return { fill: (st.width * st.height) / (innerWidth * innerHeight), logoOk: logo.top >= st.top - 1 && logo.bottom <= st.bottom + 1 };
     });
     record(area, 'title fully visible', lay.logoOk);
-    record(area, 'arena fills screen', lay.fill >= 0.75, `${Math.round(lay.fill * 100)}% of screen`);
+    record(area, 'arena fills screen (title)', lay.fill >= FILL_MIN, `${Math.round(lay.fill * 100)}% of screen · grid ${await page.evaluate(() => __overdue.grid ? __overdue.grid() : '')}`);
+    const fit = await page.evaluate(`(${TITLE_FIT_JS})()`);
+    record(area, 'title fits without scrolling, every element on screen', fit.length === 0, fit.join(' | '));
     // Readability: secondary menu text must be light on the dark UI (dark-on-dark regression)
     const lum = await page.evaluate(`(${LUM})(getComputedStyle(document.querySelector('[data-act=howto]')).color)`);
     record(area, 'menu text readable', lum > 0.5, `luminance ${lum.toFixed(2)}`);
@@ -263,6 +283,7 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     await tap('#btnEnterWing'); await page.waitForTimeout(300);
     await page.evaluate(() => __overdue.god()); await page.waitForTimeout(1800);
     await shot(page, `${name}-10-story-room`);
+    record(area, 'arena fills screen (story room)', (await page.evaluate(`(${FILL_JS})()`)) >= FILL_MIN, `${Math.round((await page.evaluate(`(${FILL_JS})()`)) * 100)}%`);
     record(area, 'story room starts', await page.evaluate(() => __overdue.game.mode === 'story' && __overdue.game.state === 'playing'));
     const clearRoom = () => page.evaluate(async () => {
       const O = __overdue;
@@ -515,9 +536,32 @@ if (want('screens')) {
       return { hidden: document.getElementById('rotate').hidden, pause: !document.getElementById('pause').hidden, state: __overdue.game.state, fill: (st.width * st.height) / (innerWidth * innerHeight) };
     });
     record(area, 'rotating back hides overlay, shows pause screen, no auto-resume', back.hidden && back.pause && back.state === 'paused', JSON.stringify(back));
-    record(area, 'arena fills screen after rotating back', back.fill >= 0.75, `${Math.round(back.fill * 100)}% of screen`);
+    record(area, 'arena fills screen after rotating back', back.fill >= FILL_MIN, `${Math.round(back.fill * 100)}% of screen`);
   } catch (e) { record(area, 'flow completed', false, e.message.split('\n')[0]); }
   record(area, 'no page/console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+// ---------------------------------------------------------------- 3c. rotation sequences (v1.11.1): same fill, no title overflow
+if (want('screens')) for (const [label, port, land, seq] of [
+  ['iphone-13', [390, 844], [844, 390], ['portrait→landscape', 'landscape→portrait→landscape']],
+  ['iphone-se', [375, 667], [667, 331], ['portrait→landscape', 'landscape→portrait→landscape']],
+  ['iphone-15-pro-max', [430, 932], [932, 430], ['portrait→landscape', 'landscape→portrait→landscape']],
+]) for (const kind of seq) {
+  const area = `screens/rotate-${label}`;
+  const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: kind.startsWith('portrait') ? port[0] : land[0], height: kind.startsWith('portrait') ? port[1] : land[1] } });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  try {
+    await page.goto(URL0); await page.waitForTimeout(600);
+    if (kind === 'landscape→portrait→landscape') { await page.setViewportSize({ width: port[0], height: port[1] }); await page.waitForTimeout(400); }
+    await page.setViewportSize({ width: land[0], height: land[1] }); await page.waitForTimeout(600);
+    const r = await page.evaluate(`({ fill: (${FILL_JS})(), fit: (${TITLE_FIT_JS})(), grid: __overdue.grid(), rot: document.getElementById('rotate').hidden })`);
+    if (label === 'iphone-13') await shot(page, `rotate-${kind.startsWith('portrait') ? 'p2l' : 'l2p2l'}`);
+    record(area, `${kind}: fill ≥ ${FILL_MIN * 100}% and title fits`, r.rot && r.fill >= FILL_MIN && r.fit.length === 0, `${Math.round(r.fill * 100)}% · ${r.grid} · ${r.fit.join(' | ')}`);
+  } catch (e) { record(area, `${kind}: flow completed`, false, e.message.split('\n')[0]); }
+  record(area, `${kind}: no page errors`, errors.length === 0, errors.slice(0, 2).join(' | '));
   await ctx.close();
 }
 

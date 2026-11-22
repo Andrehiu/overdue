@@ -431,6 +431,15 @@ body.portrait .reach-row { grid-template-columns: 1fr; }
   #title { gap: .3em; }
   #title .tag, #title .touch-hint { margin: 0; }
 }
+/* v1.11.1: mid-height screens (iPad mini 744px, iPad Safari 740px): the title must fit without scrolling */
+@media (min-height: 641px) and (max-height: 800px) {
+  #title { gap: .3em; }
+  #title .logo { font-size: 3.6em; margin: 0; }
+  #title .blurb { display: none; }
+  #title .tag, #title .touch-hint { margin: 0; }
+  #title .menu { gap: .45em; }
+  #title .menu button { padding: .5em 1.4em; }
+}
 /* iPads and desktop windows: the Renovations list is a little taller than the stage, so tighten it too */
 @media (min-height: 641px) and (max-height: 800px) {
   #shop { gap: .35em; }

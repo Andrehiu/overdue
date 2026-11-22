@@ -30,7 +30,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | File | Lines | What it is |
 |---|---|---|
 | `index.html` | 218 | Page shell: menus and screens as `<section id>` |
-| `src/arena.js` | 332 | Procedural, mirrored library layouts on a grid. Pure module (no DOM) so it is unit-testable. |
+| `src/arena.js` | 345 | Procedural, mirrored library layouts on a grid. Pure module (no DOM) so it is unit-testable. |
 | `src/audio.js` | 166 | 100% procedural audio: every sound effect and the adaptive soundtrack are synthesised |
 | `src/backend.js` | 84 | Score storage. The game is fully static, so there are two places a Hall of Fame can live: |
 | `src/catalogue.js` | 140 | Built-in book catalogue: the titles you throw and the authors bosses are named after. |
@@ -48,7 +48,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/doors.test.js` | 125 | Story doors (v1.7.0): pure rules, no DOM. |
 | `test/game-logic.test.js` | 590 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
 | `test/story-meta.test.js` | 247 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
-| `scripts/qa/run.mjs` | 631 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
+| `scripts/qa/run.mjs` | 675 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 43 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
 | `scripts/codemap.mjs` | 113 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
@@ -59,7 +59,7 @@ Screens: title:23 · howto:44 · settings:79 · leaderboard:104 · upgrade:110 �
 
 ## src/arena.js
 
-SAFE:12 · setGrid:18 · setOrientation:26 · gridForAspect:33 · idx:41 · cellOf:43 · isSolidPx:48 · isConnected:54 · overlapsSafe:77 · generateArena:85 · scatterArena:94 · SHAPES:137 · shuffled:139 · SHAPE_GEN:145 · rectsOf:253 · isWide:274 · shapedArena:287 · edgeCells:326
+SAFE:12 · setGrid:18 · setOrientation:26 · gridForAspect:33 · idx:54 · cellOf:56 · isSolidPx:61 · isConnected:67 · overlapsSafe:90 · generateArena:98 · scatterArena:107 · SHAPES:150 · shuffled:152 · SHAPE_GEN:158 · rectsOf:266 · isWide:287 · shapedArena:300 · edgeCells:339
 
 ## src/audio.js
 
@@ -200,7 +200,7 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 
 ## scripts/qa/run.mjs
 
-results:24 · record:25 · want:29 · sh:32 · TYPES:47 · TARGETS:57 · shot:64 · PINNED_CHECK:72 · md:618
+results:24 · record:25 · want:29 · sh:32 · TYPES:47 · TARGETS:57 · FILL_JS:69 · TITLE_FIT_JS:70 · shot:82 · PINNED_CHECK:90 · md:662
 
 ## scripts/build.mjs
 
