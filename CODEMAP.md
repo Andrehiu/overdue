@@ -39,7 +39,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/main.js` | 2550 | OVERDUE! — Night Shift at the Meme Library |
 | `src/meta.js` | 99 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
 | `src/palette.js` | 52 | Projectile colours. Pure module (no DOM), unit-tested. |
-| `src/story.js` | 144 | Story mode: ten handmade library wings (7 rooms each), unlocked in order. Pure module (no DOM) so it is unit-tested. |
+| `src/story.js` | 154 | Story mode: ten handmade library wings (7 rooms each), unlocked in order. Pure module (no DOM) so it is unit-tested. |
 | `src/upgrades.js` | 301 | Perks offered between waves. Pure data + a seeded roller (no DOM), so it is unit-tested. |
 | `src/util.js` | 132 | Small, dependency-free helpers shared by the game and its unit tests. |
 | `src/version.js` | 22 | Which build of the game is running. The build script injects the real values |
@@ -47,7 +47,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/balance.test.js` | 116 | Balance bot (v1.7.1 tooling): pure helpers only, no browser. See scripts/balance-lib.mjs. |
 | `test/doors.test.js` | 125 | Story doors (v1.7.0): pure rules, no DOM. |
 | `test/game-logic.test.js` | 612 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
-| `test/story-meta.test.js` | 247 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
+| `test/story-meta.test.js` | 270 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
 | `scripts/qa/run.mjs` | 732 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 43 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
@@ -105,7 +105,7 @@ PLAYER:7 · ENEMY:22 · hueOf:25 · isEnemyHue:34 · bookLook:45
 
 ## src/story.js
 
-CURVE:18 · curveRoom:19 · SURVIVE_ROOMS:25 · roomGoal:27 · WINGS:31 · roomKind:64 · difficulty:70 · threat:99 · composeRoom:104 · layoutSeed:119 · forcedRoom:121 · roomShape:127 · roomReward:138 · firstClearBonus:143
+CURVE:18 · curveRoom:19 · SURVIVE_CHUNKS:27 · SURVIVE_ROOMS:28 · roomGoal:30 · WINGS:34 · roomKind:67 · difficulty:73 · threat:102 · composeRoom:107 · layoutSeed:129 · forcedRoom:131 · roomShape:137 · roomReward:148 · firstClearBonus:153
 
 ## src/upgrades.js
 
@@ -190,17 +190,18 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 - 32: wing 1 plays like the opening of endless (mapped onto the old curve); room 4 is elite and room 7 a boss
 - 55: roomGoal: never room 1, the elite or the boss room; capped per wing; deterministic; most wings have one
 - 72: a Survive room is never easier than the same room played plain, and its spawns fill the whole timer
-- 95: fines: a full 7-room wing pays within 10% of the old 10-room wing, elite and boss stay the biggest
-- 105: an old 10-room save loads safely: best clamps to 7, wing 1 stays cleared, wing 2 stays unlocked
-- 112: composeWave without story options is unchanged (endless runs stay reproducible)
-- 122: story layouts are fixed per room and every room is connected
-- 137: Renovation costs rise with level and every stat stays finite at max
-- 152: buying spends fines, refuses when broke or maxed
-- 164: runs bank fines, unlock the next wing once, and saves repair themselves
-- 190: a lost wing-1 run that dies in the room after the elite room still affords the cheapest Renovation
-- 199: every wing has room shapes; elite and boss rooms are open; shapes do not repeat back to back
-- 216: even the worst door route (cheapest door every time) still affords the cheapest Renovation by the room after the elite room
-- 241: every wing has an intro, taunt and cleared line, each 1-60 characters
+- 95: Survive rooms build up: every spawn lands well before the buzzer and the budget arrives in a rising crescendo
+- 118: fines: a full 7-room wing pays within 10% of the old 10-room wing, elite and boss stay the biggest
+- 128: an old 10-room save loads safely: best clamps to 7, wing 1 stays cleared, wing 2 stays unlocked
+- 135: composeWave without story options is unchanged (endless runs stay reproducible)
+- 145: story layouts are fixed per room and every room is connected
+- 160: Renovation costs rise with level and every stat stays finite at max
+- 175: buying spends fines, refuses when broke or maxed
+- 187: runs bank fines, unlock the next wing once, and saves repair themselves
+- 213: a lost wing-1 run that dies in the room after the elite room still affords the cheapest Renovation
+- 222: every wing has room shapes; elite and boss rooms are open; shapes do not repeat back to back
+- 239: even the worst door route (cheapest door every time) still affords the cheapest Renovation by the room after the elite room
+- 264: every wing has an intro, taunt and cleared line, each 1-60 characters
 
 ## scripts/qa/run.mjs
 
