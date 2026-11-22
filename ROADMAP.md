@@ -6,6 +6,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-22 | Door after the elite room: yes. Bosses keep random catalogue names (story + endless). Replace all real-person/trademarked catalogue authors with original parody names | Owner |
 | 2026-11-22 | Rare Books option C; SHHH resets each story room (endless unchanged) | Owner playtest: wing 4 cleared easily, elite door not scary; SHHH should be fresh per room |
 | 2026-11-21 | Story doors (v1.7.0) with the planner's default numbers; balance to be tuned after the owner plays | Owner: turn 10 fixed rooms into a route you plan |
 | 2026-11-21 | Story rooms get shapes per wing; endless keeps today's generator | Owner: "every room feels the same"; endless must stay comparable |
@@ -31,6 +32,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 | 1.6.0 | **Room shapes per story wing:** aisles, pillars, maze, reading room, bridge (+ today's scatter); 2–3 per wing; rooms 5/10 open; endless layouts unchanged | Shipped 2026-11-22 with 1.7.0 (7ebfdad) |
 | 1.7.0 | **Pick your next door** (story): 2 doors after rooms 1–3 and 6–8: 💰 Rare Books (+0.5 elite share, ×2 fines), ☕ Break Room (heal 1, ×0.5 fines min 3), 🎲 Mystery Shelf (cursed book or bonus perk); 🚪 Stacks replaces Break Room at full HP | Shipped 2026-11-22 (7ebfdad); owner balance-testing. Balance bot: `npm run balance` |
 | 1.7.1 | **Balance fixes:** Rare Books option C (+30% enemies; from wing 4 elites +50% HP, fire 30% faster), SHHH ready each story room, Mystery bonus-pick label, end-screen buttons never cover text | Shipped 2026-11-22 (a19bd61). Bot: Rare Books wing 4 half-save clears 10% → 0%, fines/run 102 → 66 |
+| 1.8.0 | **Story polish:** wing intros, boss taunts, cleared lines; door after the elite room; original parody names for all 10 catalogue authors | In progress: coder "Overdue · v1.8.0 story polish". Handoff: `docs/handoffs/1.8.0-story-beats.md` |
 | — | **Bigger map (parked):** ~40×24 cells (1.7× floor), camera follows the player with a dead zone; light layer screen-sized (same look; owner OK needed since CLAUDE.md says keep lighting); auto-aim only on screen; spawns just off-screen; edge arrows for off-screen enemies; perf budget must hold. Build behind `?bigmap=1` first | Parked: 1.3.1 fixed the cramped feeling. Revisit only if it comes back |
 
 ### 1.3.1 phone checklist (wing 1, rooms 1–10)
