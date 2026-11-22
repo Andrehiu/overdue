@@ -301,7 +301,8 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     const doorScreen = () => page.evaluate((LUMSRC) => {
       const lum = eval(LUMSRC);
       const s = document.getElementById('doors'), vw = innerWidth, vh = innerHeight;
-      const ds = [...s.querySelectorAll('.door')].map((b) => { const r = b.getBoundingClientRect(); return { id: b.dataset.door, ok: r.left >= -1 && r.right <= vw + 1 && r.top >= -1 && r.bottom <= vh + 1, hit: (() => { const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return h === b || b.contains(h); })() }; });
+      const ds = [...s.querySelectorAll('.door')].map((b) => { const r = b.getBoundingClientRect(); return { id: b.dataset.door, ok: r.left >= -1 && r.right <= vw + 1 && r.top >= -1 && r.bottom <= vh + 1, hit: (() => { const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return h === b || b.contains(h); })(),
+        keyClear: (() => { const k = b.querySelector('.key').getBoundingClientRect(), i = b.querySelector('.icon').getBoundingClientRect(); return k.right <= i.left || k.left >= i.right || k.bottom <= i.top || k.top >= i.bottom; })() }; });
       return { state: __overdue.game.state, visible: !s.hidden, ds, noScroll: s.scrollHeight <= s.clientHeight + 1,
         lum: lum(getComputedStyle(s.querySelector('.door strong')).color), lineLum: lum(getComputedStyle(s.querySelector('.door .line')).color), title: document.getElementById('doorsTitle').textContent };
     }, `(${LUM})`);
@@ -309,6 +310,7 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     await shot(page, `${name}-doors`);
     record(area, 'door screen shows 2 different doors after room 1', dr.state === 'doors' && dr.visible && dr.ds.length === 2 && dr.ds[0].id !== dr.ds[1].id, `${dr.state} · ${dr.ds.map((d) => d.id).join(' + ')}`);
     record(area, 'doors fit on screen, nothing covers them, no scrolling', dr.ds.every((d) => d.ok && d.hit) && dr.noScroll, JSON.stringify(dr.ds.map((d) => [d.ok, d.hit])) + ` noScroll ${dr.noScroll}`);
+    record(area, 'door key badge does not touch the icon', dr.ds.every((d) => d.keyClear), JSON.stringify(dr.ds.map((d) => d.keyClear)));
     record(area, 'door text readable', dr.lum > 0.5 && dr.lineLum > 0.5, `title ${dr.lum.toFixed(2)} · line ${dr.lineLum.toFixed(2)}`);
     await page.waitForTimeout(100);
     // Rare Books: more elites in the next room; Break Room: heals 1 when damaged (forced offers keep this deterministic)
@@ -626,6 +628,7 @@ if (want('shapes')) {
     await page.evaluate(([w, r]) => { const O = __overdue; O.unlockAll(); O.startRun('story', w); O.startWave(r); O.god(); }, pick);
     await page.waitForTimeout(1500);
     await shot(page, `shape-${shape}`);
+    if (shape === 'bridge') await shot(page, 'iphone-landscape-bridge-room'); // v1.11.2: one continuous wall
     const ok = await page.evaluate(() => __overdue.game.state === 'playing' && Number.isFinite(__overdue.player.x));
     record('shapes', `${shape} room (wing ${pick[0]} room ${pick[1]}) plays`, ok);
   }

@@ -587,3 +587,25 @@ test('v1.11.0 tips: one at a time, in order, and a seen tip never fires again', 
   for (const bad of [null, undefined, {}, { seen: 5 }, 'x']) assert.deepEqual(normalizeTips(bad), { seen: [] });
   assert.deepEqual(normalizeTips({ seen: ['a', 'a', 3, 'b'] }), { seen: ['a', 'b'] });
 });
+
+test('v1.11.2 touching collinear shelves merge into one rect: same cells as solid, nothing left to merge', async () => {
+  const A = await load('arena');
+  try {
+    for (const [cols, rows] of [[32, 18], [28, 20], A.gridForAspect(4 / 3), A.gridForAspect(2.17), A.gridForAspect(2.0)]) {
+      A.setGrid(cols, rows);
+      for (const shape of A.SHAPES) for (const dens of [2, 4, 7]) for (let seed = 1; seed <= 6; seed++) {
+        const a = A.generateArena(seed * 17, 5, dens, shape);
+        const cover = new Uint8Array(cols * rows);
+        for (const r of a.shelves) for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) cover[A.idx(x, y)] = 1;
+        assert.deepEqual(Array.from(cover), Array.from(a.solid), `${shape} ${cols}x${rows}: merged rects cover exactly the solid cells`);
+        assert.equal(a.rects.length, a.shelves.length);
+        for (let i = 0; i < a.shelves.length; i++) for (let j = i + 1; j < a.shelves.length; j++) {
+          const p = a.shelves[i], q = a.shelves[j];
+          const row = p.y === q.y && p.h === q.h && p.x <= q.x + q.w && q.x <= p.x + p.w;
+          const col = p.x === q.x && p.w === q.w && p.y <= q.y + q.h && q.y <= p.y + p.h;
+          assert.ok(!row && !col, `${shape} ${cols}x${rows}: two collinear touching rects were left unmerged`);
+        }
+      }
+    }
+  } finally { A.setOrientation(false); }
+});
