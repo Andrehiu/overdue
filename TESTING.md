@@ -9,13 +9,27 @@ look at the screenshots) notices.
 | Area | Checks | Pass criteria |
 |---|---|---|
 | Unit | All `node:test` suites (arenas, pathfinding, waves, perks, previews, versioning) | 0 failures |
-| Screens: iPhone landscape (750x342), iPad landscape, iPad mini landscape 1133x744 (full flow; mobile only, no desktop target). iPhone portrait runs only the **rotate-overlay checks**: overlay covers the title, rotating mid-run pauses, rotating back shows pause and the arena fills ≥ 75% | Title fully visible · arena fills screen · menu text readable · version label · run starts · perk cards render with plain text · Masterwork at 3/3 · pause + build strip · boss spawns · game-over text readable · score saves · Codex opens · **no page/console errors · no failed requests** | Fill ≥ 75% of screen; menu text luminance > 0.5; card title luminance < 0.3 |
-| Story + late fees (every device) | Renovations shop readable · buying spends fines and saves · wing select (10 wings, only wing 1 open) · story room starts · 4-card hand fits the screen · elite room is all elites · Survive room counts down, keeps spawning and clears itself · room-7 boss · clearing wing 1 unlocks wing 2 | as listed |
+| Screens, **full flow** on 3 targets: iPhone 13 landscape (844x390, Home Screen size), iPad landscape, iPad mini landscape 1133x744 (mobile only, no desktop target) | Title fully visible · arena fills screen · menu text readable · version label · run starts · perk cards render with plain text · Masterwork at 3/3 · pause + build strip · boss spawns · game-over text readable · score saves · Codex opens · **no page/console errors · no failed requests** (plus every row below) | Fill ≥ 95% of screen; menu text luminance > 0.5; card title luminance < 0.3 |
+| Screens, **fit-only pass** on the other 4 sizes: iPhone SE 667x331, iPhone 13 Safari 750x342, iPhone 15 Pro Max 932x430, iPad Safari 1180x740 | Same layout checks as above, minus the rule/logic checks: title (fill, no scroll, every element on screen, contrast, version) · perk screen (cards, tip strip, build strip, popover on screen) · endless game over (stats readable, pinned row) · Renovations text · story wing select + story room fill · 4-card hand · door screen fit · room-7 boss + wing-cleared screen (buttons on screen with a big build, pinned row) · no page/console errors | as above |
+| Menus (all 7 sizes) | Title, How to play, Settings, Leaderboard, Codex, Story, Renovations: bottom buttons on screen and tappable · pinned row covers nothing · How to play text/contrast | as listed |
+| Rotation (cheap, all phones) | iPhone portrait: rotate overlay covers the title, rotating mid-run pauses, rotating back shows pause and the arena fills ≥ 95% · iPhone 13 / SE / 15 Pro Max: portrait→landscape and landscape→portrait→landscape keep fill ≥ 95% and the title fits | as listed |
+| Story + late fees (**full-flow targets only**; fit-only targets run the layout rows) | Renovations shop readable · buying spends fines and saves · wing select (10 wings, only wing 1 open) · story room starts · 4-card hand fits the screen · elite room is all elites · Survive room counts down, keeps spawning and clears itself · room-7 boss · clearing wing 1 unlocks wing 2 | as listed |
 | Performance | Wave-15 boss, ~25 perks + Masterworks, phone viewport; story wing 10 room 6 (elites shooting) | Game speed ≥ 0.85x, ≥ 50 fps (CI: ≥ 0.75x, fps not judged), books in flight ≤ 110 |
 | Privacy | Secrets and email addresses in tracked files **and commit messages**; your private terms if `.qa-private-terms` exists | No hits |
 
-Output: `qa-report/report.md` plus screenshots per device (`iphone-landscape-1-title.png` … `-13-wing-cleared.png`, `perf-late-boss.png`, `perf-story-late.png`).
-Options: `npm run qa -- --only=perf` (or `unit`, `screens`, `security`, comma-separated) · `--ci` relaxes perf for slow machines.
+Output: `qa-report/report.md` plus screenshots per device (`iphone-landscape-1-title.png` … `-13-wing-cleared.png`, `perf-late-boss.png`, `perf-story-late.png`). Fit-only targets produce the layout screenshots only (title, perks, build strip, doors, game over, wing cleared, menus).
+
+### How long it takes, and what runs where
+Typical `npm run qa`: **about 5 minutes on a 4-core machine** (was ~11 when all 7 sizes ran the whole flow one after another).
+Why it is faster: (1) most bugs here were layout/fit bugs on one size, which don't need the whole gameplay flow on every size, so only the 3 targets above run the full flow; (2) independent flows (targets, menus, rotation, shapes) run **in parallel browser contexts, 4 at a time** (`--jobs=N`, default min(4, CPUs)); (3) **perf always runs alone**, after the parallel part, so fps numbers stay comparable.
+
+Options:
+- `--only=perf` (or `unit`, `screens`, `menus`, `shapes`, `security`, comma-separated) still works.
+- `--full`: run the full flow on **every** size. Use it for releases that change gameplay screens or flow (new screens, perk/door/game-over logic), or when a fit-only target fails and you need to see what happened earlier in the flow. Takes ~8–9 minutes.
+- `--jobs=1`: run everything one at a time (slowest, most stable; use it if a flow only fails when the machine is busy).
+- `--ci`: relaxed perf for slow machines.
+
+A check that exists only in the full flow does not run on the fit-only sizes: those sizes can't catch rule bugs, only layout ones. If you change something that depends on screen size inside such a check (a new screen, a new pinned row), add it to the part of the flow that **both** tiers run (see `full` in `screensFlow` in `scripts/qa/run.mjs`).
 
 ## Checklist by type of change
 

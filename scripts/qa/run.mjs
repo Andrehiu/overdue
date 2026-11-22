@@ -12,12 +12,15 @@ import { readFile, mkdir, rm, cp, writeFile } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { cpus } from 'node:os';
 
 const ROOT = resolve(new URL('../..', import.meta.url).pathname);
 const OUT = join(ROOT, 'qa-report');
 const SITE = join(OUT, 'site');
 const CI = process.argv.includes('--ci');
 const ONLY = process.argv.find((a) => a.startsWith('--only='))?.slice(7); // e.g. --only=perf
+const FULL = process.argv.includes('--full'); // full gameplay flow on every target (default: only FULL_TARGETS; the rest get the fit-only pass)
+const JOBS = Math.max(1, Number(process.argv.find((a) => a.startsWith('--jobs='))?.slice(7)) || Math.min(4, cpus().length)); // parallel browser contexts (perf always runs alone)
 // Performance budgets (see TESTING.md). CI runners have no GPU, so fps is not judged there.
 const PERF = CI ? { sim: 0.75, fps: 0 } : { sim: 0.85, fps: 50 };
 
@@ -27,6 +30,10 @@ const record = (area, check, ok, detail = '') => {
   console.log(`${ok ? '✅' : '❌'} ${area} · ${check}${detail ? ` — ${detail}` : ''}`);
 };
 const want = (area) => !ONLY || ONLY.split(',').includes(area);
+// Flows that run in parallel keep their own result list (so the report stays in a stable order) and hand it back.
+const recorder = () => { const list = []; const rc = (area, check, ok, detail = '') => { list.push({ area, check, ok, detail }); console.log(`${ok ? '✅' : '❌'} ${area} · ${check}${detail ? ` — ${detail}` : ''}`); }; rc.list = list; return rc; };
+// Run async tasks `n` at a time; results come back in task order.
+const pool = async (tasks, n) => { const out = new Array(tasks.length); let i = 0; await Promise.all(Array.from({ length: Math.min(n, tasks.length) }, async () => { while (i < tasks.length) { const k = i++; out[k] = await tasks[k](); } })); return out; };
 
 // ---------------------------------------------------------------- 1. unit tests + build
 function sh(cmd) { return execSync(cmd, { cwd: ROOT, stdio: 'pipe' }).toString(); }
@@ -64,6 +71,9 @@ const TARGETS = [
   ['iphone-15-pro-max-landscape', { ...devices['iPhone 13 landscape'], viewport: { width: 932, height: 430 }, screen: { width: 932, height: 430 } }],
   ['ipad-safari-landscape', { ...devices['iPad Pro 11 landscape'], viewport: { width: 1180, height: 740 } }],
 ];
+// Tiers (v1.11.3 QA trim): the full gameplay flow runs on these three; every other size gets the fit-only pass
+// (title, perks, doors, end screens, menus: fill, nothing clipped, contrast). `--full` runs the full flow everywhere.
+const FULL_TARGETS = new Set(['iphone-landscape', 'ipad-landscape', 'ipad-mini-landscape']);
 const FILL_MIN = 0.95;
 // v1.11.1: how much of the screen the stage covers, plus whether the title fits without scrolling
 const FILL_JS = () => { const st = document.getElementById('stage').getBoundingClientRect(); return (st.width * st.height) / (innerWidth * innerHeight); };
@@ -114,7 +124,9 @@ const PINNED_CHECK = (id) => {
 };
 
 // ---------------------------------------------------------------- 3. screens on every device
-if (want('screens')) for (const [name, opts] of TARGETS) {
+// `full` = whole gameplay flow; otherwise the fit-only pass (skips rules/logic checks that don't depend on screen size).
+async function screensFlow(name, opts, full) {
+  const record = recorder();
   const ctx = await browser.newContext(opts);
   const page = await ctx.newPage();
   const errors = [], failed = [];
@@ -174,6 +186,7 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
       const lock = await page.evaluate(() => { const c = document.querySelector('#cards .card'); return { lvl: c.querySelector('.lvl').textContent, mw: c.querySelector('.mw').textContent, text: c.textContent, tip: document.querySelector('#perkTip').hidden ? '' : document.querySelector('#perkTip').textContent }; });
       record(area, '2/3 card shows the lock line, "now → after" pips and no Masterwork effect', lock.lvl === '●○○ → ●●○' && /Next level unlocks a Masterwork 🔒/.test(lock.mw) && !/Unlocks [A-Z]/.test(lock.text), `${lock.lvl} | ${lock.mw}`);
       record(area, 'stacking tip does not repeat on the next perk screen', !/Perks stack to/.test(lock.tip), lock.tip);
+      if (full) {
       const p2 = await page.context().newPage(); await p2.goto(URL0); await p2.waitForTimeout(500);
       const again = await p2.evaluate(() => { __overdue.startRun('endless'); __overdue.showUpgrades(); const t = document.querySelector('#perkTip'); return { hidden: t.hidden, text: t.textContent }; }); await p2.close();
       record(area, 'stacking tip stays gone after a reload', again.hidden || !/Perks stack to/.test(again.text), again.text);
@@ -185,6 +198,7 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
       await p3.reload(); await p3.waitForTimeout(500);
       const bad = await p3.evaluate(() => { __overdue.startRun('endless'); __overdue.showUpgrades(); return document.querySelector('#perkTip').textContent; }); await p3.close();
       record(area, 'old save without tips key (and a damaged one) loads fine', /Perks stack to/.test(old) && /Perks stack to/.test(bad), `${old.slice(0, 20)} | ${bad.slice(0, 20)}`);
+      }
       await page.evaluate(() => __overdue.showUpgrades());
       await page.waitForTimeout(300);
     }
@@ -210,6 +224,7 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     record(area, 'chip tap opens popover, picks no card', !pp.hidden && pp.state === 'upgrade' && /Dewey Decimal Guidance/.test(pp.text) && /1\/3/.test(pp.text) && /Choose Your Own Adventure: 🔖 Bookmark needed/.test(pp.text) && /Unlocks/.test(pp.text), pp.text.slice(0, 160));
     record(area, 'popover stays on screen', pp.l >= 0 && pp.t >= 0 && pp.r <= pp.vw && pp.b <= pp.vh, `${Math.round(pp.l)},${Math.round(pp.t)}-${Math.round(pp.r)},${Math.round(pp.b)} in ${pp.vw}x${pp.vh}`);
     await shot(page, `${name}-build-popover`);
+    if (full) {
     // Tap away: only closes the popover, never picks the card underneath
     // Pick a point that is on a card but outside the popover (the popover may cover some card centres).
     const tapPoint = await page.evaluate(() => {
@@ -230,12 +245,14 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     await page.waitForTimeout(150);
     await page.keyboard.press('Escape');
     record(area, 'Esc closes popover', await page.evaluate(() => document.querySelector('#buildPop').hidden && __overdue.game.state === 'upgrade'));
+    } else await page.keyboard.press('Escape'); // fit pass: just close the popover
     await page.evaluate(() => __overdue.showUpgrades());
     await page.waitForTimeout(800);
     await page.waitForTimeout(400);
     await page.locator('#cards .card').first().click();
     await page.waitForTimeout(300);
 
+    if (full) {
     // Pause + build strip
     await page.waitForTimeout(400);
     await page.keyboard.press('Escape');            // pause (Esc toggles; press once only)
@@ -248,6 +265,7 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     await page.evaluate(() => { __overdue.startWave(5); __overdue.god(); }); await page.waitForTimeout(4200);
     await shot(page, `${name}-5-boss`);
     record(area, 'boss spawns', await page.evaluate(() => __overdue.enemies.some((e) => e.type === 'boss')));
+    }
 
     // Game over: stats readable, score can be filed
     await page.evaluate(() => { const O = __overdue; O.stats.maxHp = 5; O.player.hp = 1; O.player.inv = 0; O.die(); }); await page.waitForTimeout(2700);
@@ -259,20 +277,24 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     record(area, 'score saves', /Filed|rank/i.test(await page.textContent('#submitMsg')), await page.textContent('#submitMsg'));
 
     await tap('[data-act=menu]'); await page.waitForTimeout(300);
+    if (full) {
     await tap('[data-act=codex]'); await page.waitForTimeout(300);
     await shot(page, `${name}-7-codex`);
     record(area, 'codex opens', /of \d+ discovered/.test(await page.textContent('#codexProgress')));
+    await tap('#codex [data-act=back]'); await page.waitForTimeout(250);
+    }
 
     // Late fees (A): the Renovations shop spends fines and the upgrade sticks
-    await tap('#codex [data-act=back]'); await page.waitForTimeout(250);
     await page.evaluate(() => __overdue.setFines(1000));
     await tap('#title [data-act=shop]'); await page.waitForTimeout(300);
     await shot(page, `${name}-8-shop`);
     const shopLum = await page.evaluate(`(${LUM})(getComputedStyle(document.querySelector('#shopList strong')).color)`);
     record(area, 'shop text readable', shopLum > 0.5, `luminance ${shopLum.toFixed(2)}`);
+    if (full) {
     await tap('#shopList button[data-reno=catalogue]'); await page.waitForTimeout(200);
     const bought = await page.evaluate(() => ({ lvl: __overdue.progress.reno.catalogue, fines: __overdue.progress.fines, saved: JSON.parse(localStorage.getItem('overdue.progress.v1')).reno.catalogue }));
     record(area, 'Renovation bought and saved', bought.lvl === 1 && bought.saved === 1 && bought.fines === 700, JSON.stringify(bought));
+    }
 
     // Story wings (C): wing select, a room, a 4-card hand, an elite room, then clearing the wing unlocks the next
     await tap('#shop [data-act=shopback]'); await page.waitForTimeout(250);
@@ -310,6 +332,7 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     record(area, 'door screen shows 2 different doors after room 1', dr.state === 'doors' && dr.visible && dr.ds.length === 2 && dr.ds[0].id !== dr.ds[1].id, `${dr.state} · ${dr.ds.map((d) => d.id).join(' + ')}`);
     record(area, 'doors fit on screen, nothing covers them, no scrolling', dr.ds.every((d) => d.ok && d.hit) && dr.noScroll, JSON.stringify(dr.ds.map((d) => [d.ok, d.hit])) + ` noScroll ${dr.noScroll}`);
     record(area, 'door text readable', dr.lum > 0.5 && dr.lineLum > 0.5, `title ${dr.lum.toFixed(2)} · line ${dr.lineLum.toFixed(2)}`);
+    if (full) {
     await page.waitForTimeout(100);
     // Rare Books: more elites in the next room; Break Room: heals 1 when damaged (forced offers keep this deterministic)
     const base = await page.evaluate(() => { const O = __overdue; O.stats.maxHp = 5; O.player.hp = 2; O.showDoors(['rare', 'rest']); return { elite: 0 }; });
@@ -365,6 +388,7 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
       return { state: __overdue.game.state, room: __overdue.game.wave, types: [...seen] };
     });
     record(area, 'elite room spawns elites', eliteRoom.types.length > 0 && eliteRoom.types.filter((t) => !t.startsWith('worm')).every((t) => t.endsWith('★')), JSON.stringify(eliteRoom).slice(0, 200));
+    }
     // A real build (8 perks) on the way into the boss: the end screen must still fit (iPad bug: buttons fell off-screen)
     await page.evaluate(() => { const O = __overdue; for (const id of ['trilogy', 'trilogy', 'dewey', 'speedreader', 'interlibrary', 'hardcover', 'hardcover', 'hardcover', 'extendedloan', 'footnotes']) O.grant(id); O.startWave(7); O.god(); });
     await page.waitForTimeout(3600);
@@ -384,6 +408,7 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     const goBad = await page.evaluate(`(${PINNED_CHECK})('gameover')`);
     record(area, 'game over: pinned row covers nothing and fits the column', !goBad.length, goBad.join('; '));
 
+    if (full) {
     // Reset progress (Settings): needs two taps, then fines, Renovations and unlocks are gone
     await tap('#gameover [data-act=menu]'); await page.waitForTimeout(250);
     await tap('#title [data-act=settings]'); await page.waitForTimeout(250);
@@ -448,6 +473,7 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
       record(area, 'auto-aim on + stick inside deadzone: auto-aim keeps working', idleStick.throws >= 1 && idleStick.aimedFrames >= 1, JSON.stringify(idleStick));
       await page.evaluate(() => { __overdue.touch.enabled = false; __overdue.setSetting('autoaim', true); });
     }
+    }
 
   } catch (e) {
     record(area, 'flow completed', false, e.message.split('\n')[0]);
@@ -455,10 +481,12 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
   record(area, 'no page/console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
   record(area, 'no failed requests', failed.length === 0, failed.slice(0, 3).join(' | '));
   await ctx.close();
+  return record.list;
 }
 
 // ---------------------------------------------------------------- 3a. menu buttons are always on screen (v1.4.2)
-if (want('menus')) for (const [name, opts] of TARGETS) {
+async function menusFlow(name, opts) {
+  const record = recorder();
   const ctx = await browser.newContext(opts);
   const page = await ctx.newPage();
   const area = `menus/${name}`;
@@ -502,10 +530,12 @@ if (want('menus')) for (const [name, opts] of TARGETS) {
     }
   } catch (e) { record(area, 'menus flow completed', false, e.message.split('\n')[0]); }
   await ctx.close();
+  return record.list;
 }
 
 // ---------------------------------------------------------------- 3b. portrait phone: rotate overlay (landscape-only since v1.4.0)
-if (want('screens')) {
+async function rotateOverlayFlow() {
+  const record = recorder();
   const area = 'screens/iphone-rotate';
   const ctx = await browser.newContext(devices['iPhone 13']);
   const page = await ctx.newPage();
@@ -540,14 +570,17 @@ if (want('screens')) {
   } catch (e) { record(area, 'flow completed', false, e.message.split('\n')[0]); }
   record(area, 'no page/console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
   await ctx.close();
+  return record.list;
 }
 
 // ---------------------------------------------------------------- 3c. rotation sequences (v1.11.1): same fill, no title overflow
-if (want('screens')) for (const [label, port, land, seq] of [
+const ROTATIONS = [
   ['iphone-13', [390, 844], [844, 390], ['portrait→landscape', 'landscape→portrait→landscape']],
   ['iphone-se', [375, 667], [667, 331], ['portrait→landscape', 'landscape→portrait→landscape']],
   ['iphone-15-pro-max', [430, 932], [932, 430], ['portrait→landscape', 'landscape→portrait→landscape']],
-]) for (const kind of seq) {
+].flatMap(([label, port, land, seq]) => seq.map((kind) => [label, port, land, kind]));
+async function rotationFlow(label, port, land, kind) {
+  const record = recorder();
   const area = `screens/rotate-${label}`;
   const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: kind.startsWith('portrait') ? port[0] : land[0], height: kind.startsWith('portrait') ? port[1] : land[1] } });
   const page = await ctx.newPage();
@@ -563,6 +596,50 @@ if (want('screens')) for (const [label, port, land, seq] of [
   } catch (e) { record(area, `${kind}: flow completed`, false, e.message.split('\n')[0]); }
   record(area, `${kind}: no page errors`, errors.length === 0, errors.slice(0, 2).join(' | '));
   await ctx.close();
+  return record.list;
+}
+
+// ---------------------------------------------------------------- 4b. one story room per layout shape (iphone-landscape)
+async function shapesFlow() {
+  const record = recorder();
+  const { WINGS, ROOMS_PER_WING, roomShape } = await import(pathToFileURL(join(ROOT, 'src/story.js')).href);
+  const { SHAPES } = await import(pathToFileURL(join(ROOT, 'src/arena.js')).href);
+  const ctx = await browser.newContext(devices['iPhone 13 landscape']);
+  const page = await ctx.newPage();
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  await page.goto(URL0); await page.waitForTimeout(500);
+  for (const shape of SHAPES) {
+    // Prefer a mid-to-late normal room so the shape is at a decent density.
+    let pick = null;
+    for (const r of [6, 5, 3, 2, 1, 4, 7]) for (let w = 1; w <= WINGS.length && !pick; w++) if (roomShape(w, r) === shape) pick = [w, r];
+    if (!pick) { record('shapes', `${shape}: a story room uses it`, shape === 'scatter' ? true : false, 'no wing/room found'); continue; }
+    await page.evaluate(([w, r]) => { const O = __overdue; O.unlockAll(); O.startRun('story', w); O.startWave(r); O.god(); }, pick);
+    await page.waitForTimeout(1500);
+    await shot(page, `shape-${shape}`);
+    const ok = await page.evaluate(() => __overdue.game.state === 'playing' && Number.isFinite(__overdue.player.x));
+    record('shapes', `${shape} room (wing ${pick[0]} room ${pick[1]}) plays`, ok);
+  }
+  record('shapes', 'no script errors', errs.length === 0, errs.join('; ').slice(0, 200));
+  await ctx.close();
+  return record.list;
+}
+
+
+// ---------------------------------------------------------------- run everything except perf, N contexts at a time
+// Slowest flows first so the pool stays busy. Perf is NOT in the pool: it runs alone afterwards so fps stays comparable.
+{
+  const tasks = [];
+  const fullOn = (name) => FULL || FULL_TARGETS.has(name);
+  if (want('screens')) for (const [name, opts] of TARGETS.filter(([n]) => fullOn(n))) tasks.push(() => screensFlow(name, opts, true));
+  if (want('screens')) for (const [name, opts] of TARGETS.filter(([n]) => !fullOn(n))) tasks.push(() => screensFlow(name, opts, false));
+  if (want('menus')) for (const [name, opts] of TARGETS) tasks.push(() => menusFlow(name, opts));
+  if (want('screens')) { tasks.push(() => rotateOverlayFlow()); for (const r of ROTATIONS) tasks.push(() => rotationFlow(...r)); }
+  if (want('shapes')) tasks.push(() => shapesFlow());
+  const t0 = Date.now();
+  // Report order stays stable: screens (full, then fit), menus, rotation, shapes, regardless of finish order.
+  for (const list of await pool(tasks, JOBS)) results.push(...list);
+  console.log(`(parallel section: ${tasks.length} flows, ${JOBS} at a time, ${Math.round((Date.now() - t0) / 1000)}s)`);
 }
 
 // ---------------------------------------------------------------- 4. performance budget
@@ -609,30 +686,6 @@ if (want('perf')) {
   if (PERF.fps) record('perf', `story wing 10 fps ≥ ${PERF.fps}`, story.fps >= PERF.fps, `${story.fps.toFixed(0)} fps`);
   await ctx.close();
 }
-// ---------------------------------------------------------------- 4b. one story room per layout shape (iphone-landscape)
-if (want('shapes')) {
-  const { WINGS, ROOMS_PER_WING, roomShape } = await import(pathToFileURL(join(ROOT, 'src/story.js')).href);
-  const { SHAPES } = await import(pathToFileURL(join(ROOT, 'src/arena.js')).href);
-  const ctx = await browser.newContext(devices['iPhone 13 landscape']);
-  const page = await ctx.newPage();
-  const errs = [];
-  page.on('pageerror', (e) => errs.push(e.message));
-  await page.goto(URL0); await page.waitForTimeout(500);
-  for (const shape of SHAPES) {
-    // Prefer a mid-to-late normal room so the shape is at a decent density.
-    let pick = null;
-    for (const r of [6, 5, 3, 2, 1, 4, 7]) for (let w = 1; w <= WINGS.length && !pick; w++) if (roomShape(w, r) === shape) pick = [w, r];
-    if (!pick) { record('shapes', `${shape}: a story room uses it`, shape === 'scatter' ? true : false, 'no wing/room found'); continue; }
-    await page.evaluate(([w, r]) => { const O = __overdue; O.unlockAll(); O.startRun('story', w); O.startWave(r); O.god(); }, pick);
-    await page.waitForTimeout(1500);
-    await shot(page, `shape-${shape}`);
-    const ok = await page.evaluate(() => __overdue.game.state === 'playing' && Number.isFinite(__overdue.player.x));
-    record('shapes', `${shape} room (wing ${pick[0]} room ${pick[1]}) plays`, ok);
-  }
-  record('shapes', 'no script errors', errs.length === 0, errs.join('; ').slice(0, 200));
-  await ctx.close();
-}
-
 await browser.close();
 server.close();
 
