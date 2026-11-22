@@ -478,3 +478,20 @@ body.portrait .reach-row { grid-template-columns: 1fr; }
   .doors .door .icon { font-size: 2em; margin-top: .1em; }
 }
 body.portrait .doors { flex-direction: column; align-items: center; }
+
+/* How to play (v1.10.1): touch-first controls table, auto-aim ON vs OFF. Tokens scoped to the component. */
+.hw-table { --hw-line: rgba(255, 255, 255, .12); --hw-mine: #7be0c3; --hw-key: var(--accent); --hw-text: var(--ink);
+  display: grid; gap: .3em; font-size: .85em; text-align: left; }
+.hw-head, .hw-row { display: grid; grid-template-columns: 8.5em 1fr 1fr; gap: .2em .8em; padding: .2em .4em; border-radius: 4px; align-items: start; }
+.hw-head { border-bottom: 1px solid var(--hw-line); font-weight: bold; color: var(--hw-text); }
+.hw-row { background: rgba(255, 255, 255, .04); color: var(--hw-text); }
+.hw-row b { color: var(--hw-key); font-weight: normal; }
+.hw-both { grid-column: 2 / 4; }
+.hw-head small { font-weight: normal; opacity: .7; }
+.hw-mine { display: none; font-style: normal; font-size: .85em; color: var(--hw-mine); }
+.hw-table[data-aim="on"] .hw-head .hw-on .hw-mine, .hw-table[data-aim="off"] .hw-head .hw-off .hw-mine { display: block; }
+.hw-table[data-aim="on"] .hw-on, .hw-table[data-aim="off"] .hw-off { color: var(--hw-mine); }
+.hw-table[data-aim="on"] .hw-row b, .hw-table[data-aim="off"] .hw-row b { color: var(--hw-key); }
+.hw-note { margin: .2em 0 0; font-size: .95em; color: var(--hw-text); }
+.hw-note.muted { color: var(--muted); font-size: .85em; }
+#howto .cols > .hw-table { flex: 1.6 1 24em; max-width: 34em; }
