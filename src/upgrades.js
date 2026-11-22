@@ -245,3 +245,56 @@ export function rollUpgrades(rng, owned = {}, n = 3, ctx = {}) {
   }
   return out;
 }
+
+// ---- v1.11.0: teach perks as players progress (pure helpers; main.js only renders them) ----
+
+/** Why a Masterwork / Collected Work card is on offer ("because 📕 Hardcover hit 3/3"). '' for normal cards. */
+export function specialReason(u, owned = {}) {
+  const tag = (x) => `${x.icon} ${x.short}`;
+  if (u.kind === 'master') return `because ${tag(byId(u.requires[0]))} hit ${byId(u.requires[0]).max}/${byId(u.requires[0]).max}`;
+  if (u.kind === 'combo') return `because you own ${u.requires.map((r) => tag(byId(r))).join(' + ')}`;
+  return '';
+}
+
+/**
+ * Level text for a perk card. `from` pips are shown only when you already own the perk ("●●○ → ●●●").
+ * `mw`: 'near' = this pick makes 2/3 (name and effect stay hidden), 'finale' = this pick makes 3/3 (name shown).
+ */
+export function levelInfo(u, owned = {}) {
+  if (u.kind === 'combo') return { pips: 'Collected Work', mw: null, mwText: '' };
+  if (u.kind === 'master') return { pips: 'Masterwork', mw: null, mwText: '' };
+  if (!(u.max > 1)) return { pips: 'One-time', mw: null, mwText: '' };
+  const cur = owned[u.id] || 0, next = cur + 1;
+  const text = cur > 0 ? `${pips(cur, u.max)} → ${pips(next, u.max)}` : pips(next, u.max);
+  const m = u.kind === 'perk' ? masterworkFor(u.id) : null;
+  if (m && next === u.max) return { pips: text, mw: 'finale', mwText: `Unlocks ${m.name}` };
+  if (m && next === u.max - 1) return { pips: text, mw: 'near', mwText: 'Next level unlocks a Masterwork 🔒' };
+  return { pips: text, mw: null, mwText: '' };
+}
+
+export const TIPS = {
+  'perk-stack': 'Perks stack to ●●●. Max one to unlock its Masterwork.',
+  'special-unlocked': 'Unlocked cards always take the first slot until you pick them.',
+  'combo-pair': 'Two perks that pair unlock a Collected Work.',
+  'masterwork-near': "One more level and this perk's Masterwork joins the deck.",
+  codex: '📚 Added to your Library Codex (title screen)',
+};
+const TIP_ORDER = ['perk-stack', 'special-unlocked', 'combo-pair', 'masterwork-near'];
+
+/** Saved tips: `{ seen: [ids] }`. Missing or damaged saves read as "nothing seen yet". */
+export function normalizeTips(raw) {
+  const seen = raw && Array.isArray(raw.seen) ? raw.seen.filter((id) => typeof id === 'string') : [];
+  return { seen: [...new Set(seen)] };
+}
+
+/** The one tip to show above these cards (or null): the first applicable one the player hasn't seen yet. */
+export function perkTip(cards, owned = {}, seen = []) {
+  const has = {
+    'perk-stack': true,
+    'special-unlocked': cards.some((u) => u.kind === 'master' || u.kind === 'combo'),
+    'combo-pair': cards.some((u) => comboPartners(u, owned).some((x) => x.partnerOwned)),
+    'masterwork-near': cards.some((u) => levelInfo(u, owned).mw === 'near'),
+  };
+  const id = TIP_ORDER.find((t) => has[t] && !seen.includes(t));
+  return id ? { id, text: TIPS[id] } : null;
+}

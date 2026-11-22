@@ -520,3 +520,56 @@ test('aimSource: auto-aim on/off × touch / gamepad / mouse (v1.10.0)', async ()
   assert.equal(aimSource({ ...base, autoaim: false, padConnected: true, mouseSeen: false }), 'none');
   assert.equal(aimSource({ ...base, autoaim: false, bot: true }), 'auto');                              // the balance bot always auto-aims
 });
+
+test('v1.11.0 special cards say why they are on offer (every Masterwork and combo)', async () => {
+  const { UPGRADES, byId, specialReason } = await load('upgrades');
+  for (const u of UPGRADES.filter((x) => x.kind === 'master')) {
+    const p = byId(u.requires[0]);
+    assert.equal(specialReason(u, {}), `because ${p.icon} ${p.short} hit ${p.max}/${p.max}`);
+  }
+  for (const u of UPGRADES.filter((x) => x.kind === 'combo')) {
+    const [a, b] = u.requires.map(byId);
+    assert.equal(specialReason(u, {}), `because you own ${a.icon} ${a.short} + ${b.icon} ${b.short}`);
+  }
+  assert.equal(specialReason(byId('dewey'), {}), '');
+});
+
+test('v1.11.0 level text: now -> after pips, Masterwork teased at 2/3, named at 3/3, never revealed early', async () => {
+  const { UPGRADES, byId, levelInfo, masterworkFor } = await load('upgrades');
+  const perk = UPGRADES.find((u) => u.kind === 'perk' && u.max === 3 && masterworkFor(u.id));
+  const mw = masterworkFor(perk.id);
+  assert.deepEqual(levelInfo(perk, {}), { pips: '●○○', mw: null, mwText: '' });
+  const two = levelInfo(perk, { [perk.id]: 1 });
+  assert.equal(two.pips, '●○○ → ●●○');
+  assert.equal(two.mw, 'near');
+  assert.equal(two.mwText, 'Next level unlocks a Masterwork 🔒');
+  assert.ok(!two.mwText.includes(mw.name) && !two.mwText.includes(mw.desc), 'effect and name stay hidden at 2/3');
+  const three = levelInfo(perk, { [perk.id]: 2 });
+  assert.equal(three.pips, '●●○ → ●●●');
+  assert.equal(three.mwText, `Unlocks ${mw.name}`);
+  assert.equal(levelInfo(UPGRADES.find((u) => u.kind === 'cursed'), {}).pips, 'One-time');
+});
+
+test('v1.11.0 tips: one at a time, in order, and a seen tip never fires again', async () => {
+  const { UPGRADES, byId, perkTip, normalizeTips, TIPS, masterworkFor } = await load('upgrades');
+  const plain = byId('dewey');
+  assert.equal(perkTip([plain], {}, []).id, 'perk-stack');
+  assert.equal(perkTip([plain], {}, ['perk-stack']), null);
+  // a combo card in slot 1 -> special-unlocked (after perk-stack was seen)
+  const combo = UPGRADES.find((u) => u.kind === 'combo');
+  const owned = Object.fromEntries(combo.requires.map((r) => [r, 1]));
+  assert.equal(perkTip([combo, plain], owned, ['perk-stack']).id, 'special-unlocked');
+  assert.equal(perkTip([combo], owned, ['perk-stack', 'special-unlocked']), null);
+  // a perk that pairs with an owned perk -> combo-pair
+  const [a, b] = combo.requires.map(byId);
+  assert.equal(perkTip([a], { [b.id]: 1 }, ['perk-stack']).id, 'combo-pair');
+  assert.equal(perkTip([a], { [b.id]: 1 }, ['perk-stack', 'combo-pair']), null);
+  // a card that reaches 2/3 -> masterwork-near
+  const m = UPGRADES.find((u) => u.kind === 'perk' && u.max === 3 && masterworkFor(u.id));
+  const near = perkTip([m], { [m.id]: 1 }, ['perk-stack']);
+  assert.ok(near && ['masterwork-near', 'combo-pair'].includes(near.id));
+  assert.equal(TIPS['masterwork-near'], "One more level and this perk's Masterwork joins the deck.");
+  // saves: missing / damaged read as nothing seen; duplicates and junk dropped
+  for (const bad of [null, undefined, {}, { seen: 5 }, 'x']) assert.deepEqual(normalizeTips(bad), { seen: [] });
+  assert.deepEqual(normalizeTips({ seen: ['a', 'a', 3, 'b'] }), { seen: ['a', 'b'] });
+});

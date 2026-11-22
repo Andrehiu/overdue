@@ -6,7 +6,7 @@ import { BUILD, versionLabel, fetchLatestBuild } from './version.js';
 import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
-import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips, buildChips } from './upgrades.js';
+import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips, buildChips, specialReason, levelInfo, perkTip, normalizeTips, TIPS } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist, aimSource } from './util.js';
 import { PLAYER, bookLook } from './palette.js';
 import { SoundEngine } from './audio.js';
@@ -448,7 +448,14 @@ function chooseDoor(id) {
   }
 }
 
-const KIND_LABEL = { combo: 'Collected Works', cursed: 'Banned', master: 'Masterwork' };
+const KIND_LABEL = { combo: 'Unlocked', cursed: 'Banned', master: 'Unlocked' };
+
+// ---- Tips: each one shows once per player ever (v1.11.0). Own key; additive. ----
+const TIPS_KEY = 'overdue.tips.v1';
+let tips = normalizeTips(loadJSON(TIPS_KEY));
+const saveTips = () => saveJSON(TIPS_KEY, tips);
+const tipSeen = (id) => tips.seen.includes(id);
+function markTip(id) { if (!tipSeen(id)) { tips.seen.push(id); saveTips(); } }
 
 // ---- Codex: what this player has ever seen / discovered (per device) ----
 const CODEX_KEY = 'overdue.codex.v1';
@@ -462,6 +469,18 @@ const cardsArmed = () => performance.now() >= cardsArmedAt;
 let currentChoices = [];
 function rollOpts(extra = {}) { return { lights: settings.lights, banned: game.banished, ...extra }; }
 
+/** One short tip strip above the cards (never covers them). Marked seen when shown. */
+function showPerkTip(choices) {
+  const el = $('#perkTip');
+  const tip = perkTip(choices, game.owned, tips.seen);
+  const pulse = !!tip && tip.id === 'combo-pair';
+  $('#cards').querySelectorAll('.hint').forEach((h) => h.classList.remove('pulse'));
+  if (!tip) { el.hidden = true; el.textContent = ''; return; }
+  el.hidden = false; el.textContent = tip.text; el.dataset.tip = tip.id;
+  if (pulse) { const h = $('#cards .hint.ready') || [...$('#cards').querySelectorAll('.hint')].find((x) => x.textContent); if (h) h.classList.add('pulse'); }
+  markTip(tip.id);
+}
+
 function renderCards(choices) {
   currentChoices = choices;
   const box = $('#cards');
@@ -474,7 +493,7 @@ function renderCards(choices) {
     const b = document.createElement('button');
     b.className = `card ${u.kind}`;
     const lvl = (game.owned[u.id] || 0) + 1;
-    b.innerHTML = '<span class="key"></span><span class="stamp"></span><span class="icon"></span><strong></strong><span class="gain"></span><span class="hint"></span><span class="lvl"></span>';
+    b.innerHTML = '<span class="key"></span><span class="stamp"></span><span class="icon"></span><strong></strong><span class="why"></span><span class="gain"></span><span class="hint"></span><span class="lvl"></span><span class="mw"></span>';
     b.querySelector('.key').textContent = String(i + 1);
     b.querySelector('.icon').textContent = u.icon;
     b.querySelector('.stamp').textContent = KIND_LABEL[u.kind] || '';
@@ -488,11 +507,12 @@ function renderCards(choices) {
     else if (partners.length) hint.textContent = `🔗 Combos with ${partners.map((x) => `${x.partner.icon} ${x.partner.short}`).join(' or ')}`;
     else hint.textContent = '';
     const mw = u.kind === 'perk' && lvl === u.max ? masterworkFor(u.id) : null;
-    b.querySelector('.lvl').textContent = u.kind === 'combo'
-      ? `${u.requires.map((r) => byId(r).name).join(' + ')}`
-      : u.kind === 'master' ? `${byId(u.requires[0]).name} mastered`
-        : u.max > 1 ? `${pips(lvl, u.max)}${mw ? `  Unlocks ${mw.name}` : ''}` : 'One-time';
-    if (mw) b.classList.add('finale');
+    // v1.11.0: say why a special card is here, show "now → after" pips, and tease Masterworks without revealing them.
+    b.querySelector('.why').textContent = specialReason(u, game.owned);
+    const info = levelInfo(u, game.owned);
+    b.querySelector('.lvl').textContent = info.pips;
+    b.querySelector('.mw').textContent = info.mwText;
+    if (info.mw) b.classList.add(info.mw === 'finale' ? 'finale' : 'near');
     if (!codex.seen.has(u.id)) { b.classList.add('new'); codex.seen.add(u.id); }
     b.addEventListener('click', () => {
       if (!cardsArmed() || game.state !== 'upgrade') return;
@@ -502,7 +522,8 @@ function renderCards(choices) {
       if (u.kind === 'combo' || u.kind === 'master') { codex.found.add(u.id); saveCodex(); }
       if (u.kind === 'combo') toast(`📚 ${u.name} added to your Collected Works`);
       else if (u.kind === 'master') toast(`🏆 Masterwork: ${u.name}`);
-      else if (mw) toast(`🏆 ${u.name} mastered! ${mw.name} will be offered next`);
+      if ((u.kind === 'combo' || u.kind === 'master') && !tipSeen('codex')) { markTip('codex'); setTimeout(() => toast(TIPS.codex), 1700); }
+      if (u.kind === 'perk' && mw) toast(`🏆 ${u.name} mastered! ${mw.name} will be offered next`);
       afterPick();
     });
     wrap.appendChild(b);
@@ -532,6 +553,7 @@ function renderCards(choices) {
     box.appendChild(wrap);
   });
   saveCodex();
+  showPerkTip(choices);
   const renew = $('#btnRenew');
   renew.hidden = !(game.renews > 0);
   renew.textContent = `↻ Renew (${game.renews || 0})`;
@@ -2267,6 +2289,7 @@ function bankRun() {
 const inRun = () => ['playing', 'paused', 'upgrade', 'doors', 'waveclear', 'dying'].includes(game.state);
 
 // ---- Progress tools (Settings): reset for a fresh start; debug helpers with ?debug=1 ----
+$('#btnShowTips').addEventListener('click', () => { tips = normalizeTips(null); saveTips(); toast('Tips will show again'); });
 let resetArmedUntil = 0;
 const btnReset = $('#btnResetProgress');
 btnReset.addEventListener('click', () => {
