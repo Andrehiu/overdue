@@ -27,14 +27,14 @@ Or play online at **https://andrehiu.github.io/overdue/**. On a phone, use **Sha
 ## What's inside
 
 - **Two modes:**
-  - **Story: the library wings.** Ten handmade wings (Front Desk, Children's Wing, Periodicals … The Restricted Section), unlocked in order. A run is one wing of **10 rooms**: pick a perk after every room. Room 5 is an **elite room**, and room 10 is a **Rogue Author**. Each room is harder than the last, and each wing is harder than the one before it. Wings also have their own **room shapes** (long aisles, pillared halls, mazes, reading-room rings, bridges), fixed per room:
+  - **Story: the library wings.** Ten handmade wings (Front Desk, Children's Wing, Periodicals … The Restricted Section), unlocked in order. A run is one wing of **7 rooms**: pick a perk after every room. Room 4 is an **elite room**, and room 7 is a **Rogue Author**. Some rooms are **⏱️ Survive rooms** (never rooms 1, 4 or 7; at most one per wing in wings 1–2, two after that): instead of killing everything you survive 30 seconds while enemies keep coming, then whatever is left vanishes. They are never easier than a plain room and pay the same fines. Each room is harder than the last, and each wing is harder than the one before it. Wings also have their own **room shapes** (long aisles, pillared halls, mazes, reading-room rings, bridges), fixed per room:
     - tougher, faster enemies, and more of them;
     - a growing share of **★ elites**, which wear a gold crown and fire pages at you (from wing 7, three at a time);
     - faster enemy pages;
     - elites burst into pages when they die (from wing 4);
     - bosses learn a new pattern every 3 wings.
 
-    **Pick your next door:** after most rooms you choose the next room from two doors: 💰 Rare Books (more enemies and elites, double fines; from wing 4 the elites are tougher and fire faster), ☕ Break Room (heal a heart, fewer fines), 🎲 Mystery Shelf (a cursed book or a bonus perk when you clear it), or 🚪 The Stacks (a plain room, offered instead of Break Room when you're at full health). Doors never make enemies weaker. There is a door after the elite room too (room 5 to 6). Each wing opens with a one-line intro, its Rogue Author taunts you when they appear in room 10, and clearing the wing shows a closing line. Endless mode has no doors or story lines.
+    **Pick your next door:** after most rooms you choose the next room from two doors: 💰 Rare Books (more enemies and elites, double fines; from wing 4 the elites are tougher and fire faster), ☕ Break Room (heal a heart, fewer fines), 🎲 Mystery Shelf (a cursed book or a bonus perk when you clear it), or 🚪 The Stacks (a plain room, offered instead of Break Room when you're at full health). Doors never make enemies weaker. There is a door after the elite room too (room 4 to 5). Each wing opens with a one-line intro, its Rogue Author taunts you when they appear in room 7, and clearing the wing shows a closing line. Endless mode has no doors or story lines.
 
     Each wing has its own enemy mix, shelf density, floor and rug. Shelf layouts are the same every time you play a room.
   - **Endless shift:** the original wave mode with the Hall of Fame. It plays exactly as before.

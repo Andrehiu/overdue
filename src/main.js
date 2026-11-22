@@ -10,7 +10,7 @@ import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, combo
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist } from './util.js';
 import { PLAYER, bookLook } from './palette.js';
 import { SoundEngine } from './audio.js';
-import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
+import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
 import { DOORS, doorOffer, applyDoor, doorReward, mysteryPrize } from './doors.js';
 import { PROGRESS_KEY, RENOVATIONS, normalizeProgress, applyRenovations, runBonuses, recordRun, level, nextCost, canBuy, buy } from './meta.js';
 
@@ -228,7 +228,7 @@ function onPadPress(i) {
 const game = {
   state: 'title', wave: 0, score: 0, kills: 0, combo: 0, comboT: 0, bestCombo: 0, time: 0, playTime: 0,
   seed: 1, freeze: 0, timeScale: 1, trauma: 0, flash: 0, banner: '', bannerSub: '', bannerT: 0,
-  owned: {}, noHitWave: true, clearT: 0, boss: null, deathT: 0, waveT: 0, ammoT: 0, ammo: null,
+  owned: {}, noHitWave: true, clearT: 0, boss: null, deathT: 0, waveT: 0, surviveT: 0, ammoT: 0, ammo: null,
   mode: 'endless', wingN: 1, diff: null, fines: 0, cards: 3, banked: null, wingCleared: false,
   door: null, bonusPicks: 0, pickIsBonus: false,
 };
@@ -296,12 +296,15 @@ function startWave(n) {
   player.x = W / 2; player.y = H / 2; player.vx = player.vy = 0;
   spawnQueue = (isStory() ? composeRoom(game.wingN, n, rng, game.diff) : composeWave(n, rng)).spawns;
   game.waveT = 0; game.noHitWave = true; game.boss = null;
+  game.surviveT = isSurvive() ? SURVIVE_SECONDS : 0;
   game.ammo = pickBook(); game.ammoT = 0;
   player.dashStock = stats.dashCharges; player.dashCd = 0; player.amnesty = stats.amnesty;
   if (isStory()) player.shhhT = 0;   // story: SHHH is ready at the start of every room (endless keeps its cooldown)
   if (isStory()) {
     const kind = game.diff.kind;
-    banner(`ROOM ${n}/${ROOMS_PER_WING}`, kind === 'boss' ? 'A rogue author approaches…' : kind === 'elite' ? '★ Elite room: they fight back' : n === 1 ? wingDef().intro : DOORS[game.door]?.banner || wingDef().name);
+    const door = DOORS[game.door]?.banner;
+    const sub = kind === 'boss' ? 'A rogue author approaches…' : kind === 'elite' ? '★ Elite room: they fight back' : n === 1 ? wingDef().intro : door || wingDef().name;
+    banner(`ROOM ${n}/${ROOMS_PER_WING}`, isSurvive() ? `⏱️ Survive ${SURVIVE_SECONDS} seconds${door && kind === 'normal' && n > 1 ? ' · ' + door.replace(/:.*/, '') : ''}` : sub);
   } else banner(`WAVE ${n}`, n % 5 === 0 ? 'A rogue author approaches…' : '');
   sound.setIntensity(1); sound.setMuffled(false);
   game.state = 'playing';
@@ -313,6 +316,21 @@ const bannerQueue = [];
 function banner(text, sub = '') {
   if (game.bannerT > 0.5 && game.banner !== text) { if (bannerQueue.length < 3) bannerQueue.push([text, sub]); return; }
   game.banner = text; game.bannerSub = sub; game.bannerT = 2.4;
+}
+
+/** Is this story room a Survive room (timer instead of "kill everything")? */
+const isSurvive = () => isStory() && game.diff?.goal === 'survive';
+
+/** The timer ran out: whatever is left vanishes in a SHHH-style wave (no score), then the room clears. */
+function endSurvive() {
+  game.surviveT = 0;
+  for (const e of enemies) burst(e.x, e.y, e.type === 'boss' ? 30 : 8, ['#9be7dc', '#fff'], 90, 0.4);
+  enemies.length = 0; telegraphs.length = 0; spawnQueue.length = 0;
+  rings.push({ x: player.x, y: player.y, r: 8, max: Math.max(W, H), speed: 900, friendly: true, life: 1 });
+  addLight(W / 2, H / 2, Math.max(W, H), 0.6, '#9be7dc');
+  floatText(player.x, player.y - 26, 'SHHH!', '#9be7dc', 22, 1);
+  sound.play('shhh');
+  waveCleared();
 }
 
 function waveCleared() {
@@ -745,7 +763,7 @@ function materialise(type, x, y, elite = false) {
   if (type !== 'boss') { x += (Math.random() - 0.5) * 8; y += (Math.random() - 0.5) * 8; }
   burst(x, y, 14, elite ? ['#ffd54a', '#fff'] : ['#b48cff', '#fff'], 120, 0.5);
   if (type === 'worm') {
-    const headHp = game.diff ? 4 * (1 + game.wave * 0.08) * (1 + 0.22 * (game.wingN - 1)) : 4 * (1 + game.wave * 0.08);
+    const headHp = game.diff ? 4 * (1 + curveRoom(game.wave) * 0.08) * (1 + 0.22 * (game.wingN - 1)) : 4 * (1 + game.wave * 0.08);
     let prev = makeEnemy('worm', x, y, { hp: Math.round(headHp), head: true });
     prev.maxHp = prev.hp;
     for (let i = 0; i < 6; i++) prev = makeEnemy('worm', x, y, { leader: prev });
@@ -821,7 +839,8 @@ function step(dt) {
   game.ammoT += sdt;
   if (game.ammoT > 7) { game.ammoT = 0; game.ammo = pickBook(); }
 
-  if (game.state === 'playing' && !spawnQueue.length && !telegraphs.length && !enemies.length) waveCleared();
+  if (game.state === 'playing' && isSurvive()) { game.surviveT -= sdt; if (game.surviveT <= 0) endSurvive(); }
+  else if (game.state === 'playing' && !spawnQueue.length && !telegraphs.length && !enemies.length) waveCleared();
   if (game.state === 'waveclear') { game.clearT -= dt; if (game.clearT <= 0) (game.wingCleared ? showGameOver() : showUpgrades()); }
   if (game.state === 'dying') { game.deathT -= dt; if (game.deathT <= 0) showGameOver(); }
   actions.dash = actions.shhh = false;
@@ -1105,7 +1124,7 @@ function updateEnemies(dt) {
         mx = (s.x * dir - s.y * strafe * 0.6) * e.speed; my = (s.y * dir + s.x * strafe * 0.6) * e.speed;
         e.atkT -= dt;
         if (e.atkT <= 0) {
-          e.atkT = Math.max(1.6, 3 - game.wave * 0.06);
+          e.atkT = Math.max(1.6, 3 - (game.diff ? curveRoom(game.wave) : game.wave) * 0.06);
           rings.push({ x: e.x, y: e.y, r: e.r, max: 196, speed: 140, width: 12, life: 1 });
           sound.play('ring');
         }
@@ -2024,7 +2043,8 @@ function drawHUD() {
   const left = enemies.length + telegraphs.length + spawnQueue.length;
   if (isStory()) {
     txt(`ROOM ${game.wave}/${ROOMS_PER_WING}`, W / 2, 26, 18, game.diff && game.diff.kind !== 'normal' ? '#ffd54a' : '#e8d9b0', 'center');
-    if (game.state === 'playing' && !game.boss) txt(`${short(wingDef().name, 18)} · ${left} left`, W / 2, 44, 11, 'rgba(232,217,176,0.8)', 'center');
+    if (game.state === 'playing' && isSurvive()) { const t = Math.max(0, Math.ceil(game.surviveT)); txt(`⏱️ Survive ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, W / 2, 44, 13, '#ffd54a', 'center'); }
+    else if (game.state === 'playing' && !game.boss) txt(`${short(wingDef().name, 18)} · ${left} left`, W / 2, 44, 11, 'rgba(232,217,176,0.8)', 'center');
   } else {
     txt(`WAVE ${game.wave}`, W / 2, 26, 18, '#e8d9b0', 'center');
     if (game.state === 'playing' && !game.boss) txt(`${left} disturbance${left === 1 ? '' : 's'} left`, W / 2, 44, 11, 'rgba(232,217,176,0.8)', 'center');
@@ -2224,7 +2244,7 @@ function renderStory() {
   $('#wingBlurb').textContent = def.blurb;
   const d1 = difficulty(selectedWing, 1);
   $('#wingInfo').textContent = selectedWing === 1
-    ? '10 rooms · room 5 is elite · a Rogue Author waits in room 10'
+    ? `${ROOMS_PER_WING} rooms · room ${ELITE_ROOM} is elite · a Rogue Author waits in room ${BOSS_ROOM}`
     : `Enemies ×${d1.hpMult.toFixed(2)} tougher · ${Math.round(d1.eliteChance * 100)}% elites${d1.deathBurst ? ' · elites burst into pages' : ''}`;
   $('#btnEnterWing').textContent = `▶ Enter ${def.name}`;
 }
@@ -2460,7 +2480,7 @@ requestAnimationFrame(frame);
 if (DEBUG) {
   window.__overdue = {
     game, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, enemies, get content() { return content; },
-    startRun, startWave, killAll: () => { for (const e of [...enemies]) killEnemy(e); spawnQueue.length = 0; telegraphs.length = 0; },
+    startRun, startWave, setSurviveT: (t) => { game.surviveT = t; }, killAll: () => { for (const e of [...enemies]) killEnemy(e); spawnQueue.length = 0; telegraphs.length = 0; },
     get progress() { return progress; }, setFines: (n) => { progress = { ...progress, fines: n }; saveProgress(); renderFineBadges(); },
     unlockAll: () => { progress = { ...progress, unlocked: WINGS.length }; saveProgress(); },
 

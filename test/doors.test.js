@@ -7,7 +7,7 @@ const SEEDS = [1, 2, 42, 99999, 123456789];
 
 test('door offers are deterministic per (seed, wing, room) and never two of the same type', async () => {
   const { doorOffer } = await load('doors');
-  for (const seed of SEEDS) for (let wing = 1; wing <= 10; wing++) for (const room of [1, 2, 3, 6, 7, 8]) {
+  for (const seed of SEEDS) for (let wing = 1; wing <= 10; wing++) for (const room of [1, 2, 4, 5]) {
     const a = doorOffer(seed, wing, room, { atFullHp: false }), b = doorOffer(seed, wing, room, { atFullHp: false });
     assert.deepEqual(a, b);
     assert.equal(a.length, 2);
@@ -15,13 +15,13 @@ test('door offers are deterministic per (seed, wing, room) and never two of the 
   }
   // Different rooms give variety overall (not the same pair everywhere).
   const pairs = new Set();
-  for (const seed of SEEDS) for (const room of [1, 2, 3]) pairs.add(doorOffer(seed, 1, room, {}).join('+'));
+  for (const seed of SEEDS) for (const room of [1, 2, 4]) pairs.add(doorOffer(seed, 1, room, {}).join('+'));
   assert.ok(pairs.size > 1);
 });
 
 test('The Stacks only replaces Break Room, and only at full health', async () => {
   const { doorOffer } = await load('doors');
-  for (const seed of SEEDS) for (let wing = 1; wing <= 10; wing++) for (const room of [1, 2, 3, 6, 7, 8]) {
+  for (const seed of SEEDS) for (let wing = 1; wing <= 10; wing++) for (const room of [1, 2, 4, 5]) {
     const hurt = doorOffer(seed, wing, room, { atFullHp: false }), full = doorOffer(seed, wing, room, { atFullHp: true });
     assert.ok(!hurt.includes('stacks'));
     assert.ok(!full.includes('rest'));
@@ -29,15 +29,22 @@ test('The Stacks only replaces Break Room, and only at full health', async () =>
   }
 });
 
-test('rooms 4 and 9 show one fixed door, room 5 shows a normal 2-door choice, room 10 none', async () => {
+test('doors follow ELITE_ROOM / BOSS_ROOM: fixed elite door, fixed author door, 2-door choice elsewhere, none after the boss', async () => {
   const { doorOffer, DOORS } = await load('doors');
+  const { ELITE_ROOM, BOSS_ROOM, ROOMS_PER_WING } = await load('story');
+  assert.equal(ROOMS_PER_WING, 7); assert.equal(ELITE_ROOM, 4); assert.equal(BOSS_ROOM, 7);
   for (const seed of SEEDS) for (let wing = 1; wing <= 10; wing++) {
-    assert.deepEqual(doorOffer(seed, wing, 4, {}), ['elite']);
-    assert.deepEqual(doorOffer(seed, wing, 9, {}), ['author']);
-    const after5 = doorOffer(seed, wing, 5, {});
-    assert.equal(after5.length, 2); assert.notEqual(after5[0], after5[1]);
-    assert.deepEqual(doorOffer(seed, wing, 10, {}), []);
-    assert.deepEqual(doorOffer(seed, wing, 11, {}), []);
+    for (let room = 1; room < BOSS_ROOM; room++) {
+      const o = doorOffer(seed, wing, room, {});
+      if (room === ELITE_ROOM - 1) assert.deepEqual(o, ['elite']);
+      else if (room === BOSS_ROOM - 1) assert.deepEqual(o, ['author']);
+      else { assert.equal(o.length, 2, `after room ${room}`); assert.notEqual(o[0], o[1]); }
+    }
+    assert.deepEqual(doorOffer(seed, wing, 3, {}), ['elite']);
+    assert.deepEqual(doorOffer(seed, wing, 6, {}), ['author']);
+    assert.equal(doorOffer(seed, wing, 4, {}).length, 2);   // after the elite room: a normal choice
+    assert.deepEqual(doorOffer(seed, wing, 7, {}), []);
+    assert.deepEqual(doorOffer(seed, wing, 8, {}), []);
   }
   assert.ok(DOORS.elite.fixed && DOORS.author.fixed);
 });
