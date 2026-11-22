@@ -362,13 +362,33 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
       await sim(`O.stepN(300);`); // let the room's enemies materialise
       const idle = await sim(`const t0 = O.player.throws; const en = O.enemies.length; O.stepN(150); return { enemies: en, throws: O.player.throws - t0 };`);
       record(area, 'auto-aim off, no second finger: no throws at enemies', idle.enemies > 0 && idle.throws === 0, JSON.stringify(idle));
-      const manual = await sim(`const p = O.player; O.touch.aimId = 99; O.touch.ax = p.x - 200; O.touch.ay = p.y + 100; const t0 = p.throws;
-        O.stepN(60); const exp = Math.atan2(O.touch.ay - p.y, O.touch.ax - p.x); O.touch.aimId = null;
-        const l = p.lastThrow; const d = l ? Math.abs(Math.atan2(Math.sin(l.aim - exp), Math.cos(l.aim - exp))) : 9; return { throws: p.throws - t0, diff: d };`);
-      record(area, 'auto-aim off, second finger down: throws toward the finger', manual.throws >= 1 && manual.diff < 0.15, JSON.stringify(manual));
+      // v1.10.2: floating aim stick. The finger lands far to the RIGHT of the player and drags 60 px LEFT: throws must go left.
+      const angOff = `const dd = (l, e) => l ? Math.abs(Math.atan2(Math.sin(l.aim - e), Math.cos(l.aim - e))) : 9;`;
+      const down = await sim(`const p = O.player; O.touch.aimId = 99; O.touch.ax0 = O.touch.ax = p.x + 300; O.touch.ay0 = O.touch.ay = p.y; const t0 = p.throws;
+        O.stepN(90); O.touch.aimId = null; return { throws: p.throws - t0 };`);
+      record(area, 'auto-aim off, finger down but not dragged: no throws', down.throws === 0, JSON.stringify(down));
+      const manual = await sim(`${angOff} const p = O.player; O.touch.aimId = 99; O.touch.ax0 = p.x + 300; O.touch.ay0 = p.y; O.touch.ax = O.touch.ax0 - 60; O.touch.ay = O.touch.ay0; const t0 = p.throws;
+        O.stepN(60); O.touch.aimId = null; return { throws: p.throws - t0, diff: dd(p.lastThrow, Math.PI) };`);
+      record(area, 'auto-aim off, finger right of player dragged 60px left: throws go left', manual.throws >= 1 && manual.diff < 0.15, JSON.stringify(manual));
+      const manualUp = await sim(`${angOff} const p = O.player; O.touch.aimId = 99; O.touch.ax0 = p.x - 200; O.touch.ay0 = p.y + 50; O.touch.ax = O.touch.ax0; O.touch.ay = O.touch.ay0 - 60; const t0 = p.throws;
+        O.stepN(60); O.touch.aimId = null; return { throws: p.throws - t0, diff: dd(p.lastThrow, -Math.PI / 2) };`);
+      record(area, 'auto-aim off, dragged 60px up: throws go up', manualUp.throws >= 1 && manualUp.diff < 0.15, JSON.stringify(manualUp));
+      const released = await sim(`const p = O.player; O.touch.aimId = null; const t0 = p.throws; O.stepN(90); return { throws: p.throws - t0 };`);
+      record(area, 'auto-aim off, stick released: throwing stops', released.throws === 0, JSON.stringify(released));
+      // aim-stick screenshot with both sticks visible (real loop running, fingers faked in state)
+      await page.evaluate(() => { const O = __overdue, p = O.player, t = O.touch; t.moveId = 98; t.mx0 = t.mx = 150; t.my0 = t.my = 280; t.mx += 25; t.my -= 15;
+        t.aimId = 99; t.ax0 = O.W - 150; t.ay0 = 280; t.ax = t.ax0 - 40; t.ay = t.ay0 - 25; });
+      await page.waitForTimeout(300); await shot(page, `${name}-aim-stick`);
+      await page.evaluate(() => { const t = __overdue.touch; t.aimId = null; t.moveId = null; });
       const auto = await sim(`O.setSetting('autoaim', true); O.touch.enabled = true; O.touch.aimId = null; const p = O.player; const t0 = p.throws; p.autoAim = { n: 0, nearest: true }; O.stepN(120);
         return { throws: p.throws - t0, aimedFrames: p.autoAim.n, aimedAtNearest: p.autoAim.nearest };`);
       record(area, 'auto-aim on: throws at the nearest enemy with no finger (unchanged)', auto.throws >= 1 && auto.aimedFrames >= 1 && auto.aimedAtNearest, JSON.stringify(auto));
+      const over = await sim(`${angOff} const p = O.player; O.touch.aimId = 99; O.touch.ax0 = p.x + 300; O.touch.ay0 = p.y; O.touch.ax = O.touch.ax0 - 60; O.touch.ay = O.touch.ay0; const t0 = p.throws;
+        O.stepN(60); O.touch.aimId = null; return { throws: p.throws - t0, diff: dd(p.lastThrow, Math.PI) };`);
+      record(area, 'auto-aim on + deflected stick: throws follow the stick', over.throws >= 1 && over.diff < 0.15, JSON.stringify(over));
+      const idleStick = await sim(`const p = O.player; O.touch.aimId = 99; O.touch.ax0 = O.touch.ax = p.x + 300; O.touch.ay0 = O.touch.ay = p.y; p.autoAim = { n: 0, nearest: true }; const t0 = p.throws;
+        O.stepN(120); O.touch.aimId = null; return { throws: p.throws - t0, aimedFrames: p.autoAim.n };`);
+      record(area, 'auto-aim on + stick inside deadzone: auto-aim keeps working', idleStick.throws >= 1 && idleStick.aimedFrames >= 1, JSON.stringify(idleStick));
       await page.evaluate(() => { __overdue.touch.enabled = false; __overdue.setSetting('autoaim', true); });
     }
 

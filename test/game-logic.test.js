@@ -511,7 +511,7 @@ test('aimSource: auto-aim on/off × touch / gamepad / mouse (v1.10.0)', async ()
   const base = { autoaim: true, bot: false, touchEnabled: false, touchAiming: false, padConnected: false, padStick: false, mouseSeen: true };
   for (const autoaim of [true, false]) {
     assert.equal(aimSource({ ...base, autoaim }), 'mouse');                                              // mouse unchanged
-    assert.equal(aimSource({ ...base, autoaim, touchEnabled: true, touchAiming: true }), 'touch');       // second finger always aims
+    assert.equal(aimSource({ ...base, autoaim, touchEnabled: true, touchAiming: true }), 'touch');       // deflected aim stick always aims
     assert.equal(aimSource({ ...base, autoaim, padConnected: true, padStick: true, mouseSeen: false }), 'pad');
   }
   assert.equal(aimSource({ ...base, touchEnabled: true }), 'auto');
@@ -519,4 +519,18 @@ test('aimSource: auto-aim on/off × touch / gamepad / mouse (v1.10.0)', async ()
   assert.equal(aimSource({ ...base, padConnected: true, mouseSeen: false }), 'auto');
   assert.equal(aimSource({ ...base, autoaim: false, padConnected: true, mouseSeen: false }), 'none');
   assert.equal(aimSource({ ...base, autoaim: false, bot: true }), 'auto');                              // the balance bot always auto-aims
+});
+
+test('aimStick: drag vector from where the finger landed, with a deadzone (v1.10.2)', async () => {
+  const { aimStick } = await import('../src/util.js');
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+  assert.equal(aimStick(500, 200, 500, 200, 10).deflected, false);          // finger down, not dragged
+  assert.equal(aimStick(500, 200, 510, 200, 10).deflected, false);          // exactly on the deadzone edge: not yet
+  assert.equal(aimStick(500, 200, 510.5, 200, 10).deflected, true);
+  assert.ok(near(aimStick(500, 200, 440, 200, 10).angle, Math.PI) || near(aimStick(500, 200, 440, 200, 10).angle, -Math.PI)); // drag left
+  assert.ok(near(aimStick(500, 200, 560, 200, 10).angle, 0));               // right
+  assert.ok(near(aimStick(500, 200, 500, 140, 10).angle, -Math.PI / 2));    // up (canvas y grows downward)
+  assert.ok(near(aimStick(500, 200, 500, 260, 10).angle, Math.PI / 2));     // down
+  // independent of where the finger started: same drag, different origins, same angle
+  assert.equal(aimStick(0, 0, -30, 40, 10).angle, aimStick(900, 300, 870, 340, 10).angle);
 });
