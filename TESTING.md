@@ -10,8 +10,8 @@ look at the screenshots) notices.
 |---|---|---|
 | Unit | All `node:test` suites (arenas, pathfinding, waves, perks, previews, versioning) | 0 failures |
 | Screens: iPhone landscape, iPad landscape, desktop (full flow). iPhone portrait runs only the **rotate-overlay checks**: overlay covers the title, rotating mid-run pauses, rotating back shows pause and the arena fills ≥ 75% | Title fully visible · arena fills screen · menu text readable · version label · run starts · perk cards render with plain text · Masterwork at 3/3 · pause + build strip · boss spawns · game-over text readable · score saves · Codex opens · **no page/console errors · no failed requests** | Fill ≥ 75% of screen; menu text luminance > 0.5; card title luminance < 0.3 |
-| Story + late fees (every device) | Renovations shop readable · buying spends fines and saves · wing select (10 wings, only wing 1 open) · story room starts · 4-card hand fits the screen · elite room is all elites · room-10 boss · clearing wing 1 unlocks wing 2 | as listed |
-| Performance | Wave-15 boss, ~25 perks + Masterworks, phone viewport; story wing 10 room 9 (elites shooting) | Game speed ≥ 0.85x, ≥ 50 fps (CI: ≥ 0.75x, fps not judged), books in flight ≤ 110 |
+| Story + late fees (every device) | Renovations shop readable · buying spends fines and saves · wing select (10 wings, only wing 1 open) · story room starts · 4-card hand fits the screen · elite room is all elites · Survive room counts down, keeps spawning and clears itself · room-7 boss · clearing wing 1 unlocks wing 2 | as listed |
+| Performance | Wave-15 boss, ~25 perks + Masterworks, phone viewport; story wing 10 room 6 (elites shooting) | Game speed ≥ 0.85x, ≥ 50 fps (CI: ≥ 0.75x, fps not judged), books in flight ≤ 110 |
 | Privacy | Secrets and email addresses in tracked files **and commit messages**; your private terms if `.qa-private-terms` exists | No hits |
 
 Output: `qa-report/report.md` plus screenshots per device (`iphone-landscape-1-title.png` … `-13-wing-cleared.png`, `perf-late-boss.png`, `perf-story-late.png`).

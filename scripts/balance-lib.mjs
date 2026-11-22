@@ -3,7 +3,7 @@
 
 export const POLICIES = ['rare', 'rest', 'mixed'];
 export const WINGS_TESTED = [1, 4, 7, 10];
-export const ROOMS = 10;
+export const ROOMS = 7;   // = ROOMS_PER_WING in src/story.js (a unit test keeps them equal; this file also runs inside the game page, so it imports nothing)
 
 /** Door preference per policy, best first. Mystery Shelf is always last: only taken when nothing else is offered. */
 const ORDER = {
@@ -173,7 +173,7 @@ export function renderReport(rows, meta = {}) {
   L.push(...(f.length ? f.map((x) => `- ${x}`) : ['- Nothing stands out.']), '');
   for (const renos of [...new Set(rows.map((r) => r.renos))]) {
     L.push(`## ${renos === 'none' ? 'Fresh save (no Renovations)' : 'Mid-game save (about half of every Renovation)'}`, '');
-    L.push('| Wing | Policy | Runs | Clear | Hearts left (clears) | Fines/run | Run time | Timeouts | Deaths by room 1–10 |');
+    L.push(`| Wing | Policy | Runs | Clear | Hearts left (clears) | Fines/run | Run time | Timeouts | Deaths by room 1–${ROOMS} |`);
     L.push('|---|---|---|---|---|---|---|---|---|');
     for (const r of rows.filter((x) => x.renos === renos)) {
       L.push(`| ${r.wing} | ${r.policy} | ${r.runs}${r.errors ? ` (+${r.errors} err)` : ''} | ${pct(r.clearRate)} (${r.clears}/${r.runs}) | ${r.heartsLeft ?? '–'} | ${r.fines ?? '–'} | ${mmss(r.time)} | ${r.timeouts} | ${r.deathRooms.join(' ')} |`);

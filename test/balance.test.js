@@ -46,8 +46,8 @@ test('steering: runs from a threat, avoids shelves, holds or drifts to centre wh
 const run = (o) => ({ renos: 'none', wing: 1, policy: 'rare', outcome: 'death', room: 3, hearts: 0, fines: 10, time: 100, ...o });
 test('aggregation: clear rate, death rooms, hearts, fines, time, timeouts; errors are left out', () => {
   const rows = aggregate([
-    run({ outcome: 'clear', room: 10, hearts: 4, fines: 100, time: 300 }),
-    run({ outcome: 'clear', room: 10, hearts: 2, fines: 120, time: 340 }),
+    run({ outcome: 'clear', room: 7, hearts: 4, fines: 100, time: 300 }),
+    run({ outcome: 'clear', room: 7, hearts: 2, fines: 120, time: 340 }),
     run({ room: 3, fines: 20, time: 60 }),
     run({ outcome: 'timeout', room: 7, fines: 40, time: 200 }),
     run({ outcome: 'error', room: 0 }),
@@ -57,7 +57,7 @@ test('aggregation: clear rate, death rooms, hearts, fines, time, timeouts; error
   assert.equal(r.runs, 4); assert.equal(r.errors, 1);
   assert.equal(r.clearRate, 0.5); assert.equal(r.heartsLeft, 3);
   assert.equal(r.fines, 70); assert.equal(r.timeouts, 1);
-  assert.deepEqual(r.deathRooms, [0, 0, 1, 0, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(r.deathRooms, [0, 0, 1, 0, 0, 0, 0]);
   assert.equal(r.time, 225);
 });
 
@@ -77,4 +77,10 @@ test('what-stands-out: biggest wing drop, best policy, death pile-up; report ren
   const md = renderReport(rows, { runsPerCell: 20, version: 't' });
   assert.match(md, /What stands out/);
   assert.match(md, /\| 7 \| rest \|/);
+});
+
+test('the balance bot knows the wing length', async () => {
+  const { ROOMS } = await import('../scripts/balance-lib.mjs');
+  const { ROOMS_PER_WING } = await import('../src/story.js');
+  assert.equal(ROOMS, ROOMS_PER_WING);
 });

@@ -238,7 +238,7 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     const hand = await page.evaluate(() => ({ state: __overdue.game.state, title: document.querySelector('#upgradeTitle').textContent,
       cards: [...document.querySelectorAll('#cards .card')].map((c) => { const r = c.getBoundingClientRect(); return { l: r.left, r: r.right }; }) }));
     await shot(page, `${name}-11-story-perks`);
-    record(area, 'room clear offers 4 cards', hand.state === 'upgrade' && hand.cards.length === 4 && /Room 1\/10/.test(hand.title), `${hand.cards.length} cards · ${hand.title}`);
+    record(area, 'room clear offers 4 cards', hand.state === 'upgrade' && hand.cards.length === 4 && /Room 1\/7/.test(hand.title), `${hand.cards.length} cards · ${hand.title}`);
     const vw = await page.evaluate(() => innerWidth);
     record(area, '4 cards fit on screen', hand.cards.every((c) => c.l >= -1 && c.r <= vw + 1));
     // Doors (v1.7.0): after the perk pick, choose the next room from 2 doors
@@ -273,9 +273,9 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     record(area, 'Break Room never heals above max', await page.evaluate(() => __overdue.player.hp === 5));
     const intro = await page.evaluate(() => { const O = __overdue; O.startWave(1); return { sub: O.game.bannerSub, want: O.WINGS ? O.WINGS[O.game.wingN - 1].intro : null }; });
     record(area, 'story room 1 banner shows the wing intro', !!intro.sub && intro.sub !== 'Front Desk' && intro.sub.length > 10, intro.sub);
-    await page.evaluate(() => { const O = __overdue; O.stats.maxHp = 5; O.player.hp = 5; O.game.wave = 5; O.nextRoom(); }); await page.waitForTimeout(600);
+    await page.evaluate(() => { const O = __overdue; O.stats.maxHp = 5; O.player.hp = 5; O.game.wave = 4; O.nextRoom(); }); await page.waitForTimeout(600);
     const d5 = await page.evaluate(() => ({ state: __overdue.game.state, n: document.querySelectorAll('#doorCards .door').length }));
-    record(area, 'a 2-door screen appears after room 5', d5.state === 'doors' && d5.n === 2, JSON.stringify(d5));
+    record(area, 'a 2-door screen appears after the elite room (room 4)', d5.state === 'doors' && d5.n === 2, JSON.stringify(d5));
     await page.evaluate(() => { __overdue.startWave(1); });
     // v1.7.1: SHHH is ready at the start of every story room; endless keeps its cooldown
     const shhhStory = await page.evaluate(() => { const O = __overdue; O.player.shhhT = 9; O.startWave(2); return O.player.shhhT; });
@@ -286,7 +286,22 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     const bonusTitle = await page.evaluate(() => { const O = __overdue; O.game.bonusPicks = 1; O.showUpgrades(); return document.querySelector('#upgradeTitle').textContent; });
     record(area, 'Mystery Shelf bonus pick screen is titled', bonusTitle === '🎲 Mystery Shelf: bonus perk!', bonusTitle);
     await page.evaluate(() => { __overdue.game.pickIsBonus = false; __overdue.startWave(2); });
-    await page.evaluate(() => { __overdue.startWave(5); __overdue.god(); }); await page.waitForTimeout(1200);
+    // v1.9.0: Survive rooms (wing 1 room 3): countdown HUD, spawns keep coming, the room clears itself when the timer ends
+    await page.evaluate(() => { const O = __overdue; O.startRun('story', 1); O.startWave(3); O.god(); }); await page.waitForTimeout(1500);
+    const sv = await page.evaluate(() => { const O = __overdue; return { goal: O.game.diff.goal, t: O.game.surviveT, sub: O.game.bannerSub, state: O.game.state }; });
+    await shot(page, `${name}-survive-room`);
+    record(area, 'Survive room starts with a 30 s timer and a banner naming the goal', sv.goal === 'survive' && sv.t > 26 && sv.t <= 30 && /Survive 30 seconds/.test(sv.sub) && sv.state === 'playing', JSON.stringify(sv));
+    const svSpawn = await page.evaluate(async () => {
+      const O = __overdue; let seenLate = 0;
+      for (let i = 0; i < 60; i++) { await new Promise((r) => setTimeout(r, 100)); if (O.game.waveT > 5) seenLate = Math.max(seenLate, O.counts().enemies); }
+      return { state: O.game.state, enemies: seenLate, left: O.game.surviveT };
+    });
+    record(area, 'Survive room is not cleared by killing (spawns continue)', svSpawn.state === 'playing' && svSpawn.left > 15, JSON.stringify(svSpawn));
+    await page.evaluate(() => { __overdue.killAll(); __overdue.setSurviveT(0.4); }); await page.waitForTimeout(900);
+    const svEnd = await page.evaluate(() => ({ state: __overdue.game.state, left: __overdue.enemies.length }));
+    record(area, 'Survive room clears itself when the timer ends', (svEnd.state === 'waveclear' || svEnd.state === 'upgrade') && svEnd.left === 0, JSON.stringify(svEnd));
+    await page.waitForTimeout(2300);
+    await page.evaluate(() => { __overdue.startWave(4); __overdue.god(); }); await page.waitForTimeout(1200);
     await shot(page, `${name}-12-elite-room`);
     // Watch for 3s and collect every enemy that appears (auto-fire can kill the first ones before a single snapshot).
     const eliteRoom = await page.evaluate(async () => {
@@ -296,13 +311,14 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     });
     record(area, 'elite room spawns elites', eliteRoom.types.length > 0 && eliteRoom.types.filter((t) => !t.startsWith('worm')).every((t) => t.endsWith('★')), JSON.stringify(eliteRoom).slice(0, 200));
     // A real build (8 perks) on the way into the boss: the end screen must still fit (iPad bug: buttons fell off-screen)
-    await page.evaluate(() => { const O = __overdue; for (const id of ['trilogy', 'trilogy', 'dewey', 'speedreader', 'interlibrary', 'hardcover', 'hardcover', 'hardcover', 'extendedloan', 'footnotes']) O.grant(id); O.startWave(10); O.god(); });
+    await page.evaluate(() => { const O = __overdue; for (const id of ['trilogy', 'trilogy', 'dewey', 'speedreader', 'interlibrary', 'hardcover', 'hardcover', 'hardcover', 'extendedloan', 'footnotes']) O.grant(id); O.startWave(7); O.god(); });
     await page.waitForTimeout(3600);
-    record(area, 'room 10 boss spawns', await page.evaluate(() => __overdue.enemies.some((e) => e.type === 'boss')));
+    record(area, 'room 7 boss spawns', await page.evaluate(() => __overdue.enemies.some((e) => e.type === 'boss')));
     const taunt = await page.evaluate(() => __overdue.texts.filter((t) => /: /.test(t.text) && t.size >= 12).map((t) => t.text));
     record(area, 'story boss shows its taunt', taunt.length > 0, taunt.join(' | '));
     await clearRoom(); await page.waitForTimeout(3400);
     await shot(page, `${name}-13-wing-cleared`);
+    record(area, 'wing-cleared screen shows 7/7', await page.evaluate(() => /7\/7/.test(document.getElementById('gameover').innerText)));
     const won = await page.evaluate(() => ({ title: document.querySelector('#goTitle').textContent, unlocked: __overdue.progress.unlocked, next: !document.querySelector('#btnNextWing').hidden }));
     const cl = await page.evaluate(() => { const e = document.querySelector('#goSub'); return { t: e.textContent, vis: !e.hidden }; });
     record(area, 'wing-cleared screen shows the cleared line', cl.vis && cl.t.length > 10, cl.t);
@@ -443,8 +459,8 @@ if (want('perf')) {
   record('perf', `late boss game speed ≥ ${PERF.sim}x`, avg('sim') >= PERF.sim, `${avg('sim').toFixed(2)}x (samples ${samples.map((s) => s.sim.toFixed(2)).join(', ')})`);
   if (PERF.fps) record('perf', `late boss fps ≥ ${PERF.fps}`, avg('fps') >= PERF.fps, `${avg('fps').toFixed(0)} fps`);
   record('perf', 'books in flight capped', Math.max(...samples.map((s) => s.books)) <= 110, `max ${Math.max(...samples.map((s) => s.books))}`);
-  // Story late game: wing 10 room 9, a crowd of elites firing fans of pages.
-  await page.evaluate(() => { const O = __overdue; O.unlockAll(); O.startRun('story', 10); O.startWave(9); O.god(); });
+  // Story late game: wing 10 room 6, a crowd of elites firing fans of pages.
+  await page.evaluate(() => { const O = __overdue; O.unlockAll(); O.startRun('story', 10); O.startWave(6); O.god(); });
   await page.waitForTimeout(5000);
   const story = await page.evaluate(async () => {
     const O = __overdue, t0 = performance.now(), sim0 = O.game.playTime; let frames = 0;
@@ -468,7 +484,7 @@ if (want('shapes')) {
   for (const shape of SHAPES) {
     // Prefer a mid-to-late normal room so the shape is at a decent density.
     let pick = null;
-    for (const r of [8, 7, 9, 6, 4, 3, 2, 1, 5, 10]) for (let w = 1; w <= WINGS.length && !pick; w++) if (roomShape(w, r) === shape) pick = [w, r];
+    for (const r of [6, 5, 3, 2, 1, 4, 7]) for (let w = 1; w <= WINGS.length && !pick; w++) if (roomShape(w, r) === shape) pick = [w, r];
     if (!pick) { record('shapes', `${shape}: a story room uses it`, shape === 'scatter' ? true : false, 'no wing/room found'); continue; }
     await page.evaluate(([w, r]) => { const O = __overdue; O.unlockAll(); O.startRun('story', w); O.startWave(r); O.god(); }, pick);
     await page.waitForTimeout(1500);
