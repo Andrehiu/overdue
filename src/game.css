@@ -365,6 +365,8 @@ body.portrait .cards:has(> .card-wrap:nth-child(4)) .card { width: 100%; padding
 #wingLock:empty { display: none; }
 /* End-of-run buttons wrap; on phones the main action gets its own full-width row */
 #gameover .menu.row { flex-wrap: wrap; }
+body:not(.portrait) #gameover .menu.row { flex-wrap: nowrap; }   /* v1.8.0: one line (the fit script lets the row grow to fit it) */
+body:not(.portrait) #gameover .menu.row button { white-space: nowrap; }
 body.portrait #gameover .menu.row > .primary:not([hidden]) { flex-basis: 100%; }
 body.portrait #gameover .menu.row > .primary:not([hidden]) ~ .primary { flex-basis: auto; }
 
@@ -422,7 +424,10 @@ body.portrait .reach-row { grid-template-columns: 1fr; }
   #settings .progress-tools { margin-top: .2em; }
   #settings .progress-tools p { font-size: .75em; margin: 0; line-height: 1.25; }
   #settings .version-label { margin: 0; }
-  .screen > .menu.row:last-child { margin-top: 0; padding-top: .3em; }
+  .screen > .menu.row:last-child { margin-top: 0; padding-top: .3em; padding-bottom: max(.25em, env(safe-area-inset-bottom, 0px)); flex-wrap: nowrap; gap: .4em; }
+  /* v1.8.0: on short screens the pinned row is ONE compact line, as wide as the screen allows */
+  .screen > .menu.row:last-child button { font-size: .85em; padding: .35em .9em; white-space: nowrap; min-width: 0; }
+  .screen > .menu.row:last-child .coin, #gameover .menu.row button .coin { display: none; }
   #title { gap: .3em; }
   #title .tag, #title .touch-hint { margin: 0; }
 }

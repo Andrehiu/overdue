@@ -76,7 +76,11 @@ const PINNED_CHECK = (id) => {
   const rr = row.getBoundingClientRect(), bad = [];
   const kids = [...scr.children].filter((c) => c !== row && !c.hidden && c.offsetParent !== null);
   const col = Math.max(0, ...kids.map((c) => c.getBoundingClientRect().width));
-  if (rr.width > col + 1) bad.push(`row ${Math.round(rr.width)}px wider than content ${Math.round(col)}px`);
+  if (rr.height > innerHeight * 0.22 + 1) bad.push(`row ${Math.round(rr.height)}px tall > 22% of ${innerHeight}px`);
+  // One line everywhere; as wide as the screen allows (tall screens keep the column cap only while the buttons still fit it)
+  const tops = [...row.querySelectorAll('button')].filter((b) => !b.hidden && b.offsetParent).map((b) => Math.round(b.getBoundingClientRect().top));
+  if (Math.max(...tops) - Math.min(...tops) > 4) bad.push(`row wraps onto ${new Set(tops).size} lines`);
+  if (rr.right > innerWidth + 1 || rr.left < -1) bad.push('row wider than the screen');
   const w = document.createTreeWalker(scr, NodeFilter.SHOW_TEXT);
   for (let n; (n = w.nextNode());) {
     if (!n.textContent.trim()) continue;
