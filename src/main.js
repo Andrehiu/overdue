@@ -9,6 +9,7 @@ import { composeWave } from './waves.js';
 import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips, buildChips, specialReason, levelInfo, perkTip, normalizeTips, TIPS } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist, aimSource, aimStick } from './util.js';
 import { PLAYER, bookLook } from './palette.js';
+import { ART, EYES, ART_BURST, artShadowK, drawArtEnemy, drawArtWorms, drawGlowEyes } from './enemy-art.js';
 import { SoundEngine } from './audio.js';
 import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
 import { DOORS, doorOffer, applyDoor, doorReward, mysteryPrize } from './doors.js';
@@ -871,7 +872,7 @@ function step(dt) {
 }
 
 // Balance bot (debug only): when set, the bot's move vector replaces the keyboard/touch stick and the player auto-aims like on touch.
-let botInput = null, botDrive = false;
+let botInput = null, botDrive = false, debugFreeze = false;
 function moveInput() {
   if (botInput) return botInput;
   let x = 0, y = 0;
@@ -1316,9 +1317,10 @@ function killEnemy(e) {
   game.score += gained;
   const colors = { bunny: ['#c9c2b6', '#8d867a'], notice: ['#f4efe1', '#e74c3c'], patron: ['#ff9f43', '#ffd8a8'], worm: ['#7bd88f', '#3c8d50'],
     golem: ['#d4a017', '#8a6d1a'], coin: ['#ffd54a'], boss: ['#6c3cff', '#b48cff', '#fff'] }[e.type];
-  burst(e.x, e.y, e.type === 'boss' ? 90 : 16, colors, e.type === 'boss' ? 360 : 170, e.type === 'boss' ? 1.4 : 0.6);
+  const burstColors = (ART && ART_BURST[e.type]) || colors;
+  burst(e.x, e.y, e.type === 'boss' ? 90 : 16, burstColors, e.type === 'boss' ? 360 : 170, e.type === 'boss' ? 1.4 : 0.6);
   pages(e.x, e.y, e.type === 'boss' ? 40 : 3);
-  addLight(e.x, e.y, e.r * 5, 0.35, colors[0]);
+  addLight(e.x, e.y, e.r * 5, 0.35, burstColors[0]);
   sound.play('kill', 1 + Math.min(game.combo, 20) * 0.03);
   if (game.combo > 0 && game.combo % 10 === 0) floatText(player.x, player.y - 34, `${game.combo} COMBO!`, '#ffd54a', 18, 1.1);
   if (e.type === 'coin') { game.fines += 1; floatText(e.x, e.y - 12, '+1 🪙', '#ffd54a', 12, 0.7); }
@@ -1709,7 +1711,8 @@ function render() {
 
   for (const t of telegraphs) drawTelegraph(t);
   for (const k of pickups) drawPickup(k);
-  for (const e of enemies) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(e.x + 3, e.y + e.r * 0.8, e.r * 0.9, e.r * 0.4, 0, 0, TAU); ctx.fill(); }
+  for (const e of enemies) { const k = ART ? artShadowK(e) : 1; ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(e.x + 3, e.y + e.r * 0.8, e.r * 0.9 * k, e.r * 0.4 * k, 0, 0, TAU); ctx.fill(); }
+  if (ART) drawArtWorms(ctx, enemies);
   for (let i = enemies.length - 1; i >= 0; i--) drawEnemy(enemies[i]);
   for (const b of books) drawThrownBook(b);
   if (game.state !== 'title' && game.state !== 'gameover' && !(game.state === 'dying' && game.deathT < 1.5)) {
@@ -1721,6 +1724,7 @@ function render() {
   drawParticles();
 
   if (settings.lights) renderLights();
+  if (EYES && settings.lights) drawGlowEyes(ctx, enemies, player, 230 * stats.lanternScale);
 
   for (const t of texts) {
     ctx.globalAlpha = clamp(t.life / t.max * 1.5, 0, 1);
@@ -1857,6 +1861,8 @@ function drawEliteHalo(e) {
 }
 
 function drawEnemy(e) {
+  // ?art=a|b|c: enemy art prototypes (src/enemy-art.js); the boss keeps its own drawing
+  if (ART && e.type !== 'boss') return drawArtEnemy(ctx, e, { player, playing: game.state === 'playing' });
   if (e.elite) drawEliteHalo(e);
   const look = Math.atan2(player.y - e.y, player.x - e.x);
   ctx.save(); ctx.translate(e.x, e.y);
@@ -2481,6 +2487,7 @@ const STEP = 1 / 120;
 let last = performance.now(), acc = 0, fps = 60;
 function frame(now) {
   requestAnimationFrame(frame);
+  if (debugFreeze) { last = now; render(); return; } // debug: simulation frozen, still drawing (art screenshots)
   if (botDrive) { last = now; return; } // balance bot steps the simulation itself, faster than real time
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
@@ -2529,7 +2536,7 @@ requestAnimationFrame(frame);
 if (DEBUG) {
   window.__overdue = {
     game, grid: () => `${COLS}x${ROWS}`, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, enemies, get content() { return content; },
-    startRun, startWave, setSurviveT: (t) => { game.surviveT = t; }, killAll: () => { for (const e of [...enemies]) killEnemy(e); spawnQueue.length = 0; telegraphs.length = 0; },
+    makeEnemy, freeze: (on) => { debugFreeze = !!on; }, startRun, startWave, setSurviveT: (t) => { game.surviveT = t; }, killAll: () => { for (const e of [...enemies]) killEnemy(e); spawnQueue.length = 0; telegraphs.length = 0; },
     get progress() { return progress; }, setFines: (n) => { progress = { ...progress, fines: n }; saveProgress(); renderFineBadges(); },
     unlockAll: () => { progress = { ...progress, unlocked: WINGS.length }; saveProgress(); },
 
