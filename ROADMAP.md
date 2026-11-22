@@ -38,6 +38,7 @@ only when the owner says "ship".
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-22 | Off-centre title seen on the owner's "Duo" device: not fixed. Optimise for normal iPhones (iPad keeps filling the screen) | Owner: "it's fine, I'm on the Duo, optimise for normal iPhones". Title measured centred on iPhone 13 and on iPad sizes |
 | 2026-11-22 | Arena follows the phone's aspect up to ~2.2:1 so phones fill the screen; 16:9 and iPad grids unchanged | Owner saw black side bars on iPhone |
 | 2026-11-22 | Teach perks just-in-time (learn as you go), not a tutorial run | Owner: players don't understand perks |
 | 2026-11-22 | Second-finger aiming becomes a floating joystick (drag to aim), not aim-at-finger | Owner: pressing all over the screen to shoot left makes no sense |
