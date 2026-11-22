@@ -885,7 +885,10 @@ function updatePlayer(dt) {
   else if (src === 'touch') { p.aim = Math.atan2(touch.ay - p.y, touch.ax - p.x); firing = true; }
   else if (src === 'auto') {
     const t = nearestEnemy(p.x, p.y, PORTRAIT ? 600 : 460);
-    if (t) { p.aim = Math.atan2(t.y - p.y, t.x - p.x); firing = true; }
+    if (t) {
+      p.aim = Math.atan2(t.y - p.y, t.x - p.x); firing = true;
+      if (DEBUG) { const d = Math.hypot(t.x - p.x, t.y - p.y); p.autoAim = { n: (p.autoAim?.n || 0) + 1, nearest: enemies.every((e) => Math.hypot(e.x - p.x, e.y - p.y) >= d - 1e-9) }; } // QA only
+    }
   } else if (src === 'mouse') {
     p.aim = Math.atan2(mouse.y - p.y, mouse.x - p.x);
     firing = mouse.down;
@@ -987,6 +990,7 @@ function fire() {
   const p = player, n = stats.projectiles;
   currentLook = bookLook(game.owned); // perks change how books look (cheap: a few flags per throw)
   p.throws++;
+  if (DEBUG) p.lastThrow = { aim: p.aim }; // QA only
   for (let i = 0; i < n; i++) {
     const a = p.aim + (i - (n - 1) / 2) * stats.spread + (Math.random() - 0.5) * 0.04;
     spawnBook(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a);
