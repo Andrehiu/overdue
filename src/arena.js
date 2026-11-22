@@ -133,7 +133,8 @@ function scatterArena(seed, wave, shelvesPerHalf) {
       }
     }
     if (isConnected(solid) && (!best || shelves.length > best.shelves.length)) {
-      const rects = shelves.map((s) => ({ x: s.x * CELL, y: s.y * CELL, w: s.w * CELL, h: s.h * CELL }));
+      const merged = mergeRects(shelves);
+  const rects = merged.map((s) => ({ x: s.x * CELL, y: s.y * CELL, w: s.w * CELL, h: s.h * CELL }));
       best = { seed, wave, shape: 'scatter', shelves, rects, solid };
     }
     // Wide aisles can make a crowded request not fit; if so keep retrying for the fullest layout,
@@ -297,6 +298,27 @@ export function isWide(solid) {
   return true;
 }
 
+/**
+ * Merge shelf rects (grid cells) that sit on the same row or column and touch or overlap, so a wall built
+ * from several pieces is one continuous shelf when drawn. Same cells covered, so `solid` is unaffected.
+ */
+export function mergeRects(list) {
+  const rs = list.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h }));
+  for (let again = true; again;) {
+    again = false;
+    outer: for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) {
+      const a = rs[i], b = rs[j];
+      if (a.y === b.y && a.h === b.h && a.x <= b.x + b.w && b.x <= a.x + a.w) {
+        const x = Math.min(a.x, b.x); a.w = Math.max(a.x + a.w, b.x + b.w) - x; a.x = x;
+      } else if (a.x === b.x && a.w === b.w && a.y <= b.y + b.h && b.y <= a.y + a.h) {
+        const y = Math.min(a.y, b.y); a.h = Math.max(a.y + a.h, b.y + b.h) - y; a.y = y;
+      } else continue;
+      rs.splice(j, 1); again = true; break outer;
+    }
+  }
+  return rs;
+}
+
 function shapedArena(seed, wave, shelvesPerHalf, shape) {
   const gen = SHAPE_GEN[shape];
   if (!gen) return null;
@@ -331,8 +353,9 @@ function shapedArena(seed, wave, shelvesPerHalf, shape) {
     placed++;
   }
   if (!shelves.length) return null; // fall back to scatter rather than an empty room
-  const rects = shelves.map((s) => ({ x: s.x * CELL, y: s.y * CELL, w: s.w * CELL, h: s.h * CELL }));
-  return { seed, wave, shape, shelves, rects, solid };
+  const merged = mergeRects(shelves);
+  const rects = merged.map((s) => ({ x: s.x * CELL, y: s.y * CELL, w: s.w * CELL, h: s.h * CELL }));
+  return { seed, wave, shape, shelves: merged, rects, solid };
 }
 
 /** Free cells on the outer ring, used as enemy entry points. */
