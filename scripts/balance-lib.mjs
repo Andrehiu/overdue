@@ -93,8 +93,11 @@ export function aggregate(results) {
     const clears = ok.filter((r) => r.outcome === 'clear');
     const deathRooms = Array(ROOMS).fill(0);
     for (const r of ok) if (r.outcome === 'death' && r.room >= 1 && r.room <= ROOMS) deathRooms[r.room - 1]++;
+    // Runs that reached room r: clears reached all rooms; a death or timeout in room d reached rooms 1..d.
+    const reached = Array(ROOMS).fill(0);
+    for (const r of ok) { const top = r.outcome === 'clear' ? ROOMS : Math.min(ROOMS, Math.max(0, r.room)); for (let i = 0; i < top; i++) reached[i]++; }
     out.push({
-      renos: g.renos, wing: g.wing, policy: g.policy,
+      renos: g.renos, wing: g.wing, policy: g.policy, reached,
       runs: ok.length, errors: g.runs.length - ok.length,
       clears: clears.length, timeouts: ok.filter((r) => r.outcome === 'timeout').length,
       clearRate: ok.length ? clears.length / ok.length : null,
@@ -105,6 +108,35 @@ export function aggregate(results) {
     });
   }
   return out.sort((a, b) => a.renos.localeCompare(b.renos) || a.wing - b.wing || POLICIES.indexOf(a.policy) - POLICIES.indexOf(b.policy));
+}
+
+/**
+ * Per-room numbers from rows that have deathRooms + reached (one row, or several rows pooled).
+ * -> [{ room, reached, deaths, share (deaths / all deaths), rate (deaths / reached) }]
+ */
+export function roomStats(rows) {
+  const deaths = Array(ROOMS).fill(0), reached = Array(ROOMS).fill(0);
+  for (const r of rows) for (let i = 0; i < ROOMS; i++) { deaths[i] += r.deathRooms?.[i] || 0; reached[i] += r.reached?.[i] || 0; }
+  const total = deaths.reduce((a, b) => a + b, 0);
+  return deaths.map((d, i) => ({ room: i + 1, reached: reached[i], deaths: d, share: total ? d / total : null, rate: reached[i] ? d / reached[i] : null }));
+}
+
+/**
+ * Survive-room check from the balance handoff: reach-conditional death rate of a Survive room vs the mean of the
+ * clear (non-elite, non-boss) rooms just before and after it. info(room) -> { goal, kind }.
+ * -> [{ room, rate, ref, ratio, verdict: 'easy'|'hard'|'fine'|'n/a' }]
+ */
+export function surviveChecks(stats, info) {
+  const out = [];
+  for (const s of stats) {
+    if (info(s.room).goal !== 'survive') continue;
+    const near = [stats[s.room - 2], stats[s.room]].filter((n) => n && info(n.room).goal === 'clear' && info(n.room).kind === 'normal' && n.rate !== null);
+    const ref = near.length ? avg(near.map((n) => n.rate)) : null;
+    if (s.rate === null || ref === null || ref === 0) { out.push({ room: s.room, rate: s.rate, ref, ratio: null, verdict: 'n/a' }); continue; }
+    const ratio = s.rate / ref;
+    out.push({ room: s.room, rate: s.rate, ref, ratio, verdict: ratio < 0.6 ? 'easy' : ratio > 1.5 ? 'hard' : 'fine' });
+  }
+  return out;
 }
 
 const pct = (v) => (v === null ? '–' : `${Math.round(v * 100)}%`);
@@ -179,6 +211,26 @@ export function renderReport(rows, meta = {}) {
       L.push(`| ${r.wing} | ${r.policy} | ${r.runs}${r.errors ? ` (+${r.errors} err)` : ''} | ${pct(r.clearRate)} (${r.clears}/${r.runs}) | ${r.heartsLeft ?? '–'} | ${r.fines ?? '–'} | ${mmss(r.time)} | ${r.timeouts} | ${r.deathRooms.join(' ')} |`);
     }
     L.push('');
+    const info = meta.roomInfo || (() => ({ goal: 'clear', kind: 'normal' }));
+    L.push(`### Deaths by room, ${renos === 'none' ? 'fresh save' : 'mid-game save'}`, '');
+    L.push('Share = this room\'s deaths ÷ all deaths in the cell. Death rate = deaths in the room ÷ runs that reached it. ⏱️ = Survive room, ⭐ = elite, 👑 = boss.', '');
+    const wings = [...new Set(rows.filter((x) => x.renos === renos).map((x) => x.wing))];
+    for (const w of wings) {
+      const cells = rows.filter((x) => x.renos === renos && x.wing === w);
+      const groups = [...cells.map((c) => ({ label: c.policy, rows: [c] })), { label: 'all policies', rows: cells }];
+      L.push(`**Wing ${w}**`, '');
+      L.push('| Room | Goal | Kind | ' + groups.map((g) => `${g.label} reached / deaths / share / rate`).join(' | ') + ' |');
+      L.push('|---|---|---|' + groups.map(() => '---').join('|') + '|');
+      const stats = groups.map((g) => roomStats(g.rows));
+      for (let i = 0; i < ROOMS; i++) {
+        const inf = info(i + 1, w);
+        L.push(`| ${i + 1} | ${inf.goal === 'survive' ? '⏱️ survive' : 'clear'} | ${inf.kind === 'elite' ? '⭐ elite' : inf.kind === 'boss' ? '👑 boss' : 'normal'} | ` + stats.map((st) => `${st[i].reached} / ${st[i].deaths} / ${pct(st[i].share)} / ${pct(st[i].rate)}`).join(' | ') + ' |');
+      }
+      L.push('');
+      const chk = surviveChecks(stats[stats.length - 1], (r) => info(r, w));
+      for (const c of chk) L.push(`- Survive room ${c.room}: death rate ${pct(c.rate)} vs ${pct(c.ref)} for the clear rooms around it (ratio ${c.ratio === null ? '–' : c.ratio.toFixed(2)}, ${c.verdict}).`);
+      if (chk.length) L.push('');
+    }
   }
   L.push('Policies: `rare` = always 💰 Rare Books; `rest` = ☕ Break Room / 🚪 Stacks; `mixed` = Break Room at ≤ 2 hearts, else Rare Books. 🎲 Mystery Shelf only when nothing else is offered.');
   L.push('Run time is game time (what a player would spend). Hearts left and fines are averaged over the runs that apply (hearts: clears only).', '');

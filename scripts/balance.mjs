@@ -17,6 +17,7 @@ import { cpus } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { aggregate, findings, renderReport, POLICIES, WINGS_TESTED } from './balance-lib.mjs';
 import { RENOVATIONS, normalizeProgress } from '../src/meta.js';
+import { roomGoal, roomKind } from '../src/story.js';
 
 const ROOT = resolve(new URL('..', import.meta.url).pathname);
 const OUT = join(ROOT, 'balance-report');
@@ -107,6 +108,6 @@ server.close();
 const rows = aggregate(results);
 const meta = { date: new Date().toISOString().slice(0, 10), runsPerCell: RUNS, version: BUILD.version, wings: WINGS, policies: PICKED, renos: RENOS, seconds: Math.round((Date.now() - started) / 1000) };
 const errs = results.filter((r) => r.outcome === 'error');
-await writeFile(join(OUT, 'report.md'), renderReport(rows, meta) + (errs.length ? `\n## Errors\n\n${errs.length} run(s) failed to play and are excluded above:\n\n${[...new Set(errs.flatMap((r) => r.errors || []))].slice(0, 10).map((e) => `- ${e}`).join('\n')}\n` : ''));
+await writeFile(join(OUT, 'report.md'), renderReport(rows, { ...meta, roomInfo: (room, wing) => ({ goal: roomGoal(wing, room), kind: roomKind(room) }) }) + (errs.length ? `\n## Errors\n\n${errs.length} run(s) failed to play and are excluded above:\n\n${[...new Set(errs.flatMap((r) => r.errors || []))].slice(0, 10).map((e) => `- ${e}`).join('\n')}\n` : ''));
 await writeFile(join(OUT, 'report.json'), JSON.stringify({ meta, rows, findings: findings(rows), results }, null, 1));
 console.log(`\nWrote balance-report/report.md and report.json in ${meta.seconds}s (${results.length} runs, ${errs.length} errors).`);

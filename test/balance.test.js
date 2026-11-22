@@ -1,7 +1,7 @@
 // Balance bot (v1.7.1 tooling): pure helpers only, no browser. See scripts/balance-lib.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-const { chooseDoor, pickPerk, chooseMove, aggregate, findings, renderReport } = await import('../scripts/balance-lib.mjs');
+const { chooseDoor, pickPerk, chooseMove, aggregate, findings, renderReport, roomStats, surviveChecks } = await import('../scripts/balance-lib.mjs');
 
 test('door policies: rare, rest, mixed; Mystery Shelf only as a last resort; fixed doors are taken', () => {
   assert.equal(chooseDoor('rare', ['rest', 'rare'], 5), 'rare');
@@ -83,4 +83,33 @@ test('the balance bot knows the wing length', async () => {
   const { ROOMS } = await import('../scripts/balance-lib.mjs');
   const { ROOMS_PER_WING } = await import('../src/story.js');
   assert.equal(ROOMS, ROOMS_PER_WING);
+});
+
+test('per-room stats: reached counts, death share and reach-conditional death rate', () => {
+  const run = (outcome, room) => ({ renos: 'none', wing: 1, policy: 'rest', outcome, room, hearts: 0, fines: 0, time: 1 });
+  const [row] = aggregate([run('death', 2), run('death', 2), run('death', 4), run('clear', 7)]);
+  assert.deepEqual(row.reached, [4, 4, 2, 2, 1, 1, 1]);
+  const s = roomStats([row]);
+  assert.equal(s[1].deaths, 2);
+  assert.ok(Math.abs(s[1].share - 2 / 3) < 1e-9);   // 2 of 3 deaths
+  assert.equal(s[1].rate, 0.5);                       // 2 deaths / 4 reached
+  assert.equal(s[3].rate, 0.5);                       // 1 death / 2 reached
+  assert.equal(s[6].rate, 0);
+});
+
+test('survive check: compares with the clear rooms around it, verdict easy / fine / hard', () => {
+  const info = (r) => ({ goal: r === 3 ? 'survive' : 'clear', kind: r === 4 ? 'elite' : 'normal' });
+  const mk = (rates) => rates.map((rate, i) => ({ room: i + 1, reached: 10, deaths: 0, share: 0, rate }));
+  const v = (rates) => surviveChecks(mk(rates), info)[0];
+  assert.equal(v([0, 0.2, 0.2, 0.9, 0, 0, 0]).verdict, 'fine');   // room 4 is elite: only room 2 counts as the reference
+  assert.equal(v([0, 0.2, 0.05, 0.9, 0, 0, 0]).verdict, 'easy');
+  assert.equal(v([0, 0.2, 0.4, 0.9, 0, 0, 0]).verdict, 'hard');
+  assert.equal(v([0, 0, 0.1, 0.9, 0, 0, 0]).verdict, 'n/a');
+});
+
+test('report shows goal and kind per room', () => {
+  const rows = aggregate([{ renos: 'none', wing: 3, policy: 'rest', outcome: 'death', room: 2, hearts: 0, fines: 0, time: 1 }]);
+  const md = renderReport(rows, { roomInfo: (r) => ({ goal: r === 2 ? 'survive' : 'clear', kind: r === 4 ? 'elite' : r === 7 ? 'boss' : 'normal' }) });
+  assert.match(md, /\| 2 \| ⏱️ survive \| normal \|/);
+  assert.match(md, /\| 4 \| clear \| ⭐ elite \|/);
 });
