@@ -505,3 +505,18 @@ test('reading rooms have four openings and bridge walls are continuous but for 2
     }
   } finally { A.setOrientation(false); }
 });
+
+test('aimSource: auto-aim on/off × touch / gamepad / mouse (v1.10.0)', async () => {
+  const { aimSource } = await import('../src/util.js');
+  const base = { autoaim: true, bot: false, touchEnabled: false, touchAiming: false, padConnected: false, padStick: false, mouseSeen: true };
+  for (const autoaim of [true, false]) {
+    assert.equal(aimSource({ ...base, autoaim }), 'mouse');                                              // mouse unchanged
+    assert.equal(aimSource({ ...base, autoaim, touchEnabled: true, touchAiming: true }), 'touch');       // second finger always aims
+    assert.equal(aimSource({ ...base, autoaim, padConnected: true, padStick: true, mouseSeen: false }), 'pad');
+  }
+  assert.equal(aimSource({ ...base, touchEnabled: true }), 'auto');
+  assert.equal(aimSource({ ...base, autoaim: false, touchEnabled: true }), 'none');
+  assert.equal(aimSource({ ...base, padConnected: true, mouseSeen: false }), 'auto');
+  assert.equal(aimSource({ ...base, autoaim: false, padConnected: true, mouseSeen: false }), 'none');
+  assert.equal(aimSource({ ...base, autoaim: false, bot: true }), 'auto');                              // the balance bot always auto-aims
+});

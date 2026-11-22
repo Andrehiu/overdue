@@ -344,6 +344,31 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     await clearRoom(); await page.waitForTimeout(2600);
     await page.locator('#cards .card').first().click(); await page.waitForTimeout(500);
     record(area, 'endless shows no door screen', await page.evaluate(() => __overdue.game.mode === 'endless' && __overdue.game.state === 'playing' && __overdue.game.wave === 2 && document.getElementById('doors').hidden && __overdue.game.door === null));
+    // v1.10.0: Auto-aim setting. Off = no throwing without a second finger; the finger sets the aim.
+    {
+      const hasBox = await page.evaluate(() => !!document.querySelector('#settings input[data-k=autoaim]'));
+      record(area, 'settings has an Auto-aim toggle', hasBox);
+      await page.evaluate(() => localStorage.setItem('overdue.settings.v1', JSON.stringify({ sfx: true, music: true, lights: true, motion: true, autofire: false })));
+      const p2 = await page.context().newPage(); await p2.goto(URL0); await p2.waitForTimeout(500);
+      const oldLoad = await p2.evaluate(() => ({ s: __overdue.settings.autoaim, box: document.querySelector('#settings input[data-k=autoaim]').checked })); await p2.close();
+      record(area, 'old settings save (no autoaim) loads with auto-aim on', oldLoad.s === true && oldLoad.box === true, JSON.stringify(oldLoad));
+      await page.evaluate(() => { __overdue.startRun('endless'); __overdue.god(); __overdue.touch.enabled = true; __overdue.setSetting('autoaim', false); });
+      await page.waitForTimeout(2500);
+      const p3 = await page.context().newPage(); await p3.goto(URL0); await p3.waitForTimeout(500);
+      const saved = await p3.evaluate(() => __overdue.settings.autoaim); await p3.close();
+      record(area, 'auto-aim off persists across reload', saved === false, String(saved));
+      const idle = await page.evaluate(async () => { const O = __overdue; O.books.length = 0; const en = O.enemies.length; await new Promise((r) => setTimeout(r, 1100)); return { enemies: en, books: O.books.length }; });
+      record(area, 'auto-aim off, no second finger: no books thrown at enemies', idle.enemies > 0 && idle.books === 0, JSON.stringify(idle));
+      const manual = await page.evaluate(async () => { const O = __overdue; const p = O.player; O.touch.aimId = 99; O.touch.ax = p.x - 200; O.touch.ay = p.y + 100;
+        await new Promise((r) => setTimeout(r, 120)); const exp = Math.atan2(O.touch.ay - p.y, O.touch.ax - p.x);
+        const b = O.books.filter((k) => !k.child).sort((a, c) => c.life - a.life)[0]; O.touch.aimId = null;
+        const va = b ? Math.atan2(b.vy, b.vx) : 9; return { n: O.books.length, diff: b ? Math.abs(Math.atan2(Math.sin(va - exp), Math.cos(va - exp))) : 9 }; });
+      record(area, 'auto-aim off, second finger down: books fly toward the finger', manual.n > 0 && manual.diff < 0.3, JSON.stringify(manual));
+      const auto = await page.evaluate(async () => { const O = __overdue; O.setSetting('autoaim', true); O.touch.enabled = true; O.touch.aimId = null; O.books.length = 0; let n = 0; for (let i = 0; i < 25; i++) { await new Promise((r) => setTimeout(r, 20)); n = Math.max(n, O.books.length); } const near = O.enemies.some((e) => Math.hypot(e.x - O.player.x, e.y - O.player.y) < 440); return { n, near }; });
+      record(area, 'auto-aim on: books thrown with no finger (unchanged)', auto.n > 0 || !auto.near, JSON.stringify(auto));
+      await page.evaluate(() => { __overdue.touch.enabled = false; __overdue.setSetting('autoaim', true); });
+    }
+
   } catch (e) {
     record(area, 'flow completed', false, e.message.split('\n')[0]);
   }
