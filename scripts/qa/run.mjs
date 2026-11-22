@@ -357,15 +357,18 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
       const p3 = await page.context().newPage(); await p3.goto(URL0); await p3.waitForTimeout(500);
       const saved = await p3.evaluate(() => __overdue.settings.autoaim); await p3.close();
       record(area, 'auto-aim off persists across reload', saved === false, String(saved));
-      const idle = await page.evaluate(async () => { const O = __overdue; O.books.length = 0; const en = O.enemies.length; await new Promise((r) => setTimeout(r, 1100)); return { enemies: en, books: O.books.length }; });
-      record(area, 'auto-aim off, no second finger: no books thrown at enemies', idle.enemies > 0 && idle.books === 0, JSON.stringify(idle));
-      const manual = await page.evaluate(async () => { const O = __overdue; const p = O.player; O.touch.aimId = 99; O.touch.ax = p.x - 200; O.touch.ay = p.y + 100;
-        await new Promise((r) => setTimeout(r, 120)); const exp = Math.atan2(O.touch.ay - p.y, O.touch.ax - p.x);
-        const b = O.books.filter((k) => !k.child).sort((a, c) => c.life - a.life)[0]; O.touch.aimId = null;
-        const va = b ? Math.atan2(b.vy, b.vx) : 9; return { n: O.books.length, diff: b ? Math.abs(Math.atan2(Math.sin(va - exp), Math.cos(va - exp))) : 9 }; });
-      record(area, 'auto-aim off, second finger down: books fly toward the finger', manual.n > 0 && manual.diff < 0.3, JSON.stringify(manual));
-      const auto = await page.evaluate(async () => { const O = __overdue; O.setSetting('autoaim', true); O.touch.enabled = true; O.touch.aimId = null; O.books.length = 0; let n = 0; for (let i = 0; i < 25; i++) { await new Promise((r) => setTimeout(r, 20)); n = Math.max(n, O.books.length); } const near = O.enemies.some((e) => Math.hypot(e.x - O.player.x, e.y - O.player.y) < 440); return { n, near }; });
-      record(area, 'auto-aim on: books thrown with no finger (unchanged)', auto.n > 0 || !auto.near, JSON.stringify(auto));
+      // Deterministic: the sim is stepped by hand (real loop paused) and we count THROWS, not books in flight.
+      const sim = (body) => page.evaluate(`(async () => { const O = __overdue; O.drive(true); try { ${body} } finally { O.drive(false); } })()`);
+      await sim(`O.stepN(300);`); // let the room's enemies materialise
+      const idle = await sim(`const t0 = O.player.throws; const en = O.enemies.length; O.stepN(150); return { enemies: en, throws: O.player.throws - t0 };`);
+      record(area, 'auto-aim off, no second finger: no throws at enemies', idle.enemies > 0 && idle.throws === 0, JSON.stringify(idle));
+      const manual = await sim(`const p = O.player; O.touch.aimId = 99; O.touch.ax = p.x - 200; O.touch.ay = p.y + 100; const t0 = p.throws;
+        O.stepN(60); const exp = Math.atan2(O.touch.ay - p.y, O.touch.ax - p.x); O.touch.aimId = null;
+        const l = p.lastThrow; const d = l ? Math.abs(Math.atan2(Math.sin(l.aim - exp), Math.cos(l.aim - exp))) : 9; return { throws: p.throws - t0, diff: d };`);
+      record(area, 'auto-aim off, second finger down: throws toward the finger', manual.throws >= 1 && manual.diff < 0.15, JSON.stringify(manual));
+      const auto = await sim(`O.setSetting('autoaim', true); O.touch.enabled = true; O.touch.aimId = null; const p = O.player; const t0 = p.throws; p.autoAim = { n: 0, nearest: true }; O.stepN(120);
+        return { throws: p.throws - t0, aimedFrames: p.autoAim.n, aimedAtNearest: p.autoAim.nearest };`);
+      record(area, 'auto-aim on: throws at the nearest enemy with no finger (unchanged)', auto.throws >= 1 && auto.aimedFrames >= 1 && auto.aimedAtNearest, JSON.stringify(auto));
       await page.evaluate(() => { __overdue.touch.enabled = false; __overdue.setSetting('autoaim', true); });
     }
 
