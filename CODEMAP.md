@@ -44,7 +44,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/util.js` | 132 | Small, dependency-free helpers shared by the game and its unit tests. |
 | `src/version.js` | 22 | Which build of the game is running. The build script injects the real values |
 | `src/waves.js` | 59 | Budget-based wave composer. Pure + seeded => every run with the same seed plays the same waves. |
-| `test/balance.test.js` | 87 | Balance bot (v1.7.1 tooling): pure helpers only, no browser. See scripts/balance-lib.mjs. |
+| `test/balance.test.js` | 116 | Balance bot (v1.7.1 tooling): pure helpers only, no browser. See scripts/balance-lib.mjs. |
 | `test/doors.test.js` | 125 | Story doors (v1.7.0): pure rules, no DOM. |
 | `test/game-logic.test.js` | 612 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
 | `test/story-meta.test.js` | 247 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
@@ -131,6 +131,9 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 - 47: aggregation: clear rate, death rooms, hearts, fines, time, timeouts; errors are left out
 - 64: what-stands-out: biggest wing drop, best policy, death pile-up; report renders
 - 82: the balance bot knows the wing length
+- 88: per-room stats: reached counts, death share and reach-conditional death rate
+- 100: survive check: compares with the clear rooms around it, verdict easy / fine / hard
+- 110: report shows goal and kind per room
 
 ## test/doors.test.js
 
