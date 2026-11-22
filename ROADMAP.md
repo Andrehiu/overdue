@@ -6,6 +6,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-22 | Setting to turn off auto-aim; off = second finger aims and throws (twin-stick) | Owner |
 | 2026-11-22 | Wings shrink to 7 rooms (elite 4, boss 7); add Survive room goal (Rescue/Thief not now) | Owner: shorter runs, rooms that play differently |
 | 2026-11-22 | Door after the elite room: yes. Bosses keep random catalogue names (story + endless). Replace all real-person/trademarked catalogue authors with original parody names | Owner |
 | 2026-11-22 | Rare Books option C; SHHH resets each story room (endless unchanged) | Owner playtest: wing 4 cleared easily, elite door not scary; SHHH should be fresh per room |
@@ -35,6 +36,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 | 1.7.1 | **Balance fixes:** Rare Books option C (+30% enemies; from wing 4 elites +50% HP, fire 30% faster), SHHH ready each story room, Mystery bonus-pick label, end-screen buttons never cover text | Shipped 2026-11-22 (a19bd61). Bot: Rare Books wing 4 half-save clears 10% → 0%, fines/run 102 → 66 |
 | 1.8.0 | **Story polish:** wing intros, boss taunts, cleared lines; door after the elite room; original parody names for all 10 catalogue authors | Shipped 2026-11-22 (0d559a0) |
 | 1.9.0 | **7-room wings + ⏱️ Survive rooms:** elite at 4, boss at 7, difficulty envelope kept (rooms map onto the old curve), fines rescaled; Survive 30 s rooms (never 1/4/7, ≤1–2 per wing) | Shipped 2026-11-22 (cf4c466). Survive budget ×1.15; owner to judge whether harder is needed |
+| 1.10.0 | **Auto-aim off setting:** twin-stick style, throw only while a 2nd finger is down, toward it; default stays on | In progress: coder "Overdue · v1.10.0 manual aim". Handoff: `docs/handoffs/1.10.0-manual-aim.md` |
 | — | **Bigger map (parked):** ~40×24 cells (1.7× floor), camera follows the player with a dead zone; light layer screen-sized (same look; owner OK needed since CLAUDE.md says keep lighting); auto-aim only on screen; spawns just off-screen; edge arrows for off-screen enemies; perf budget must hold. Build behind `?bigmap=1` first | Parked: 1.3.1 fixed the cramped feeling. Revisit only if it comes back |
 
 ### 1.3.1 phone checklist (wing 1, rooms 1–10)
