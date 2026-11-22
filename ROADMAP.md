@@ -6,6 +6,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-22 | Second-finger aiming becomes a floating joystick (drag to aim), not aim-at-finger | Owner: pressing all over the screen to shoot left makes no sense |
 | 2026-11-22 | Mobile only (option A): desktop unsupported and dropped from QA, code kept; iPad + gamepad stay. How to play becomes a simple touch-first list (no WASD/mouse) | Owner: "stick with a mobile game moving forward" |
 | 2026-11-22 | Setting to turn off auto-aim; off = second finger aims and throws (twin-stick) | Owner |
 | 2026-11-22 | Wings shrink to 7 rooms (elite 4, boss 7); add Survive room goal (Rescue/Thief not now) | Owner: shorter runs, rooms that play differently |
@@ -39,6 +40,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 | 1.9.0 | **7-room wings + ⏱️ Survive rooms:** elite at 4, boss at 7, difficulty envelope kept (rooms map onto the old curve), fines rescaled; Survive 30 s rooms (never 1/4/7, ≤1–2 per wing) | Shipped 2026-11-22 (cf4c466). Survive budget ×1.15; owner to judge whether harder is needed |
 | 1.10.0 | **Auto-aim off setting:** twin-stick style, throw only while a 2nd finger is down, toward it; default stays on | Shipped 2026-11-22 (3a8c1e0) |
 | 1.10.1 | **Mobile only:** desktop QA target removed (iPad mini added to full screens), touch-first How to play (no WASD/mouse; one line on 2nd-finger aiming), outdated boss text fixed | Merged, QA green (0 failures, 52–60 fps); awaiting owner "ship" |
+| 1.10.2 | **Aim joystick:** second finger becomes a floating aim stick (drag direction, deadzone), drawn like the move stick; also overrides auto-aim while deflected | In progress: coder "Overdue · v1.10.2 aim stick". Handoff: `docs/handoffs/1.10.2-aim-stick.md` |
 | — | **Bigger map (parked):** ~40×24 cells (1.7× floor), camera follows the player with a dead zone; light layer screen-sized (same look; owner OK needed since CLAUDE.md says keep lighting); auto-aim only on screen; spawns just off-screen; edge arrows for off-screen enemies; perf budget must hold. Build behind `?bigmap=1` first | Parked: 1.3.1 fixed the cramped feeling. Revisit only if it comes back |
 
 ### 1.3.1 phone checklist (wing 1, rooms 1–10)
