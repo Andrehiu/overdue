@@ -29,12 +29,13 @@ test('The Stacks only replaces Break Room, and only at full health', async () =>
   }
 });
 
-test('rooms 4 and 9 show one fixed door, room 5 and room 10 show none', async () => {
+test('rooms 4 and 9 show one fixed door, room 5 shows a normal 2-door choice, room 10 none', async () => {
   const { doorOffer, DOORS } = await load('doors');
   for (const seed of SEEDS) for (let wing = 1; wing <= 10; wing++) {
     assert.deepEqual(doorOffer(seed, wing, 4, {}), ['elite']);
     assert.deepEqual(doorOffer(seed, wing, 9, {}), ['author']);
-    assert.deepEqual(doorOffer(seed, wing, 5, {}), []);
+    const after5 = doorOffer(seed, wing, 5, {});
+    assert.equal(after5.length, 2); assert.notEqual(after5[0], after5[1]);
     assert.deepEqual(doorOffer(seed, wing, 10, {}), []);
     assert.deepEqual(doorOffer(seed, wing, 11, {}), []);
   }

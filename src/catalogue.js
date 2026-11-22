@@ -4,136 +4,136 @@ export const CATALOGUE = {
   "source": "catalogue",
   "books": [
     {
-      "title": "Much Wow: A Doge Memoir",
-      "author": "Doge Shibe"
+      "title": "Much Wow: A Memoir",
+      "author": "Sir Wowsworth"
     },
     {
       "title": "Such Read, Very Library",
-      "author": "Doge Shibe"
+      "author": "Sir Wowsworth"
     },
     {
       "title": "To The Moon: Crypto for Shibas",
-      "author": "Doge Shibe"
+      "author": "Sir Wowsworth"
     },
     {
       "title": "No: The Complete Works",
-      "author": "Grumpy Cat"
+      "author": "Baron von Frown"
     },
     {
       "title": "I Had Fun Once and It Was Awful",
-      "author": "Grumpy Cat"
+      "author": "Baron von Frown"
     },
     {
-      "title": "Rickrolled: Never Gonna Give You Up (the Late Fees)",
-      "author": "Rick Astley"
+      "title": "Never Gonna Give You Up (the Late Fees)",
+      "author": "Gerald Nevergonna"
     },
     {
       "title": "Never Gonna Let You Down: A Librarian Oath",
-      "author": "Rick Astley"
+      "author": "Gerald Nevergonna"
     },
     {
       "title": "One Does Not Simply Return a Book On Time",
-      "author": "Boromir of Gondor"
+      "author": "Simply Walter"
     },
     {
       "title": "One Does Not Simply Walk Into the Archives",
-      "author": "Boromir of Gondor"
+      "author": "Simply Walter"
     },
     {
       "title": "Pop-Tart Propulsion: A Rainbow Physics Primer",
-      "author": "Nyan Cat"
+      "author": "Captain Pop-Tart"
     },
     {
-      "title": "Nyan Nyan Nyan: The Unabridged Edition",
-      "author": "Nyan Cat"
+      "title": "Pop Pop Pop: The Unabridged Edition",
+      "author": "Captain Pop-Tart"
     },
     {
       "title": "Infinite Loops and Rainbow Trails",
-      "author": "Nyan Cat"
+      "author": "Captain Pop-Tart"
     },
     {
       "title": "Fist Pump: Winning at Overdue Notices",
-      "author": "Success Kid"
+      "author": "Fist-Pump Felix"
     },
     {
       "title": "Sandcastles and Small Victories",
-      "author": "Success Kid"
+      "author": "Fist-Pump Felix"
     },
     {
       "title": "Nailed It: A Self-Help Guide",
-      "author": "Success Kid"
+      "author": "Fist-Pump Felix"
     },
     {
-      "title": "Distracted Boyfriend's Guide to Commitment",
-      "author": "Distracted Boyfriend"
+      "title": "A Wandering Eye's Guide to Commitment",
+      "author": "The Wandering Glance"
     },
     {
       "title": "Looking Back: Regrets of a Stock Photo",
-      "author": "Distracted Boyfriend"
+      "author": "The Wandering Glance"
     },
     {
       "title": "Coffee First: A Rare Collection",
-      "author": "Dog With Coffee"
+      "author": "Fido the Unbothered"
     },
     {
       "title": "This Is Fine: Fire Safety for Libraries",
-      "author": "Dog With Coffee"
+      "author": "Fido the Unbothered"
     },
     {
       "title": "Burning Room, Calm Mind",
-      "author": "Dog With Coffee"
+      "author": "Fido the Unbothered"
     },
     {
       "title": "Gone But Not Forgotten: A Zoo Remembrance",
-      "author": "Harambe Memorial"
+      "author": "The Silverback Shelver"
     },
     {
-      "title": "Gone Too Soon: Gorilla Biographies",
-      "author": "Harambe Memorial"
+      "title": "Gone Too Soon: Silverback Biographies",
+      "author": "The Silverback Shelver"
     },
     {
       "title": "Stonks Only Go Up: Investing in Library Cards",
-      "author": "Stonks Guy"
+      "author": "Number-Go-Up Norman"
     },
     {
       "title": "Not Stonks: When Fines Compound",
-      "author": "Stonks Guy"
+      "author": "Number-Go-Up Norman"
     },
     {
       "title": "Big Brain Time: Advanced Shelving Theory",
-      "author": "Stonks Guy"
+      "author": "Number-Go-Up Norman"
     }
   ],
   "authors": [
     {
-      "name": "Doge Shibe"
+      "name": "Sir Wowsworth"
     },
     {
-      "name": "Grumpy Cat"
+      "name": "Baron von Frown"
     },
     {
-      "name": "Rick Astley"
+      "name": "Gerald Nevergonna"
     },
     {
-      "name": "Boromir of Gondor"
+      "name": "Simply Walter"
     },
     {
-      "name": "Nyan Cat"
+      "name": "Captain Pop-Tart"
     },
     {
-      "name": "Success Kid"
+      "name": "Fist-Pump Felix"
     },
     {
-      "name": "Distracted Boyfriend"
+      "name": "The Wandering Glance"
     },
     {
-      "name": "Dog With Coffee"
+      "name": "Fido the Unbothered"
     },
     {
-      "name": "Harambe Memorial"
+      "name": "The Silverback Shelver"
     },
     {
-      "name": "Stonks Guy"
+      "name": "Number-Go-Up Norman"
     }
   ]
 };

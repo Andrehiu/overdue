@@ -25,7 +25,6 @@ const FIXED_AFTER = { [ELITE_ROOM - 1]: 'elite', [ROOMS_PER_WING - 1]: 'author' 
 export function doorOffer(seed, wing, clearedRoom, { atFullHp = false } = {}) {
   if (clearedRoom >= ROOMS_PER_WING || clearedRoom < 1) return [];
   if (FIXED_AFTER[clearedRoom]) return [FIXED_AFTER[clearedRoom]];
-  if (clearedRoom === ELITE_ROOM) return [];       // room 6 follows the elite room with no door
   const rng = new Rng(hashString(`door:${seed}:${wing}:${clearedRoom}`));
   const picks = POOL.slice();
   picks.splice(rng.int(0, picks.length - 1), 1);   // drop one type, keep two different ones
