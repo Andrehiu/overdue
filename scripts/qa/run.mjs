@@ -410,20 +410,11 @@ if (want('menus')) for (const [name, opts] of TARGETS) {
         record(area, `${id}: pinned row covers nothing and fits the column`, !ov.length, ov.join('; '));
       }
       if (id === 'howto') {
-        const hw = async (on) => { await page.evaluate((on) => __overdue.setSetting('autoaim', on), on); await page.waitForTimeout(100);
-          return page.evaluate(() => {
-            const t = document.getElementById('hwTable'), vis = (el) => el.offsetParent !== null && getComputedStyle(el).display !== 'none';
-            const mine = [...t.querySelectorAll('.hw-head .hw-mine')].filter(vis).map((e) => e.parentElement.classList.contains('hw-on') ? 'on' : 'off');
-            const heads = [...t.querySelectorAll('.hw-head .hw-col')].map((e) => e.textContent);
-            return { mine, heads, rows: t.querySelectorAll('.hw-row').length, text: t.textContent, touchFirst: !/WASD|mouse|click/i.test(document.getElementById('howto').textContent) };
-          }); };
-        const on = await hw(true), off = await hw(false);
-        record(area, 'howto: shows ON and OFF columns', /Auto-aim ON/.test(on.heads[0]) && /Auto-aim OFF/.test(on.heads[1]) && on.rows >= 5, on.heads.join(' | '));
-        record(area, 'howto: marks the active column (on, then off)', on.mine.join() === 'on' && off.mine.join() === 'off', `on=${on.mine} off=${off.mine}`);
-        record(area, 'howto: touch-first text, controller line, no keyboard/mouse', on.touchFirst && /Controller: left stick/.test(on.text));
-        const hl = await page.evaluate(`(${LUM})(getComputedStyle(document.querySelector('#hwTable .hw-row .hw-both')).color)`);
+        const txt = await page.textContent('#howto');
+        record(area, 'howto: no keyboard/mouse terms', !/WASD|Arrows|click|Space|Shift|Esc\b/i.test(txt), (txt.match(/WASD|Arrows|click|Space|Shift|Esc\b/i) || [''])[0]);
+        record(area, 'howto: mentions second-finger option and controller line', /second finger/.test(txt) && /Controller: left stick/.test(txt));
+        const hl = await page.evaluate(`(${LUM})(getComputedStyle(document.querySelector('#howto .controls dd')).color)`);
         record(area, 'howto: text readable', hl > 0.5, `luminance ${hl.toFixed(2)}`);
-        await page.evaluate(() => __overdue.setSetting('autoaim', true));
       }
       await page.click(`#${id} [data-act=${back}]`); await page.waitForTimeout(250);
     }

@@ -2291,11 +2291,7 @@ function setSetting(k, v) {
   if (k === 'music') sound.setMusic(v);
   const box = document.querySelector(`#settings input[data-k="${k}"]`);
   if (box) box.checked = v;
-  if (k === 'autoaim') markHowto();
 }
-/** How to play: mark the auto-aim column that matches the player's current setting. */
-function markHowto() { document.getElementById('hwTable').dataset.aim = settings.autoaim === false ? 'off' : 'on'; }
-markHowto();
 document.querySelectorAll('#settings input[data-k]').forEach((box) => {
   box.checked = !!settings[box.dataset.k];
   box.addEventListener('change', () => setSetting(box.dataset.k, box.checked));
