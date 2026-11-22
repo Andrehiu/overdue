@@ -134,6 +134,40 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     record(area, 'perk cards render', cards.length >= 1 && cards.every((c) => c.gain.trim().length > 0), `${cards.length} cards`);
     record(area, 'no technical units on cards', !cards.some((c) => /\d\s?(px|rad)\b|rad\/s/.test(c.text)));
     record(area, 'Masterwork offered at 3/3', cards[0]?.kind.includes('master'));
+    // v1.11.0: learn perks as you go. Fresh tips store -> first perk screen shows the stacking tip.
+    {
+      const tipInfo = await page.evaluate(() => {
+        const t = document.querySelector('#perkTip'), tr = t.getBoundingClientRect();
+        const cs = [...document.querySelectorAll('#cards .card')];
+        const hit = cs.map((c) => { const r = c.getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!e && c.contains(e); });
+        return { hidden: t.hidden, text: t.textContent, bottom: tr.bottom, tops: cs.map((c) => c.getBoundingClientRect().top), hit,
+          seen: (JSON.parse(localStorage.getItem('overdue.tips.v1') || '{}').seen || []), vh: innerHeight };
+      });
+      record(area, 'first perk screen shows the stacking tip once', !tipInfo.hidden && /Perks stack to ●●●/.test(tipInfo.text) && tipInfo.seen.includes('perk-stack'), tipInfo.text);
+      record(area, 'tip strip never overlaps cards and cards stay tappable', tipInfo.tops.every((t) => t >= tipInfo.bottom - 1) && tipInfo.hit.every(Boolean), `tip bottom ${Math.round(tipInfo.bottom)}, card tops ${tipInfo.tops.map(Math.round)}`);
+      await shot(page, `${name}-perk-tips`);
+      const sp = await page.evaluate(() => { const c = document.querySelector('#cards .card.master'); return c ? { stamp: c.querySelector('.stamp').textContent, why: c.querySelector('.why').textContent } : null; });
+      record(area, 'special card shows UNLOCKED and its reason', !!sp && /UNLOCKED/i.test(sp.stamp) && /^because .+ hit 3\/3$/.test(sp.why), JSON.stringify(sp));
+      await shot(page, `${name}-special-reason`);
+      await page.evaluate(() => __overdue.showCards(['dewey']));
+      await page.waitForTimeout(300);
+      const lock = await page.evaluate(() => { const c = document.querySelector('#cards .card'); return { lvl: c.querySelector('.lvl').textContent, mw: c.querySelector('.mw').textContent, text: c.textContent, tip: document.querySelector('#perkTip').hidden ? '' : document.querySelector('#perkTip').textContent }; });
+      record(area, '2/3 card shows the lock line, "now → after" pips and no Masterwork effect', lock.lvl === '●○○ → ●●○' && /Next level unlocks a Masterwork 🔒/.test(lock.mw) && !/Unlocks [A-Z]/.test(lock.text), `${lock.lvl} | ${lock.mw}`);
+      record(area, 'stacking tip does not repeat on the next perk screen', !/Perks stack to/.test(lock.tip), lock.tip);
+      const p2 = await page.context().newPage(); await p2.goto(URL0); await p2.waitForTimeout(500);
+      const again = await p2.evaluate(() => { __overdue.startRun('endless'); __overdue.showUpgrades(); const t = document.querySelector('#perkTip'); return { hidden: t.hidden, text: t.textContent }; }); await p2.close();
+      record(area, 'stacking tip stays gone after a reload', again.hidden || !/Perks stack to/.test(again.text), again.text);
+      // Old saves have no tips key; a damaged one must not break the game either.
+      await page.evaluate(() => localStorage.removeItem('overdue.tips.v1'));
+      const p3 = await page.context().newPage(); await p3.goto(URL0); await p3.waitForTimeout(500);
+      const old = await p3.evaluate(() => { __overdue.startRun('endless'); __overdue.showUpgrades(); return document.querySelector('#perkTip').textContent; });
+      await p3.evaluate(() => localStorage.setItem('overdue.tips.v1', '{oops'));
+      await p3.reload(); await p3.waitForTimeout(500);
+      const bad = await p3.evaluate(() => { __overdue.startRun('endless'); __overdue.showUpgrades(); return document.querySelector('#perkTip').textContent; }); await p3.close();
+      record(area, 'old save without tips key (and a damaged one) loads fine', /Perks stack to/.test(old) && /Perks stack to/.test(bad), `${old.slice(0, 20)} | ${bad.slice(0, 20)}`);
+      await page.evaluate(() => __overdue.showUpgrades());
+      await page.waitForTimeout(300);
+    }
     const cardLum = await page.evaluate(`(${LUM})(getComputedStyle(document.querySelector('#cards .card strong')).color)`);
     record(area, 'card title readable on paper', cardLum < 0.3, `luminance ${cardLum.toFixed(2)}`);
     // Build strip: short names as text, linked chip when a combo partner is offered, popover opens without picking a card
@@ -332,6 +366,8 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     // Reset progress (Settings): needs two taps, then fines, Renovations and unlocks are gone
     await tap('#gameover [data-act=menu]'); await page.waitForTimeout(250);
     await tap('#title [data-act=settings]'); await page.waitForTimeout(250);
+    await tap('#btnShowTips'); await page.waitForTimeout(150);
+    record(area, 'Show tips again resets the tips', await page.evaluate(() => (JSON.parse(localStorage.getItem('overdue.tips.v1') || '{}').seen || []).length === 0));
     await tap('#btnResetProgress'); await page.waitForTimeout(150);
     const afterOne = await page.evaluate(() => __overdue.progress.unlocked);
     await tap('#btnResetProgress'); await page.waitForTimeout(200);
@@ -438,6 +474,8 @@ if (want('menus')) for (const [name, opts] of TARGETS) {
         record(area, 'howto: mentions second-finger option and controller line', /second finger/.test(txt) && /Controller: left stick/.test(txt));
         const hl = await page.evaluate(`(${LUM})(getComputedStyle(document.querySelector('#howto .controls dd')).color)`);
         record(area, 'howto: text readable', hl > 0.5, `luminance ${hl.toFixed(2)}`);
+        const pb = await page.evaluate(() => { const b = document.querySelector('#howto .perks-box'); const r = b.getBoundingClientRect(); const row = document.querySelector('#howto > .menu.row:last-child').getBoundingClientRect(); return { text: b.textContent, w: r.width, vw: innerWidth, right: r.right, lum: getComputedStyle(b).color }; });
+        record(area, 'howto: Perks box present and fits the width', /Masterwork/.test(pb.text) && /Collected Work/.test(pb.text) && /once per run/.test(pb.text) && pb.right <= pb.vw + 1, `${Math.round(pb.w)} of ${pb.vw}`);
       }
       await page.click(`#${id} [data-act=${back}]`); await page.waitForTimeout(250);
     }

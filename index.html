@@ -66,6 +66,12 @@
           <li><b>Doors</b> between rooms let you pick your next room.</li>
         </ul>
       </div>
+      <div class="perks-box" aria-label="Perks">
+        <b>Perks</b>
+        <span>●○○ → ●●● = Masterwork</span>
+        <span>Perk A + Perk B = Collected Work</span>
+        <span>Each special: once per run</span>
+      </div>
       <p class="muted small">Chain kills for a combo multiplier (up to ×4). Clear a wave without getting hit for a flawless bonus. Shelves block enemy pages — use them as cover.</p>
       <div class="menu row"><button data-act="back">Back</button></div>
     </section>
@@ -81,7 +87,10 @@
         <label><input type="checkbox" data-k="autoaim"> Auto-aim (off: aim with a second finger)</label>
       </div>
       <div class="progress-tools">
-        <button id="btnResetProgress" type="button" class="danger">Reset progress</button>
+        <div class="menu row tool-row">
+          <button id="btnShowTips" type="button">Show tips again</button>
+          <button id="btnResetProgress" type="button" class="danger">Reset progress</button>
+        </div>
         <p class="muted small">Fines, Renovations and story unlocks. Settings, Codex and Hall of Fame are kept.</p>
         <div class="debug-only menu row">
           <button id="btnDebugFines" type="button">+500 fines</button>
@@ -100,6 +109,7 @@
 
     <section id="upgrade" class="screen" hidden>
       <h2 id="upgradeTitle">Choose a perk</h2>
+      <p id="perkTip" class="perk-tip" role="note" hidden></p>
       <div id="cards" class="cards"></div>
       <button id="btnRenew" class="renew" hidden>↻ Renew</button>
       <div id="buildStrip" class="build" aria-label="Your build" hidden></div>
