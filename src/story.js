@@ -22,6 +22,9 @@ export const curveRoom = (room) => CURVE[Math.min(CURVE.length, Math.max(1, room
 // room or the boss room; wings 1-2 have at most one, wings 3+ at most two. Fines are the plain room's.
 export const SURVIVE_SECONDS = 30;
 export const SURVIVE_BUDGET_MULT = 1.2;    // total spawn budget vs the plain room: never easier
+export const SURVIVE_END = SURVIVE_SECONDS - 10;     // no spawn after this, so the last enemies still have time to be fought
+// Budget shares and the time slice of the 30 s each chunk fills (thin start, heavy finish).
+export const SURVIVE_CHUNKS = [{ share: 0.2, from: 0.8, to: 6 }, { share: 0.3, from: 6.5, to: 12 }, { share: 0.5, from: 12.5, to: SURVIVE_END }];
 const SURVIVE_ROOMS = { 1: [3], 2: [], 3: [2, 5], 4: [6], 5: [3, 6], 6: [], 7: [2, 5], 8: [3], 9: [], 10: [2, 6] };
 /** 'clear' (kill everything) or 'survive' (stay alive SURVIVE_SECONDS). Deterministic per wing + room. */
 export const roomGoal = (wing, room) => ((SURVIVE_ROOMS[wing] || []).includes(room) ? 'survive' : 'clear');
@@ -74,7 +77,7 @@ export function difficulty(wing, room) {
   const goal = roomGoal(wing, room);
   const base = baseBudget(r);
   const budgetMult = 1 + 0.08 * w;
-  const budget = base * budgetMult * (kind === 'boss' ? 0.35 : kind === 'elite' ? 0.6 : 1) * (goal === 'survive' ? SURVIVE_BUDGET_MULT : 1);
+  const budget = base * budgetMult * (kind === 'boss' ? 0.35 : kind === 'elite' ? 0.75 : 1) * (goal === 'survive' ? SURVIVE_BUDGET_MULT : 1);
   return {
     wing, room, kind, goal, pos: r,
     budget,
@@ -106,11 +109,18 @@ export function composeRoom(wing, room, rng, d = difficulty(wing, room)) {
   const opts = { boss: d.kind === 'boss', weights: def.weights, unlockShift: def.unlockShift || 0, gapMult: d.gapMult, eliteChance: d.eliteChance };
   const pos = curveRoom(room);
   if (d.goal !== 'survive') return composeWave(pos, rng, { ...opts, budget: d.budget });
-  // Survive: the budget is spread over the whole timer in chunks, so the board never empties early.
-  const chunks = 3, spawns = [];
-  for (let i = 0; i < chunks; i++) {
-    for (const s of composeWave(pos, rng, { ...opts, budget: d.budget / chunks }).spawns) spawns.push({ ...s, t: +(s.t + i * (SURVIVE_SECONDS / chunks - 0.5)).toFixed(3) });
-  }
+  // Survive: a rising siege. The total budget is split into three chunks weighted toward the end (20% / 30% / 50%),
+  // and each chunk's spawn times are fitted into its own slice of the timer, so the same enemies arrive in a
+  // thin trickle first and a crush last. Every spawn lands before SURVIVE_END, never at the buzzer.
+  const spawns = [];
+  SURVIVE_CHUNKS.forEach(({ share, from, to }) => {
+    const part = composeWave(pos, rng, { ...opts, budget: d.budget * share }).spawns;
+    if (!part.length) return;
+    const t0 = part[0].t, span = part[part.length - 1].t - t0;
+    // Stretch or squeeze the chunk to fill its slice (a lone group sits in the middle of it).
+    const k = span < 1 ? 1 : (to - from) / span, start = span < 1 ? (from + to - span) / 2 : from;
+    for (const s of part) spawns.push({ ...s, t: +Math.min(SURVIVE_END, start + (s.t - t0) * k).toFixed(3) });
+  });
   spawns.sort((a, b) => a.t - b.t);
   return { wave: pos, boss: false, spawns };
 }

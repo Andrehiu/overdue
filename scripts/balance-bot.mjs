@@ -13,7 +13,8 @@ export function playRun(o, { wing, policy, progress, roomTimeout = 180, wallMs =
     o.setProgress(progress);
     o.startRun('story', wing);
     const t0 = Date.now();
-    let prev = null, stuck = 0, outcome = null;
+    let prev = null, stuck = 0, outcome = null, lastDoor = null, seen = 0;
+    const trace = [];                   // per room: hearts on entry and the door taken (for diagnosing spike rooms)
     for (let guard = 0; guard < 3e6 && !outcome; guard++) {
       const st = g.state;
       if (st === 'gameover') break;
@@ -24,12 +25,14 @@ export function playRun(o, { wing, policy, progress, roomTimeout = 180, wallMs =
         continue;
       }
       if (st === 'doors') {
-        o.pickDoor(chooseDoor(policy, o.doors, o.player.hp));
+        lastDoor = chooseDoor(policy, o.doors, o.player.hp);
+        o.pickDoor(lastDoor);
         if (g.state === 'doors' && ++stuck > 20) { outcome = 'error'; errors.push('door screen would not close'); }
         continue;
       }
       if (st !== 'playing' && st !== 'waveclear' && st !== 'dying') { outcome = 'error'; errors.push(`unexpected state ${st}`); break; }
       stuck = 0;
+      if (st === 'playing' && g.wave !== seen) { seen = g.wave; trace.push({ room: g.wave, hp: o.player.hp, door: lastDoor }); lastDoor = null; }
       if (st === 'playing') {
         if (g.waveT > roomTimeout || Date.now() - t0 > wallMs) { outcome = 'timeout'; break; }
         prev = think(o, prev);
@@ -40,7 +43,7 @@ export function playRun(o, { wing, policy, progress, roomTimeout = 180, wallMs =
     const room = g.wave, won = g.state === 'gameover' && g.wingCleared;
     if (!outcome) outcome = g.state !== 'gameover' ? 'error' : won ? 'clear' : 'death';
     const banked = g.banked ? g.banked.banked - (g.banked.firstClear ? 30 + 10 * wing : 0) : null;
-    return { wing, policy, outcome, room, hearts: o.player.hp, fines: banked ?? Math.round(g.fines), time: Math.round(g.playTime), kills: g.kills, errors };
+    return { wing, policy, outcome, room, hearts: o.player.hp, fines: banked ?? Math.round(g.fines), time: Math.round(g.playTime), kills: g.kills, errors, trace };
   } catch (e) {
     return { wing, policy, outcome: 'error', room: g.wave, hearts: 0, fines: 0, time: Math.round(g.playTime || 0), errors: [String(e && e.message || e)] };
   } finally {
