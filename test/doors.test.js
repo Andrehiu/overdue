@@ -97,3 +97,20 @@ test('Mystery Shelf: deterministic, only unowned unbanned cursed books, otherwis
   // Lights Out needs lighting on.
   for (let seed = 1; seed <= 200; seed++) { const p = mysteryPrize(seed, 1, 3, {}, { lights: false }); assert.ok(p.kind !== 'cursed' || p.id !== 'lightsout'); }
 });
+
+test('Rare Books (v1.7.1): strictly harder in every wing and room; the bite starts at wing 4', async () => {
+  const { applyDoor } = await load('doors');
+  const { difficulty, threat, ROOMS_PER_WING } = await load('story');
+  for (let wing = 1; wing <= 10; wing++) for (let room = 1; room <= ROOMS_PER_WING; room++) {
+    const d = difficulty(wing, room), r = applyDoor(d, 'rare');
+    if (d.kind !== 'normal') { assert.deepEqual(r, d, 'elite and boss rooms have no door effect'); continue; }
+    assert.ok(threat(r) > threat(d), `Rare Books not harder at wing ${wing} room ${room}`);
+    assert.ok(Math.abs(r.budget - d.budget * 1.3) < 1e-9, 'spawn budget x1.3');
+    assert.equal(r.hpMult, d.hpMult);
+    if (wing < 4) { assert.equal(r.eliteHpMult, undefined); assert.equal(r.eliteShootEvery, d.eliteShootEvery); }
+    else { assert.equal(r.eliteHpMult, 1.5); assert.ok(Math.abs(r.eliteShootEvery - d.eliteShootEvery / 1.3) < 1e-9); }
+  }
+  // Other doors leave budget and elite stats alone.
+  const d = difficulty(5, 3);
+  for (const id of ['rest', 'mystery', 'stacks']) assert.deepEqual(applyDoor(d, id), d);
+});

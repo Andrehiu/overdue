@@ -66,6 +66,31 @@ const shot = (page, name) => page.screenshot({ path: join(OUT, `${name}.png`) })
 // Relative luminance of a CSS rgb() colour (0 = black, 1 = white).
 const LUM = `(c) => { const m = c.match(/[\\d.]+/g).map(Number); const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(m[0]) + 0.7152 * f(m[1]) + 0.0722 * f(m[2]); }`;
 
+
+// v1.7.1: the pinned bottom row must never cover content and be no wider than the content column.
+// Scrolls the screen to the bottom, then checks every visible text element against the row's rect.
+const PINNED_CHECK = (id) => {
+  const scr = document.getElementById(id), row = scr.querySelector(':scope > .menu.row:last-child');
+  if (!row) return ['no pinned row'];
+  scr.scrollTop = scr.scrollHeight;
+  const rr = row.getBoundingClientRect(), bad = [];
+  const kids = [...scr.children].filter((c) => c !== row && !c.hidden && c.offsetParent !== null);
+  const col = Math.max(0, ...kids.map((c) => c.getBoundingClientRect().width));
+  if (rr.width > col + 1) bad.push(`row ${Math.round(rr.width)}px wider than content ${Math.round(col)}px`);
+  const w = document.createTreeWalker(scr, NodeFilter.SHOW_TEXT);
+  for (let n; (n = w.nextNode());) {
+    if (!n.textContent.trim()) continue;
+    const el = n.parentElement;
+    if (row.contains(el) || !el.offsetParent || getComputedStyle(el).visibility === 'hidden') continue;
+    const rg = document.createRange(); rg.selectNodeContents(n);
+    for (const r of rg.getClientRects()) {
+      if (r.width < 1 || r.height < 1) continue;
+      if (r.bottom > rr.top + 1 && r.top < rr.bottom - 1 && r.right > rr.left && r.left < rr.right) { bad.push(`"${n.textContent.trim().slice(0, 24)}" under the row`); break; }
+    }
+  }
+  return bad;
+};
+
 // ---------------------------------------------------------------- 3. screens on every device
 if (want('screens')) for (const [name, opts] of TARGETS) {
   const ctx = await browser.newContext(opts);
@@ -242,6 +267,15 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     await page.waitForTimeout(700);
     await page.locator('#doorCards .door').click(); await page.waitForTimeout(300);
     record(area, 'Break Room never heals above max', await page.evaluate(() => __overdue.player.hp === 5));
+    // v1.7.1: SHHH is ready at the start of every story room; endless keeps its cooldown
+    const shhhStory = await page.evaluate(() => { const O = __overdue; O.player.shhhT = 9; O.startWave(2); return O.player.shhhT; });
+    record(area, 'story: SHHH ready at the start of the next room', shhhStory === 0, `shhhT ${shhhStory}`);
+    const shhhEndless = await page.evaluate(() => { const O = __overdue; O.startRun('endless'); O.player.shhhT = 9; O.startWave(2); const t = O.player.shhhT; O.startRun('story', 1); O.god(); return t; });
+    record(area, 'endless: SHHH cooldown carries over', shhhEndless === 9, `shhhT ${shhhEndless}`);
+    // v1.7.1: Mystery Shelf's bonus pick says why you get a second perk
+    const bonusTitle = await page.evaluate(() => { const O = __overdue; O.game.bonusPicks = 1; O.showUpgrades(); return document.querySelector('#upgradeTitle').textContent; });
+    record(area, 'Mystery Shelf bonus pick screen is titled', bonusTitle === '🎲 Mystery Shelf: bonus perk!', bonusTitle);
+    await page.evaluate(() => { __overdue.game.pickIsBonus = false; __overdue.startWave(2); });
     await page.evaluate(() => { __overdue.startWave(5); __overdue.god(); }); await page.waitForTimeout(1200);
     await shot(page, `${name}-12-elite-room`);
     // Watch for 3s and collect every enemy that appears (auto-fire can kill the first ones before a single snapshot).
@@ -261,6 +295,9 @@ if (want('screens')) for (const [name, opts] of TARGETS) {
     record(area, 'clearing wing 1 unlocks wing 2', /cleared/i.test(won.title) && won.unlocked === 2 && won.next, JSON.stringify(won));
     const btns = await page.$$eval('#gameover .menu.row button:not([hidden])', (bs) => bs.map((b) => { const r = b.getBoundingClientRect(); return { t: b.textContent.trim(), ok: r.top >= 0 && r.bottom <= innerHeight + 1 && r.left >= 0 && r.right <= innerWidth + 1 }; }));
     record(area, 'end-screen buttons on screen with a big build', btns.length >= 3 && btns.every((b) => b.ok), btns.filter((b) => !b.ok).map((b) => b.t).join(', ') || `${btns.length} buttons visible`);
+
+    const goBad = await page.evaluate(`(${PINNED_CHECK})('gameover')`);
+    record(area, 'game over: pinned row covers nothing and fits the column', !goBad.length, goBad.join('; '));
 
     // Reset progress (Settings): needs two taps, then fines, Renovations and unlocks are gone
     await tap('#gameover [data-act=menu]'); await page.waitForTimeout(250);
@@ -313,6 +350,10 @@ if (want('menus')) for (const [name, opts] of [...TARGETS, ['ipad-mini-landscape
       if (id === 'codex' || id === 'shop') await shot(page, `${name}-menu-${id}`);
       const bad = await check(id);
       record(area, `${id}: bottom buttons on screen`, !bad.length, bad.join(', '));
+      if (['codex', 'shop', 'settings'].includes(id)) {
+        const ov = await page.evaluate(`(${PINNED_CHECK})('${id}')`);
+        record(area, `${id}: pinned row covers nothing and fits the column`, !ov.length, ov.join('; '));
+      }
       await page.click(`#${id} [data-act=${back}]`); await page.waitForTimeout(250);
     }
   } catch (e) { record(area, 'menus flow completed', false, e.message.split('\n')[0]); }

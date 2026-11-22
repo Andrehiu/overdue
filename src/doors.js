@@ -7,9 +7,9 @@ import { ROOMS_PER_WING, ELITE_ROOM, roomReward } from './story.js';
 import { UPGRADES } from './upgrades.js';
 
 // id · icon · name · line (plain words, shown on the card) · banner (room banner subtitle)
-// eliteAdd: extra elite share · fineMult: fines multiplier · fineMin: floor for the reduced fines
+// eliteAdd: extra elite share · budgetMult: spawn budget multiplier · biteWing: from this wing elites also get +50% HP and fire 30% faster · fineMult: fines multiplier · fineMin: floor for the reduced fines
 export const DOORS = {
-  rare:    { id: 'rare', icon: '💰', name: 'Rare Books', line: 'More elites · ×2 fines', banner: '💰 Rare Books: double fines', eliteAdd: 0.5, fineMult: 2 },
+  rare:    { id: 'rare', icon: '💰', name: 'Rare Books', line: 'More enemies, more elites · ×2 fines', banner: '💰 Rare Books: double fines', eliteAdd: 0.5, budgetMult: 1.3, biteWing: 4, eliteHpMult: 1.5, eliteFireMult: 1.3, fineMult: 2 },
   rest:    { id: 'rest', icon: '☕', name: 'Break Room', line: 'Heal 1 ♥ · fewer fines', banner: '☕ Break Room: +1 ♥, fewer fines', fineMult: 0.5, fineMin: 3, heal: 1 },
   mystery: { id: 'mystery', icon: '🎲', name: 'Mystery Shelf', line: 'A surprise when you clear it', banner: '🎲 Mystery Shelf: a surprise when cleared' },
   stacks:  { id: 'stacks', icon: '🚪', name: 'The Stacks', line: 'A normal room · normal fines', banner: '🚪 The Stacks: a normal room' },
@@ -33,11 +33,16 @@ export function doorOffer(seed, wing, clearedRoom, { atFullHp = false } = {}) {
   return picks.map((id) => (id === 'rest' && atFullHp ? 'stacks' : id));
 }
 
-/** The next room's difficulty with the door applied. Doors only ever add elites: never easier. */
+/** The next room's difficulty with the door applied. Doors only ever make a room harder: never easier. */
 export function applyDoor(diff, doorId) {
   const d = DOORS[doorId];
   if (!d || !d.eliteAdd || diff.kind !== 'normal') return diff;
-  return { ...diff, eliteChance: Math.min(1, diff.eliteChance + d.eliteAdd) };
+  const out = { ...diff, eliteChance: Math.min(1, diff.eliteChance + d.eliteAdd), budget: diff.budget * (d.budgetMult || 1) };
+  if (d.biteWing && diff.wing >= d.biteWing) {   // from wing 4: tougher elites that fire pages faster
+    out.eliteHpMult = d.eliteHpMult;
+    out.eliteShootEvery = diff.eliteShootEvery / d.eliteFireMult;
+  }
+  return out;
 }
 
 /** Fines for clearing `room` of `wing` after entering through `doorId`. */

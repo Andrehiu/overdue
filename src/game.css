@@ -389,7 +389,7 @@ body.debug .debug-only { display: flex; }
 body.portrait .reach-row { grid-template-columns: 1fr; }
 /* Menus: the bottom button row stays pinned to the bottom edge (with a fade) while the content above scrolls.
    Applies to every screen whose last child is a .menu.row (howto, settings, leaderboard, codex, story, shop, game over). */
-.screen > .menu.row:last-child { position: sticky; bottom: 0; z-index: 2; width: 100%; justify-content: center; flex-wrap: wrap;
+.screen > .menu.row:last-child { position: sticky; bottom: 0; z-index: 2; width: 100%; box-sizing: border-box; flex-shrink: 0; justify-content: center; flex-wrap: wrap;
   padding: .5em 0 calc(.5em + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(to bottom, transparent, rgba(5, 3, 12, .92) 35%); }
 #goBuild { justify-content: flex-start; padding-left: 0; }
