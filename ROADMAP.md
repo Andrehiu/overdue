@@ -46,7 +46,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 | 1.11.0 | **Learn perks as you go:** one-time tips (stack to 3/3, combos), Masterwork previews at 2/3, UNLOCKED + reason on special cards, level-up pips, Perks box in How to play, "Show tips again" (new key `overdue.tips.v1`) | Shipped 2026-11-22 with 1.11.1 (416b4d4) |
 | 1.11.1 | **Fill the screen:** arena widens to the phone's shape (no black side bars; iPhones were at 81–88% fill), title fits on iPad mini / iPad Safari, QA fill ≥ 95% + more phone sizes + rotation checks | Shipped 2026-11-22 (416b4d4) |
 | 1.11.2 | **Polish:** door key numbers off the icons; touching shelves draw as one solid wall (bridge/maze/reading) | Merged, full QA green (64 unit, 0 failures, 53–60 fps); awaiting owner "ship" |
-| — | **QA trim** (tooling): full flow on 3 devices, fit-only on 4, parallel contexts; target ~5 min | In progress: coder "Overdue · QA trim". Handoff: `docs/handoffs/qa-trim.md` |
+| — | **QA trim** (tooling): full flow on 3 devices, fit-only on 4, parallel contexts; target ~5 min | Merged: QA 11 min → 3 min (full flow on 3 devices, fit-only on 4, parallel); `--full` ~3.5 min |
 | — | **Bigger map (parked):** ~40×24 cells (1.7× floor), camera follows the player with a dead zone; light layer screen-sized (same look; owner OK needed since CLAUDE.md says keep lighting); auto-aim only on screen; spawns just off-screen; edge arrows for off-screen enemies; perf budget must hold. Build behind `?bigmap=1` first | Parked: 1.3.1 fixed the cramped feeling. Revisit only if it comes back |
 
 ### 1.3.1 phone checklist (wing 1, rooms 1–10)
