@@ -17,7 +17,7 @@ Or play online at **https://andrehiu.github.io/overdue/**. On a phone, use **Sha
 | | Keyboard / mouse | Gamepad | Touch |
 |---|---|---|---|
 | Move | WASD / arrows | Left stick | Drag anywhere |
-| Throw books | Aim + hold click | Right stick / RT | Automatic (2nd finger aims) |
+| Throw books | Aim + hold click | Right stick / RT | Automatic; with Settings → Auto-aim off, hold a 2nd finger to aim and throw |
 | Dash (invulnerable) | Space / Shift | A / RB | DASH (shows a countdown while recharging) |
 | SHHH! shockwave | E / Q / right-click | B / LB | SHHH |
 | Pause | P / Esc | Start | ❚❚ |

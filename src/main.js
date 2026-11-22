@@ -7,7 +7,7 @@ import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
 import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips, buildChips } from './upgrades.js';
-import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist } from './util.js';
+import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist, aimSource } from './util.js';
 import { PLAYER, bookLook } from './palette.js';
 import { SoundEngine } from './audio.js';
 import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
@@ -26,7 +26,7 @@ const DEBUG = new URLSearchParams(location.search).has('debug');
 const loadJSON = (k) => { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch { return {}; } };
 const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage blocked */ } };
 const SETTINGS_KEY = 'overdue.settings.v1';
-const settings = Object.assign({ sfx: true, music: true, lights: true, motion: true, autofire: false }, loadJSON(SETTINGS_KEY));
+const settings = Object.assign({ sfx: true, music: true, lights: true, motion: true, autofire: false, autoaim: true }, loadJSON(SETTINGS_KEY));
 
 const sound = new SoundEngine();
 sound.sfxOn = settings.sfx; sound.musicOn = settings.music;
@@ -276,6 +276,7 @@ function startRun(mode = 'endless', wing = 1) {
   const head = bonus.startPerks ? rollUpgrades(rng, game.owned, bonus.startPerks, rollOpts({ noSpecial: true })) : [];
   for (const u of head) { game.owned[u.id] = (game.owned[u.id] || 0) + 1; u.apply(stats, player); }
   startWave(1);
+  if (touch.enabled && settings.autoaim === false) setTimeout(() => toast('Auto-aim off: hold a second finger to aim and throw'), head.length ? 1700 : 0);
   if (head.length) toast(`🎒 Head Start: ${head.map((u) => u.name).join(' + ')}`);
 }
 
@@ -876,14 +877,16 @@ function updatePlayer(dt) {
   const mv = moveInput();
   if (mv.x || mv.y) { const l = Math.hypot(mv.x, mv.y); p.lastDx = mv.x / l; p.lastDy = mv.y / l; p.lastMoveT = 0.45; }
   else p.lastMoveT = Math.max(0, (p.lastMoveT || 0) - dt);
-  // Aim: gamepad stick > touch aim > auto-aim (touch) > mouse
+  // Aim: gamepad stick > touch aim > auto-aim (touch/gamepad, setting; the bot always) > mouse. See aimSource() in util.js.
   let firing = false;
-  if (pad.connected && (pad.ax || pad.ay)) { p.aim = Math.atan2(pad.ay, pad.ax); firing = pad.fire; }
-  else if (touch.aimId !== null) { p.aim = Math.atan2(touch.ay - p.y, touch.ax - p.x); firing = true; }
-  else if (touch.enabled || botInput || (pad.connected && !mouse.seen)) {
+  const src = aimSource({ autoaim: settings.autoaim !== false, bot: !!botInput, touchEnabled: touch.enabled, touchAiming: touch.aimId !== null,
+    padConnected: pad.connected, padStick: !!(pad.ax || pad.ay), mouseSeen: mouse.seen });
+  if (src === 'pad') { p.aim = Math.atan2(pad.ay, pad.ax); firing = pad.fire; }
+  else if (src === 'touch') { p.aim = Math.atan2(touch.ay - p.y, touch.ax - p.x); firing = true; }
+  else if (src === 'auto') {
     const t = nearestEnemy(p.x, p.y, PORTRAIT ? 600 : 460);
     if (t) { p.aim = Math.atan2(t.y - p.y, t.x - p.x); firing = true; }
-  } else {
+  } else if (src === 'mouse') {
     p.aim = Math.atan2(mouse.y - p.y, mouse.x - p.x);
     firing = mouse.down;
   }
@@ -2489,7 +2492,7 @@ if (DEBUG) {
     showCards: (ids) => renderCards(ids.map(byId)),
     showUpgrades, showDoors, nextRoom, texts, get door() { return game.door; },
     // ---- balance bot (scripts/balance.mjs): drives the sim headless, faster than real time ----
-    actions, hazards, STEP, get W() { return W; }, get H() { return H; }, isSolid: (x, y) => isSolidPx(arena.solid, x, y),
+    actions, hazards, STEP, books, touch, settings, setSetting, get W() { return W; }, get H() { return H; }, isSolid: (x, y) => isSolidPx(arena.solid, x, y),
     get choices() { return currentChoices; }, get doors() { return currentDoors; },
     setBotInput: (mv) => { botInput = mv; }, drive: (on) => { botDrive = !!on; if (!on) botInput = null; },
     stepN: (n) => { for (let i = 0; i < n; i++) step(STEP); },

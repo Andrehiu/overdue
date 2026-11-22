@@ -107,3 +107,16 @@ export function cornerAssist(obj, before, r, rect, maxSlip = 8, maxStep = maxSli
   }
   return false;
 }
+
+/**
+ * Which source steers the throw this frame (pure, so it is unit-tested).
+ *  'pad'   right stick held · 'touch' a second finger is down · 'auto' nearest-enemy aim · 'mouse' follow the cursor
+ *  'none'  auto-aim is off and nothing is being aimed: don't aim, don't throw (touch / gamepad only)
+ * `autoaim` is the player's setting; the balance bot always auto-aims.
+ */
+export function aimSource({ autoaim, bot, touchEnabled, touchAiming, padConnected, padStick, mouseSeen }) {
+  if (padConnected && padStick) return 'pad';
+  if (touchAiming) return 'touch';
+  if (touchEnabled || bot || (padConnected && !mouseSeen)) return (autoaim || bot) ? 'auto' : 'none';
+  return 'mouse';
+}
