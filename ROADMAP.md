@@ -38,6 +38,7 @@ only when the owner says "ship".
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-23 | Difficulty: gentle smoothing only. Soften the two cliffs (wing 3→4 and wing 7, tester feedback) so each wing is a steady step up; don't lower the overall difficulty; wings 9–10 stay the real challenge. Target, half Renovations: wing 1–2 ~85%, 3–4 ~65%, 5–6 ~50%, 7–8 ~35%, 9–10 ~20%; no wing > ~15 pts harder than the one before | Owner: 'slightly less difficult', keep it interesting. Bot: wing 3→4 72%→11%, wings 8/10 0% |
 | 2026-11-23 | Release plan approved: 1.12.1 bugs + 1.12.2 polish (parallel) → 1.13.0 new players + 1.13.1 app basics (parallel) → 1.14.0 builds → 1.15.0 player look. Max 2 coders at a time (usage limits). 1.12.x: ship if all good | Owner |
 | 2026-11-23 | Orientation can't be locked by a web page on iPhone (manifest already says landscape; Android installs honour it), so the rotate overlay stays as the fallback. Add: Home Screen nudge, save backup code, offline play (service worker), sound-after-app-switch check | Owner asked for missing basics; planner audit |
 | 2026-11-23 | Keep the fun names; add plain captions under them, always shown (A). Show menus as they're earned (B) | Owner: testers find it unintuitive because terms aren't standard, but the fun names stay. Mock-up approved (title screen captions) |
@@ -94,7 +95,7 @@ only when the owner says "ship".
 | 1.12.2 | **Polish:** skip single-door screen, free perks as a card, banish animates one card, redundant UI removed (+ no "!" on crits), Mystery wording + "1 of 2", hide story score | Coder started 2026-11-23 (parallel). Handoff: `docs/handoffs/1.12.2-polish.md`. Owner: ship if all good |
 | 1.13.0 | **New players:** plain captions + earned menus, guided first room, wing 1 rooms 1–3 check, Survive clarity (timer, goal, max 1/wing) | Planned (runs with 1.13.1) |
 | 1.13.1 | **App basics:** Home Screen nudge, save backup code, offline play | Planned (runs with 1.13.0) |
-| 1.14.0 | **Builds:** Rare Books better pick (A), cursed books rebalance + take or walk away | Planned |
+| 1.14.0 | **Builds + difficulty curve:** Rare Books better pick (A), cursed books rebalance + take or walk away, gentle curve smoothing (cliffs at wing 4 and 7; bot measures all 10 wings) | Planned. Owner playtests wings 4 and 7 after |
 | 1.15.0 | **Player look:** art agent → 3 looks → owner pick → final, layered for cosmetics | Planned (2 sessions) |
 | — | **QA trim** (tooling): full flow on 3 devices, fit-only on 4, parallel contexts; target ~5 min | Merged: QA 11 min → 3 min (full flow on 3 devices, fit-only on 4, parallel); `--full` ~3.5 min |
 | — | **Bigger map (parked):** ~40×24 cells (1.7× floor), camera follows the player with a dead zone; light layer screen-sized (same look; owner OK needed since CLAUDE.md says keep lighting); auto-aim only on screen; spawns just off-screen; edge arrows for off-screen enemies; perf budget must hold. Build behind `?bigmap=1` first | Parked: 1.3.1 fixed the cramped feeling. Revisit only if it comes back |
