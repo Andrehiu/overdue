@@ -1,7 +1,6 @@
-// Enemy art prototypes (dev only): screenshots + perf numbers for ?art=a|b|c (and c with &eyes=1) next to today's look.
+// Enemy art (dev only): lineup / dark / combat screenshots + perf numbers for the current enemy look.
 //   node scripts/art-shots.mjs                 # everything, into art-shots/ (gitignored)
 //   node scripts/art-shots.mjs --only=shots    # screenshots only (or --only=perf)
-//   node scripts/art-shots.mjs --opts=a,c      # a subset (default, a, b, c, c-eyes)
 // Self-serves the repo root (no build needed): needs `npm ci` and Playwright's Chromium.
 import { chromium, devices } from 'playwright';
 import { createServer } from 'node:http';
@@ -12,10 +11,7 @@ const ROOT = resolve(new URL('..', import.meta.url).pathname);
 const OUT = join(ROOT, 'art-shots');
 const arg = (n) => process.argv.find((a) => a.startsWith(`--${n}=`))?.slice(n.length + 3);
 const ONLY = arg('only');
-const OPTS = {
-  default: '', a: '&art=a', b: '&art=b', c: '&art=c', 'c-eyes': '&art=c&eyes=1',
-};
-const chosen = (arg('opts')?.split(',') || Object.keys(OPTS)).filter((k) => k in OPTS);
+const chosen = ['default'];
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
 
 const server = createServer(async (req, res) => {
@@ -36,7 +32,7 @@ async function open(opt) {
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.goto(BASE + OPTS[opt]); await page.waitForTimeout(600);
+  await page.goto(BASE); await page.waitForTimeout(600);
   await page.tap('[data-act=play]'); await page.waitForTimeout(400);
   return { ctx, page, errors };
 }

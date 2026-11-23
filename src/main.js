@@ -9,7 +9,7 @@ import { composeWave } from './waves.js';
 import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips, buildChips, specialReason, levelInfo, perkTip, normalizeTips, TIPS } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist, aimSource, aimStick } from './util.js';
 import { PLAYER, bookLook } from './palette.js';
-import { ART, EYES, ART_BURST, artShadowK, drawArtEnemy, drawArtWorms, drawGlowEyes } from './enemy-art.js';
+import { BURST, shadowK, drawEnemy as drawArtEnemy, drawWorms } from './enemy-art.js';
 import { SoundEngine } from './audio.js';
 import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
 import { DOORS, doorOffer, applyDoor, doorReward, mysteryPrize } from './doors.js';
@@ -1315,9 +1315,7 @@ function killEnemy(e) {
   game.bestCombo = Math.max(game.bestCombo, game.combo);
   const gained = Math.round(e.score * comboMult() * stats.scoreMult);
   game.score += gained;
-  const colors = { bunny: ['#c9c2b6', '#8d867a'], notice: ['#f4efe1', '#e74c3c'], patron: ['#ff9f43', '#ffd8a8'], worm: ['#7bd88f', '#3c8d50'],
-    golem: ['#d4a017', '#8a6d1a'], coin: ['#ffd54a'], boss: ['#6c3cff', '#b48cff', '#fff'] }[e.type];
-  const burstColors = (ART && ART_BURST[e.type]) || colors;
+  const burstColors = e.type === 'boss' ? ['#6c3cff', '#b48cff', '#fff'] : BURST[e.type];
   burst(e.x, e.y, e.type === 'boss' ? 90 : 16, burstColors, e.type === 'boss' ? 360 : 170, e.type === 'boss' ? 1.4 : 0.6);
   pages(e.x, e.y, e.type === 'boss' ? 40 : 3);
   addLight(e.x, e.y, e.r * 5, 0.35, burstColors[0]);
@@ -1711,8 +1709,8 @@ function render() {
 
   for (const t of telegraphs) drawTelegraph(t);
   for (const k of pickups) drawPickup(k);
-  for (const e of enemies) { const k = ART ? artShadowK(e) : 1; ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(e.x + 3, e.y + e.r * 0.8, e.r * 0.9 * k, e.r * 0.4 * k, 0, 0, TAU); ctx.fill(); }
-  if (ART) drawArtWorms(ctx, enemies);
+  for (const e of enemies) { const k = shadowK(e); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(e.x + 3, e.y + e.r * 0.8, e.r * 0.9 * k, e.r * 0.4 * k, 0, 0, TAU); ctx.fill(); }
+  drawWorms(ctx, enemies);
   for (let i = enemies.length - 1; i >= 0; i--) drawEnemy(enemies[i]);
   for (const b of books) drawThrownBook(b);
   if (game.state !== 'title' && game.state !== 'gameover' && !(game.state === 'dying' && game.deathT < 1.5)) {
@@ -1724,7 +1722,6 @@ function render() {
   drawParticles();
 
   if (settings.lights) renderLights();
-  if (EYES && settings.lights) drawGlowEyes(ctx, enemies, player, 230 * stats.lanternScale);
 
   for (const t of texts) {
     ctx.globalAlpha = clamp(t.life / t.max * 1.5, 0, 1);
@@ -1837,106 +1834,13 @@ function rim(r, a = 0.55) {
   ctx.beginPath(); ctx.arc(0, 0, r - 1, Math.PI * 1.05, Math.PI * 1.6); ctx.stroke();
 }
 
-function eyes(x, y, sep, r, look, color = '#fff') {
-  for (const s of [-1, 1]) {
-    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x + s * sep, y, r, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(x + s * sep + Math.cos(look) * r * 0.4, y + Math.sin(look) * r * 0.4, r * 0.5, 0, TAU); ctx.fill();
-  }
-}
-
-/** Elites wear a gold halo that flares red just before they fire. */
-function drawEliteHalo(e) {
-  const warn = e.shootT !== undefined && e.shootT < 0.4 && game.state === 'playing';
-  ctx.save();
-  ctx.lineWidth = 2.5;
-  ctx.strokeStyle = warn ? '#ff4d5e' : '#ffd54a';
-  ctx.globalAlpha = warn ? 0.9 : 0.55 + Math.sin(e.t * 5) * 0.2;
-  ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 5 + (warn ? Math.sin(e.t * 40) * 1.5 : 0), 0, TAU); ctx.stroke();
-  // little crown
-  ctx.globalAlpha = 1; ctx.fillStyle = '#ffd54a'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1.5;
-  const y = e.y - e.r - 9;
-  ctx.beginPath(); ctx.moveTo(e.x - 7, y + 5); ctx.lineTo(e.x - 7, y - 2); ctx.lineTo(e.x - 3.5, y + 1.5); ctx.lineTo(e.x, y - 4);
-  ctx.lineTo(e.x + 3.5, y + 1.5); ctx.lineTo(e.x + 7, y - 2); ctx.lineTo(e.x + 7, y + 5); ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.restore();
-}
-
 function drawEnemy(e) {
-  // ?art=a|b|c: enemy art prototypes (src/enemy-art.js); the boss keeps its own drawing
-  if (ART && e.type !== 'boss') return drawArtEnemy(ctx, e, { player, playing: game.state === 'playing' });
-  if (e.elite) drawEliteHalo(e);
+  // every enemy but the boss is drawn by src/enemy-art.js
+  if (e.type !== 'boss') return drawArtEnemy(ctx, e, { player, playing: game.state === 'playing' });
   const look = Math.atan2(player.y - e.y, player.x - e.x);
   ctx.save(); ctx.translate(e.x, e.y);
   if (e.stun > 0) { ctx.rotate(Math.sin(e.t * 20) * 0.15); }
-  const white = e.flash > 0;
-  switch (e.type) {
-    case 'bunny': {
-      const sq = 1 + Math.sin(e.t * 14) * 0.08;
-      ctx.scale(1 / sq, sq);
-      ctx.fillStyle = OUTLINE;
-      for (let i = 0; i < 9; i++) { const a = (i / 9) * TAU + e.t; ctx.beginPath(); ctx.arc(Math.cos(a) * 7, Math.sin(a) * 7, 7.6, 0, TAU); ctx.fill(); }
-      ctx.fillStyle = white ? '#fff' : '#ddd5c6';
-      for (let i = 0; i < 9; i++) { const a = (i / 9) * TAU + e.t; ctx.beginPath(); ctx.arc(Math.cos(a) * 7, Math.sin(a) * 7, 6, 0, TAU); ctx.fill(); }
-      ctx.beginPath(); ctx.arc(0, 0, 9, 0, TAU); ctx.fill();
-      rim(13, 0.5);
-      eyes(0, -1, 4, 3, look);
-      break;
-    }
-    case 'notice': {
-      ctx.rotate(Math.sin(e.t * 6) * 0.5);
-      ctx.scale(Math.abs(Math.cos(e.t * 4)) * 0.5 + 0.6, 1);
-      ctx.fillStyle = OUTLINE; ctx.fillRect(-10.5, -12.5, 21, 25);
-      ctx.fillStyle = white ? '#fff' : '#f4efe1'; ctx.fillRect(-9, -11, 18, 22);
-      ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 2; ctx.strokeRect(-6, -3, 12, 7);
-      ctx.fillStyle = '#c0392b'; ctx.fillRect(-6, -8, 12, 2);
-      ctx.fillStyle = '#999'; ctx.fillRect(-6, 7, 9, 1.5);
-      break;
-    }
-    case 'patron': {
-      const charge = e.atkT < 0.5 ? 1 + (0.5 - e.atkT) * 0.6 : 1;
-      ctx.scale(charge, charge);
-      ctx.fillStyle = OUTLINE; ctx.beginPath(); ctx.arc(0, 0, 16, 0, TAU); ctx.fill();
-      ctx.fillStyle = white ? '#fff' : '#ff9f43'; ctx.beginPath(); ctx.arc(0, 0, 14, 0, TAU); ctx.fill();
-      ctx.strokeStyle = '#b85c12'; ctx.lineWidth = 2; ctx.stroke();
-      rim(14);
-      eyes(0, -5, 5, 3, look);
-      ctx.fillStyle = '#3a0d0d'; ctx.beginPath(); ctx.ellipse(0, 5, 6, 4 + Math.abs(Math.sin(e.t * 12)) * 3, 0, 0, TAU); ctx.fill();
-      break;
-    }
-    case 'worm': {
-      const head = !e.leader;
-      ctx.fillStyle = OUTLINE; ctx.beginPath(); ctx.arc(0, 0, head ? 13 : 11, 0, TAU); ctx.fill();
-      ctx.fillStyle = white ? '#fff' : head ? '#ff8fb1' : '#7bd88f';
-      ctx.beginPath(); ctx.arc(0, 0, head ? 11 : 9, 0, TAU); ctx.fill();
-      ctx.strokeStyle = head ? '#b34d6d' : '#3c8d50'; ctx.lineWidth = 2; ctx.stroke();
-      rim(head ? 11 : 9, 0.45);
-      if (head) {
-        eyes(0, -2, 4, 3, look);
-        ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-7, -2); ctx.lineTo(7, -2); ctx.stroke();
-      }
-      break;
-    }
-    case 'golem': {
-      ctx.fillStyle = OUTLINE; ctx.beginPath(); ctx.roundRect(-22.5, -22.5, 45, 45, 10); ctx.fill();
-      ctx.fillStyle = white ? '#fff' : '#b8860b';
-      ctx.beginPath(); ctx.roundRect(-20, -20, 40, 40, 8); ctx.fill();
-      ctx.fillStyle = 'rgba(255,226,170,0.35)'; ctx.fillRect(-16, -19, 30, 2);
-      ctx.strokeStyle = '#6b4f0c'; ctx.lineWidth = 3; ctx.stroke();
-      ctx.fillStyle = '#6b4f0c'; ctx.font = 'bold 22px ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('$', 0, 4);
-      eyes(0, -10, 8, 3, look, '#ffef9f');
-      ctx.textBaseline = 'alphabetic';
-      if (e.hp < e.maxHp) { ctx.fillStyle = '#000'; ctx.fillRect(-18, 24, 36, 4); ctx.fillStyle = '#ffd54a'; ctx.fillRect(-18, 24, 36 * (e.hp / e.maxHp), 4); }
-      break;
-    }
-    case 'coin': {
-      ctx.scale(Math.abs(Math.cos(e.t * 8)) * 0.7 + 0.3, 1);
-      ctx.fillStyle = OUTLINE; ctx.beginPath(); ctx.arc(0, 0, 8.8, 0, TAU); ctx.fill();
-      ctx.fillStyle = white ? '#fff' : '#ffd54a'; ctx.beginPath(); ctx.arc(0, 0, 7, 0, TAU); ctx.fill();
-      ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 2; ctx.stroke();
-      break;
-    }
-    case 'boss': drawBoss(e, look, white); break;
-  }
+  drawBoss(e, look, e.flash > 0);
   ctx.restore();
 }
 

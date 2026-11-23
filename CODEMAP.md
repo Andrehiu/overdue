@@ -35,9 +35,9 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/backend.js` | 84 | Score storage. The game is fully static, so there are two places a Hall of Fame can live: |
 | `src/catalogue.js` | 140 | Built-in book catalogue: the titles you throw and the authors bosses are named after. |
 | `src/doors.js` | 65 | Story doors: after most rooms you pick the next room from 2 doors. Pure module (no DOM) so it is unit-tested. |
-| `src/enemy-art.js` | 512 | Enemy art prototypes (v1.12.0 proposal). URL switch: ?art=a/b/c  (&eyes=1 adds glowing eyes in the dark). |
+| `src/enemy-art.js` | 396 | Enemy art (v1.12.0): every enemy except the boss is drawn here. Look "Blend": library characters (own face per type) |
 | `src/flowfield.js` | 102 | Dijkstra flow field: one search from the player gives every enemy a path around the shelves. |
-| `src/main.js` | 2557 | OVERDUE! — Night Shift at the Meme Library |
+| `src/main.js` | 2461 | OVERDUE! — Night Shift at the Meme Library |
 | `src/meta.js` | 99 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
 | `src/palette.js` | 52 | Projectile colours. Pure module (no DOM), unit-tested. |
 | `src/story.js` | 154 | Story mode: ten handmade library wings (7 rooms each), unlocked in order. Pure module (no DOM) so it is unit-tested. |
@@ -47,6 +47,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/waves.js` | 59 | Budget-based wave composer. Pure + seeded => every run with the same seed plays the same waves. |
 | `test/balance.test.js` | 116 | Balance bot (v1.7.1 tooling): pure helpers only, no browser. See scripts/balance-lib.mjs. |
 | `test/doors.test.js` | 125 | Story doors (v1.7.0): pure rules, no DOM. |
+| `test/enemy-art.test.js` | 35 | Enemy art colours and the patron ripple (pure data from src/enemy-art.js; no canvas needed). |
 | `test/game-logic.test.js` | 612 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
 | `test/story-meta.test.js` | 270 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
 | `scripts/qa/run.mjs` | 732 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
@@ -80,7 +81,7 @@ DOORS:11 · POOL:21 · FIXED_AFTER:22 · doorOffer:25 · applyDoor:36 · doorRew
 
 ## src/enemy-art.js
 
-ART_BURST:26 · cache:29 · canvas:30 · spr:37 · tint:50 · white:56 · outlineOf:58 · goldOf:68 · redOf:69 · put:70 · shape:74 · circ:79 · ell:80 · rrect:81 · dot:82 · bead:85 · starPath:90 · bunnyA:105 · bunnyB:111 · noticeBody:130 · patronShoulders:160 · patronHead:165 · patronPhone:183 · wormHead:190 · SPINE:207 · wormSpine:208 · wormRad:213 · golemA:216 · golemStack:226 · coinBody:241 · coinFace:246 · crownSprite:252 · setFor:262 · bodyWithOutline:312 · hopY:323 · artShadowK:325 · depthOf:331 · isHead:332 · drawArtEnemy:338 · drawArtWorms:437 · drawGlowEyes:475
+COL:19 · GOLD_TYPES:27 · BURST:30 · cache:36 · canvas:37 · spr:44 · tint:57 · white:63 · outlineOf:65 · goldOf:75 · redOf:76 · put:77 · shape:81 · circ:86 · ell:87 · dot:88 · bead:91 · bunnyBody:96 · noticeBody:115 · patronShoulders:134 · patronHead:139 · patronPhone:154 · wormHead:161 · wormRad:174 · golemStack:177 · coinBody:192 · coinFace:197 · crownSprite:203 · setFor:213 · bodyWithOutline:258 · hopY:269 · shadowK:271 · rippleOf:280 · depthOf:283 · isHead:284 · drawEnemy:287 · drawWorms:364
 
 ## src/flowfield.js
 
@@ -95,10 +96,10 @@ NEIGH:4 · canStep:44 · computeFlowField:54 · lineOfSight:91
 - **Run / wave flow** (252–724): keepAwake:256 · startRun:262 · clearWorld:285 · startWave:291 · bannerQueue:318 · banner:319 · isSurvive:325 · endSurvive:328 · waveCleared:339 · resolveMystery:368 · showUpgrades:381 · afterPick:397 · nextRoom:402 · currentDoors:411 · showDoors:412 · chooseDoor:440 · KIND_LABEL:453 · saveTips:458 · tipSeen:459 · markTip:460 · codex:464 · saveCodex:465 · cardsArmed:469 · currentChoices:471 · rollOpts:472 · showPerkTip:475 · renderCards:486 · renderBuild:569 · pop:600 · closeBuildPop:601 · openBuildPop:605 · renderReach:655 · renderCodex:673 · pause:697 · resume:707 · die:714
 - **Spawning** (725–808): DEF:728 · hpScaleNow:739 · makeEnemy:740 · spawnPoint:759 · updateSpawning:769 · materialise:787
 - **Effects helpers** (809–837): shake:812 · addLight:815 · floatText:819 · particle:822 · burst:823 · pages:831
-- **Update** (838–1545): step:841 · moveInput:876 · nearestEnemy:889 · updatePlayer:899 · collideWorld:988 · spawnBook:1001 · fire:1016 · abilityReady:1038 · inkBurst:1049 · nextToShelf:1063 · doShhh:1071 · updateFlow:1108 · seek:1119 · updateEnemies:1131 · bossAI:1220 · shootHazard:1273 · fan:1278 · radial:1279 · damageEnemy:1281 · killEnemy:1310 · buzz:1352 · hurtPlayer:1357 · updateBooks:1391 · orbiterPositions:1464 · updateOrbiters:1473 · updateHazards:1487 · updateRings:1500 · updatePickups:1513 · updateParticles:1530
-- **Rendering** (1546–2185): BOOK_PALETTE:1549 · buildBackground:1551 · lampPositions:1639 · lightSprite:1647 · glowCache:1653 · glowSprite:1654 · renderLights:1663 · render:1702 · drawThrownBook:1751 · drawBook:1784 · drawPlayer:1792 · rim:1835 · eyes:1840 · drawEliteHalo:1848 · drawEnemy:1863 · drawBoss:1943 · drawTelegraph:1977 · drawPickup:1985 · hazardSprite:1998 · drawHazards:2006 · drawRing:2023 · drawParticles:2030 · heartPath:2043 · FONT:2053 · txt:2054 · drawHUD:2060 · cooldown:2127 · btnCache:2143 · setTouchButton:2144 · drawCrosshair:2156 · drawStick:2165 · drawAimStick:2173
-- **DOM screens, settings, leaderboard** (2186–2482): SCREENS:2189 · showScreen:2191 · pinnedObservers:2201 · fitPinnedRow:2202 · renderFineBadges:2225 · renderShop:2230 · defaultWing:2264 · wingStatus:2268 · renderStory:2274 · bankRun:2307 · inRun:2314 · setSetting:2339 · toast:2353 · toggleFullscreen:2386 · loadLeaderboard:2396 · showGameOver:2419
-- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2483–2557): frame:2488 · checkForUpdate:2511
+- **Update** (838–1543): step:841 · moveInput:876 · nearestEnemy:889 · updatePlayer:899 · collideWorld:988 · spawnBook:1001 · fire:1016 · abilityReady:1038 · inkBurst:1049 · nextToShelf:1063 · doShhh:1071 · updateFlow:1108 · seek:1119 · updateEnemies:1131 · bossAI:1220 · shootHazard:1273 · fan:1278 · radial:1279 · damageEnemy:1281 · killEnemy:1310 · buzz:1350 · hurtPlayer:1355 · updateBooks:1389 · orbiterPositions:1462 · updateOrbiters:1471 · updateHazards:1485 · updateRings:1498 · updatePickups:1511 · updateParticles:1528
+- **Rendering** (1544–2089): BOOK_PALETTE:1547 · buildBackground:1549 · lampPositions:1637 · lightSprite:1645 · glowCache:1651 · glowSprite:1652 · renderLights:1661 · render:1700 · drawThrownBook:1748 · drawBook:1781 · drawPlayer:1789 · rim:1832 · drawEnemy:1837 · drawBoss:1847 · drawTelegraph:1881 · drawPickup:1889 · hazardSprite:1902 · drawHazards:1910 · drawRing:1927 · drawParticles:1934 · heartPath:1947 · FONT:1957 · txt:1958 · drawHUD:1964 · cooldown:2031 · btnCache:2047 · setTouchButton:2048 · drawCrosshair:2060 · drawStick:2069 · drawAimStick:2077
+- **DOM screens, settings, leaderboard** (2090–2386): SCREENS:2093 · showScreen:2095 · pinnedObservers:2105 · fitPinnedRow:2106 · renderFineBadges:2129 · renderShop:2134 · defaultWing:2168 · wingStatus:2172 · renderStory:2178 · bankRun:2211 · inRun:2218 · setSetting:2243 · toast:2257 · toggleFullscreen:2290 · loadLeaderboard:2300 · showGameOver:2323
+- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2387–2461): frame:2392 · checkForUpdate:2415
 
 ## src/meta.js
 
@@ -149,6 +150,13 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 - 77: door fines: Rare ×2, Break Room halved (rounded up, min 3), the others normal
 - 89: Mystery Shelf: deterministic, only unowned unbanned cursed books, otherwise a bonus perk
 - 109: Rare Books (v1.7.1): strictly harder in every wing and room; the bite starts at wing 4
+
+## test/enemy-art.test.js
+
+- 7: every enemy colour is in the enemy hue range, except the gold golem and coin
+- 15: kill-burst colours follow the body hues (gold types excepted)
+- 23: patron ripple shows only while charging, and stays faint
+- 31: only bunnies bob their shadow
 
 ## test/game-logic.test.js
 
