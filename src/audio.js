@@ -27,7 +27,7 @@ export class SoundEngine {
 
   /** Must be called from a user gesture (browser autoplay policy). */
   init() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    if (this.ctx) { this.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     const ctx = (this.ctx = new AC());
@@ -45,6 +45,13 @@ export class SoundEngine {
     const d = this.noiseBuf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this.startMusic();
+  }
+
+  /** iOS can leave the context 'suspended' or 'interrupted' after an app switch / call; nudge it back. Safe to call any time. */
+  resume() {
+    const c = this.ctx;
+    if (!c || c.state === 'running' || c.state === 'closed') return;
+    try { const r = c.resume(); if (r && r.catch) r.catch(() => {}); } catch { /* needs a user gesture; the next touch retries */ }
   }
 
   setSfx(on) { this.sfxOn = on; if (this.sfx) this.sfx.gain.setTargetAtTime(on ? 0.55 : 0, this.ctx.currentTime, 0.05); }

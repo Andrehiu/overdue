@@ -360,6 +360,13 @@ body.portrait .shop-list { grid-template-columns: 1fr; width: 100%; }
 /* 4-card hands (Bigger Card Catalogue): slimmer cards so a row still fits */
 .cards:has(> .card-wrap:nth-child(4)) .card { width: 11.5em; }
 .cards.dealing .card-wrap:nth-child(4) { animation-delay: .21s; }
+/* v1.12.1: 4 and 5 cards always sit in ONE row and shrink to fit (never wrap, never push the build strip off screen) */
+@media not (orientation: portrait) {
+  .cards:has(> .card-wrap:nth-child(4)) { flex-wrap: nowrap; gap: .5em; width: 100%; max-width: 100%; }
+  .cards:has(> .card-wrap:nth-child(4)) > .card-wrap { flex: 1 1 0; min-width: 0; max-width: 13em; }
+  .cards:has(> .card-wrap:nth-child(4)) .card { width: 100%; padding-right: .6em; }
+  .cards:has(> .card-wrap:nth-child(5)) { font-size: .88em; gap: .4em; }
+}
 body.portrait .cards:has(> .card-wrap:nth-child(4)) .card { width: 100%; padding-top: .7em; padding-bottom: 1.1em; }
 .wing-grid .wing:disabled:hover { transform: none; background: var(--tile); border-color: rgba(243, 234, 210, .25); }
 #wingLock:empty { display: none; }
@@ -391,8 +398,11 @@ body.debug .debug-only { display: flex; }
 body.portrait .reach-row { grid-template-columns: 1fr; }
 /* Menus: the bottom button row stays pinned to the bottom edge (with a fade) while the content above scrolls.
    Applies to every screen whose last child is a .menu.row (howto, settings, leaderboard, codex, story, shop, game over). */
-.screen > .menu.row:last-child { position: sticky; bottom: 0; z-index: 2; width: 100%; box-sizing: border-box; flex-shrink: 0; justify-content: center; flex-wrap: wrap;
-  padding: .5em 0 calc(.5em + env(safe-area-inset-bottom, 0px));
+.screen > .menu.row:last-child { position: sticky; bottom: calc(-1 * var(--pad-b)); z-index: 2; box-sizing: border-box; flex-shrink: 0; justify-content: center; flex-wrap: wrap;
+  /* v1.12.1: the band runs edge to edge: negative margins cancel the screen padding, padding puts the buttons back inside */
+  align-self: stretch; margin-right: calc(-1 * var(--pad-r)); margin-bottom: calc(-1 * var(--pad-b)); margin-left: calc(-1 * var(--pad-l));
+  --row-inset: max(0px, calc((100% + var(--pad-l) + var(--pad-r) - var(--row-cap, 100vw)) / 2));
+  padding: .5em max(var(--pad-r), var(--row-inset)) calc(.5em + var(--pad-b)) max(var(--pad-l), var(--row-inset));
   background: linear-gradient(to bottom, transparent, rgba(5, 3, 12, .92) 35%); }
 #goBuild { justify-content: flex-start; padding-left: 0; }
 
@@ -410,12 +420,12 @@ body.portrait .reach-row { grid-template-columns: 1fr; }
 @media (prefers-reduced-motion: reduce) { #rotate svg { animation: none; } }
 
 /* Safe areas (v1.4.2): status bar, notch and home indicator never sit on menu text or buttons */
-.screen { padding: max(1.2em, env(safe-area-inset-top, 0px)) max(1.2em, env(safe-area-inset-right, 0px))
-  max(1.2em, env(safe-area-inset-bottom, 0px)) max(1.2em, env(safe-area-inset-left, 0px)); }
+.screen { --pad-r: max(1.2em, env(safe-area-inset-right, 0px)); --pad-b: max(1.2em, env(safe-area-inset-bottom, 0px)); --pad-l: max(1.2em, env(safe-area-inset-left, 0px));
+  padding: max(1.2em, env(safe-area-inset-top, 0px)) var(--pad-r) var(--pad-b) var(--pad-l); }
 
 /* Short stages (landscape phones, iPads with the browser bar): menus fit without scrolling where they can */
 @media (max-height: 640px) {
-  .screen { gap: .4em; padding-top: max(.7em, env(safe-area-inset-top, 0px)); padding-bottom: max(.5em, env(safe-area-inset-bottom, 0px)); }
+  .screen { gap: .4em; --pad-b: max(.5em, env(safe-area-inset-bottom, 0px)); padding-top: max(.7em, env(safe-area-inset-top, 0px)); padding-bottom: var(--pad-b); }
   .screen h2 { margin: 0; font-size: 1.3em; }
   #shop > p.small, #story > p.small { display: none; }
   .shop-list .reno { padding: .25em .5em; }
@@ -424,7 +434,7 @@ body.portrait .reach-row { grid-template-columns: 1fr; }
   #settings .progress-tools { margin-top: .2em; }
   #settings .progress-tools p { font-size: .75em; margin: 0; line-height: 1.25; }
   #settings .version-label { margin: 0; }
-  .screen > .menu.row:last-child { margin-top: 0; padding-top: .3em; padding-bottom: max(.25em, env(safe-area-inset-bottom, 0px)); flex-wrap: nowrap; gap: .4em; }
+  .screen > .menu.row:last-child { margin-top: 0; padding-top: .3em; padding-bottom: calc(.25em + var(--pad-b)); flex-wrap: nowrap; gap: .4em; }
   /* v1.8.0: on short screens the pinned row is ONE compact line, as wide as the screen allows */
   .screen > .menu.row:last-child button { font-size: .85em; padding: .35em .9em; white-space: nowrap; min-width: 0; }
   .screen > .menu.row:last-child .coin, #gameover .menu.row button .coin { display: none; }

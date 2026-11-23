@@ -90,11 +90,28 @@ function updateRotateOverlay(canPause = false) {
   // Pause a run in progress; no auto-resume on rotating back, so the player isn't hit while turning the phone.
   if (canPause && need && !was && game.state === 'playing') pause();
 }
-addEventListener('resize', () => {
+/** Re-check orientation and layout. iOS fires a portrait-sized resize while the page is hidden (app switcher) and
+ *  often none on return, so this also runs on visibility / pageshow / orientation changes and once more shortly after. */
+function relayout(canPause = false) {
+  if (document.hidden) return; // sizes reported while hidden are not the real ones
   // Re-shape the arena on rotation only while no run is in progress.
   if (game.state === 'title' || game.state === 'gameover') applyLayout(); else resize();
-  updateRotateOverlay(true);
-});
+  updateRotateOverlay(canPause);
+}
+let relayoutTimer = 0;
+function relayoutSoon(canPause = false) {
+  relayout(canPause);
+  clearTimeout(relayoutTimer);
+  relayoutTimer = setTimeout(() => relayout(canPause), 300);
+}
+addEventListener('resize', () => relayout(true));
+addEventListener('orientationchange', () => relayoutSoon(true));
+addEventListener('pageshow', () => relayoutSoon());
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { relayoutSoon(); sound.resume(); } });
+addEventListener('pageshow', () => sound.resume());
+// Any touch/click/key also resumes a context iOS left suspended (the only reliable way: it needs a user gesture)
+for (const ev of ['touchend', 'pointerdown', 'keydown']) addEventListener(ev, () => sound.resume(), { passive: true, capture: true });
+try { matchMedia('(orientation: portrait)').addEventListener('change', () => relayoutSoon(true)); } catch { /* old browsers */ }
 
 // ======================================================================
 // Input: keyboard + mouse, touch (virtual stick), gamepad
@@ -524,7 +541,7 @@ function renderCards(choices) {
       if (u.kind === 'combo' || u.kind === 'master') { codex.found.add(u.id); saveCodex(); }
       if (u.kind === 'combo') toast(`📚 ${u.name} added to your Collected Works`);
       else if (u.kind === 'master') toast(`🏆 Masterwork: ${u.name}`);
-      if ((u.kind === 'combo' || u.kind === 'master') && !tipSeen('codex')) { markTip('codex'); setTimeout(() => toast(TIPS.codex), 1700); }
+      if ((u.kind === 'combo' || u.kind === 'master') && !tipSeen('codex')) setTimeout(() => { if (game.state === 'gameover' || tipSeen('codex')) return; markTip('codex'); toast(TIPS.codex); }, 1700);
       if (u.kind === 'perk' && mw) toast(`🏆 ${u.name} mastered! ${mw.name} will be offered next`);
       afterPick();
     });
@@ -2116,7 +2133,8 @@ function fitPinnedRow(scr) {
     const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
     const one = btns.reduce((a, b) => a + b.getBoundingClientRect().width, 0) + gap * Math.max(0, btns.length - 1);
     const nowrap = getComputedStyle(row).flexWrap === 'nowrap';
-    row.style.maxWidth = w && !short ? `max(${Math.ceil(w)}px, 12em${nowrap ? `, ${Math.ceil(one)}px` : ''})` : '';
+    // v1.12.1: the band itself is full width; the cap now only insets the buttons (--row-cap drives the row's side padding)
+    if (w && !short) row.style.setProperty('--row-cap', `max(${Math.ceil(w)}px, 12em${nowrap ? `, ${Math.ceil(one)}px` : ''})`); else row.style.removeProperty('--row-cap');
   };
   fit();
   if (pinnedObservers.has(scr) || typeof ResizeObserver === 'undefined') return;
@@ -2256,6 +2274,7 @@ document.querySelectorAll('#settings input[data-k]').forEach((box) => {
 let toastTimer = 0;
 function toast(msg) {
   const el = $('#toast');
+  if (game.state === 'gameover') return; // v1.12.1: toasts never sit on the end-screen headings
   el.textContent = msg; el.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (el.hidden = true), 1600);
@@ -2360,6 +2379,7 @@ function showGameOver() {
   $('#nameInput').value = loadJSON('overdue.name.v1').name || '';
   renderBuild($('#goBuild'));
   $('#goBoard').hidden = story;
+  $('#toast').hidden = true; clearTimeout(toastTimer);
   showScreen('gameover');
   if (!story) loadLeaderboard($('#goList'));
   if (!touch.enabled) (story ? (nextBtn.hidden ? $('#btnAgain') : nextBtn) : $('#nameInput')).focus();
