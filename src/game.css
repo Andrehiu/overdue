@@ -101,6 +101,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 html, body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; }
 input { -webkit-user-select: text; user-select: text; }
 .touch-hint { display: none; color: var(--teal); }
+.touch-hint[hidden] { display: none !important; }
 body.touch .touch-hint, body.portrait .touch-hint { display: block; }
 .fs-only { display: none; }
 @media (pointer: coarse) { .fs-only { display: block; } .touch-hint { display: block; } }
@@ -187,9 +188,6 @@ body.portrait .card .preview { flex-basis: 100%; }
   box-shadow: 0 .5em 1.2em rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(0, 0, 0, .08);
   transition: transform .12s ease-out, box-shadow .12s;
 }
-/* punch hole where the card sat on the catalogue rod */
-.cards .card::after { content: ""; position: absolute; left: 50%; bottom: .45em; width: .7em; height: .7em; margin-left: -.35em;
-  border-radius: 50%; background: var(--bg); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .6); }
 .cards .card:hover, .cards .card:focus-visible { transform: translateY(-3px) rotate(-.6deg); background-color: transparent;
   box-shadow: 0 .8em 1.6em rgba(0, 0, 0, .6), 0 0 0 3px var(--accent); outline: none; }
 .cards .card strong { color: var(--ink-red); font-size: 1.05em; line-height: 1.2; }
@@ -289,8 +287,7 @@ body.touch .cards .card .key { display: none; }
 .banish-slot { visibility: hidden; display: block; }
 /* Masterwork stamp sits inside the foil edge */
 .cards .card.master .stamp { top: 1.1em; right: 1.1em; }
-/* phones: punch hole in the left margin; cards in thumb reach */
-body.portrait .cards .card::after { left: .85em; top: 50%; bottom: auto; margin-left: 0; margin-top: -.35em; }
+/* phones: cards in thumb reach */
 body.portrait #upgrade { justify-content: flex-end; padding-bottom: 3em; }
 
 /* ---- Menus never clip ----
@@ -473,6 +470,7 @@ body.portrait .reach-row { grid-template-columns: 1fr; }
 .doors .door .icon { font-size: 2.4em; line-height: 1; margin-top: .25em; }
 .doors .door strong { color: var(--door-glow); font-size: 1.1em; line-height: 1.2; }
 .doors .door .line { color: var(--door-sub); font-size: .85em; line-height: 1.35; }
+body.touch .doors .door .key { display: none; }
 .doors .door .key { position: absolute; top: 2.1em; left: 2.3em; width: 1.7em; height: 1.7em; line-height: 1.7em; border-radius: 50%; font-size: .7em; font-weight: 700;
   background: rgba(0, 0, 0, .4); box-shadow: inset 0 0 0 1px var(--door-brass); color: var(--door-sub); }
 .doors .door.rare { --door-wood: #4a2a5e; --door-wood-hi: #6a3c86; }
@@ -511,3 +509,23 @@ body.portrait .doors { flex-direction: column; align-items: center; }
 #settings .tool-row { gap: .5em; margin-top: 0; }
 @media (max-height: 640px) { .perk-tip { font-size: .75em; padding: .2em .7em; } .perks-box { font-size: .72em; padding: .2em .6em; } }
 .perks-box span + span::before { content: "·"; margin-right: .9em; opacity: .6; }
+
+/* ---- v1.12.2 polish ---- */
+/* banish: only the banished card leaves; its replacement deals into the same slot */
+.card-wrap.leaving { animation: banish-out .3s ease-in both; pointer-events: none; }
+.card-wrap.leaving .card .stamp { color: #d3263a; font-size: 2.4em; opacity: 1; top: 30%; right: 50%; transform: translateX(50%) rotate(-12deg); }
+.card-wrap.dealt-one { animation: deal .35s ease-out both; }
+@keyframes banish-out { to { opacity: 0; transform: translateY(.8em) scale(.9) rotate(4deg); } }
+@media (prefers-reduced-motion: reduce) { .card-wrap.leaving, .card-wrap.dealt-one { animation: none; } }
+/* Mystery bonus pick: 1 of 2 / 2 of 2 pips */
+.pick-pips { margin-left: .6em; font-size: .6em; letter-spacing: .15em; color: var(--accent); vertical-align: middle; }
+/* free perks (Head Start / Mystery Shelf): small card, top-left under the hearts, never blocks play */
+#freePerks { position: absolute; left: 1em; top: 5em; z-index: 5; pointer-events: none; }
+.free-perk { pointer-events: auto; display: grid; grid-template-columns: auto 1fr; column-gap: .6em; align-items: center; text-align: left; max-width: 15em;
+  padding: .5em .8em; border-radius: .5em; border: 2px solid var(--accent); background: rgba(24, 14, 44, .92); color: var(--ink); animation: deal .35s ease-out both; }
+.free-perk .fp-label { grid-column: 1 / 3; font-size: .65em; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.free-perk .fp-icon { grid-row: 2 / 4; font-size: 1.8em; line-height: 1; }
+.free-perk strong { font-size: .95em; }
+.free-perk .fp-gain { font-size: .8em; color: var(--muted); }
+.build-item.fresh { animation: chip-pulse 1s ease-in-out 3; border-color: var(--chip-glow); }
+@media (prefers-reduced-motion: reduce) { .free-perk { animation: none; } .build-item.fresh { animation: none; box-shadow: 0 0 .6em rgba(255, 213, 74, .7); } }
