@@ -333,7 +333,7 @@ async function screensFlow(name, opts, full) {
       const lum = eval(LUMSRC);
       const s = document.getElementById('doors'), vw = innerWidth, vh = innerHeight;
       const ds = [...s.querySelectorAll('.door')].map((b) => { const r = b.getBoundingClientRect(); return { id: b.dataset.door, ok: r.left >= -1 && r.right <= vw + 1 && r.top >= -1 && r.bottom <= vh + 1, hit: (() => { const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return h === b || b.contains(h); })(),
-        keyClear: (() => { const k = b.querySelector('.key').getBoundingClientRect(), i = b.querySelector('.icon').getBoundingClientRect(); return k.right <= i.left || k.left >= i.right || k.bottom <= i.top || k.top >= i.bottom; })() }; });
+        keyClear: (() => { if (getComputedStyle(b.querySelector('.key')).display === 'none') return true; const k = b.querySelector('.key').getBoundingClientRect(), i = b.querySelector('.icon').getBoundingClientRect(); return k.right <= i.left || k.left >= i.right || k.bottom <= i.top || k.top >= i.bottom; })() }; });
       return { state: __overdue.game.state, visible: !s.hidden, ds, noScroll: s.scrollHeight <= s.clientHeight + 1,
         lum: lum(getComputedStyle(s.querySelector('.door strong')).color), lineLum: lum(getComputedStyle(s.querySelector('.door .line')).color), title: document.getElementById('doorsTitle').textContent };
     }, `(${LUM})`);
@@ -362,9 +362,9 @@ async function screensFlow(name, opts, full) {
     record(area, 'Break Room never heals above max', await page.evaluate(() => __overdue.player.hp === 5));
     const intro = await page.evaluate(() => { const O = __overdue; O.startWave(1); return { sub: O.game.bannerSub, want: O.WINGS ? O.WINGS[O.game.wingN - 1].intro : null }; });
     record(area, 'story room 1 banner shows the wing intro', !!intro.sub && intro.sub !== 'Front Desk' && intro.sub.length > 10, intro.sub);
-    await page.evaluate(() => { const O = __overdue; O.stats.maxHp = 5; O.player.hp = 5; O.game.wave = 4; O.nextRoom(); }); await page.waitForTimeout(600);
-    const d5 = await page.evaluate(() => ({ state: __overdue.game.state, n: document.querySelectorAll('#doorCards .door').length }));
-    record(area, 'a 2-door screen appears after the elite room (room 4)', d5.state === 'doors' && d5.n === 2, JSON.stringify(d5));
+    await page.evaluate(() => { const O = __overdue; O.stats.maxHp = 5; O.player.hp = 5; O.game.wave = 3; O.nextRoom(); }); await page.waitForTimeout(600);
+    const d5 = await page.evaluate(() => ({ state: __overdue.game.state, n: document.querySelectorAll('#doors:not([hidden]) #doorCards .door').length, door: __overdue.game.door, toast: /Elite/.test(document.getElementById('toast').textContent) && !document.getElementById('toast').hidden }));
+    record(area, 'before the elite room (after room 3) there is no door screen: straight into the elite room with a banner', d5.state === 'playing' && d5.n === 0 && d5.door === 'elite' && d5.toast, JSON.stringify(d5));
     await page.evaluate(() => { __overdue.startWave(1); });
     // v1.7.1: SHHH is ready at the start of every story room; endless keeps its cooldown
     const shhhStory = await page.evaluate(() => { const O = __overdue; O.player.shhhT = 9; O.startWave(2); return O.player.shhhT; });
@@ -373,7 +373,24 @@ async function screensFlow(name, opts, full) {
     record(area, 'endless: SHHH cooldown carries over', shhhEndless === 9, `shhhT ${shhhEndless}`);
     // v1.7.1: Mystery Shelf's bonus pick says why you get a second perk
     const bonusTitle = await page.evaluate(() => { const O = __overdue; O.game.bonusPicks = 1; O.showUpgrades(); return document.querySelector('#upgradeTitle').textContent; });
-    record(area, 'Mystery Shelf bonus pick screen is titled', bonusTitle === '🎲 Mystery Shelf: bonus perk!', bonusTitle);
+    record(area, 'Mystery bonus pick is labelled 1 of 2', /^🎲 Mystery prize: bonus pick \(1 of 2\)/.test(bonusTitle), bonusTitle);
+    // v1.12.2: banish re-deals only that card; no hole-punch; free perks show as a card; no "!" on crits
+    const bn = await page.evaluate(async () => {
+      const O = __overdue; O.game.pickIsBonus = false; O.game.bonusPicks = 0; O.game.afterBonus = false; O.game.banishes = 1; O.game.state = 'upgrade';
+      O.showCards(['hardcover', 'speedreader', 'trilogy']);
+      const wraps = [...document.querySelectorAll('#cards .card-wrap')]; wraps.forEach((w, i) => { w.dataset.m = 'k' + i; });
+      const hole = getComputedStyle(wraps[0].querySelector('.card'), '::after').content;
+      await new Promise((r) => setTimeout(r, 650));
+      wraps[0].querySelector('.banish')?.click();
+      await new Promise((r) => setTimeout(r, 700));
+      const after = [...document.querySelectorAll('#cards .card-wrap')];
+      return { n: wraps.length, after: after.length, keptOthers: after.slice(1).every((w, i) => w.dataset.m === 'k' + (i + 1)), replaced: !after[0].dataset.m, hole };
+    });
+    record(area, 'banish re-deals only the banished card; the others keep their place', bn.n === bn.after && bn.keptOthers && bn.replaced, JSON.stringify(bn));
+    record(area, 'perk cards have no hole-punch dot', bn.hole === 'none' || bn.hole === 'normal', bn.hole);
+    const fp = await page.evaluate(() => { const O = __overdue; O.game.state = 'playing'; O.showFreePerk('hardcover', 'Head Start'); const el = document.querySelector('#freePerks .free-perk'); return { has: !!el, text: el?.textContent || '' }; });
+    record(area, 'free perk shows as a card with its label', fp.has && /Head Start/.test(fp.text), fp.text);
+    await page.evaluate(() => { document.querySelector('#freePerks .free-perk')?.click(); __overdue.game.state = 'upgrade'; });
     await page.evaluate(() => { __overdue.game.pickIsBonus = false; __overdue.startWave(2); });
     // v1.9.0: Survive rooms (wing 1 room 3): countdown HUD, spawns keep coming, the room clears itself when the timer ends
     await page.evaluate(() => { const O = __overdue; O.startRun('story', 1); O.startWave(3); O.god(); }); await page.waitForTimeout(1500);

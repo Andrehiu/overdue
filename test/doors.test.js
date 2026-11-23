@@ -122,3 +122,16 @@ test('Rare Books (v1.7.1): strictly harder in every wing and room; the bite star
   const d = difficulty(5, 3);
   for (const id of ['rest', 'mystery', 'stacks']) assert.deepEqual(applyDoor(d, id), d);
 });
+
+test('v1.12.2: fixed Elite / Author doors are walked through without a screen; real choices are not', async () => {
+  const { doorOffer, soleDoor, DOORS } = await load('doors');
+  const { ELITE_ROOM, ROOMS_PER_WING } = await load('story');
+  assert.equal(soleDoor(doorOffer(1, 1, ELITE_ROOM - 1)), 'elite');
+  assert.equal(soleDoor(doorOffer(1, 1, ROOMS_PER_WING - 1)), 'author');
+  for (let r = 1; r < ROOMS_PER_WING; r++) {
+    if (r === ELITE_ROOM - 1 || r === ROOMS_PER_WING - 1) continue;
+    assert.equal(soleDoor(doorOffer(1, 1, r)), null, `room ${r} keeps its 2-door choice`);
+  }
+  assert.equal(soleDoor([]), null);
+  assert.ok(DOORS.mystery.line.includes('50/50'), 'Mystery Shelf says what it is');
+});

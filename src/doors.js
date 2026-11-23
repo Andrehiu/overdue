@@ -11,7 +11,7 @@ import { UPGRADES } from './upgrades.js';
 export const DOORS = {
   rare:    { id: 'rare', icon: '💰', name: 'Rare Books', line: 'More enemies, more elites · ×2 fines', banner: '💰 Rare Books: double fines', eliteAdd: 0.5, budgetMult: 1.3, biteWing: 4, eliteHpMult: 1.5, eliteFireMult: 1.3, fineMult: 2 },
   rest:    { id: 'rest', icon: '☕', name: 'Break Room', line: 'Heal 1 ♥ · fewer fines', banner: '☕ Break Room: +1 ♥, fewer fines', fineMult: 0.5, fineMin: 3, heal: 1 },
-  mystery: { id: 'mystery', icon: '🎲', name: 'Mystery Shelf', line: 'A surprise when you clear it', banner: '🎲 Mystery Shelf: a surprise when cleared' },
+  mystery: { id: 'mystery', icon: '🎲', name: 'Mystery Shelf', line: 'Same room · 50/50: bonus perk or a cursed book', banner: '🎲 Mystery Shelf: 50/50 bonus perk or cursed book' },
   stacks:  { id: 'stacks', icon: '🚪', name: 'The Stacks', line: 'A normal room · normal fines', banner: '🚪 The Stacks: a normal room' },
   // Fixed doors in front of the elite room and the Rogue Author: same screen every room, no choice.
   elite:   { id: 'elite', icon: '★', name: 'Elite room', line: 'They fight back', banner: '★ Elite room: they fight back', fixed: true },
@@ -31,6 +31,9 @@ export function doorOffer(seed, wing, clearedRoom, { atFullHp = false } = {}) {
   if (rng.chance(0.5)) picks.reverse();            // which card is on the left
   return picks.map((id) => (id === 'rest' && atFullHp ? 'stacks' : id));
 }
+
+/** The door to walk through without a choice screen: the single offered door (fixed Elite / Author doors), else null. */
+export function soleDoor(offer) { return offer && offer.length === 1 ? offer[0] : null; }
 
 /** The next room's difficulty with the door applied. Doors only ever make a room harder: never easier. */
 export function applyDoor(diff, doorId) {

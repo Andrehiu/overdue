@@ -12,7 +12,7 @@ import { PLAYER, bookLook } from './palette.js';
 import { BURST, shadowK, drawEnemy as drawArtEnemy, drawWorms } from './enemy-art.js';
 import { SoundEngine } from './audio.js';
 import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
-import { DOORS, doorOffer, applyDoor, doorReward, mysteryPrize } from './doors.js';
+import { DOORS, soleDoor, doorOffer, applyDoor, doorReward, mysteryPrize } from './doors.js';
 import { PROGRESS_KEY, RENOVATIONS, normalizeProgress, applyRenovations, runBonuses, recordRun, level, nextCost, canBuy, buy } from './meta.js';
 
 // ======================================================================
@@ -286,17 +286,17 @@ function startRun(mode = 'endless', wing = 1) {
   const bonus = runBonuses(progress);
   Object.assign(game, { wave: 0, score: 0, kills: 0, combo: 0, comboT: 0, bestCombo: 0, playTime: 0, owned: {}, renews: bonus.renews, banishes: bonus.banishes, banished: new Set(),
     freeze: 0, timeScale: 1, trauma: 0, flash: 0, boss: null, mode, wingN: mode === 'story' ? clamp(wing, 1, WINGS.length) : 1, diff: null,
-    fines: 0, cards: bonus.cards, banked: null, wingCleared: false, door: null, bonusPicks: 0, pickIsBonus: false });
+    fines: 0, cards: bonus.cards, banked: null, wingCleared: false, door: null, bonusPicks: 0, pickIsBonus: false, afterBonus: false });
   stats = applyRenovations(baseStats(), progress);
   player = makePlayer();
   player.hp = stats.maxHp;
   player.revives = bonus.revives;
   // Head Start: free random perks (never specials) before room/wave 1.
   const head = bonus.startPerks ? rollUpgrades(rng, game.owned, bonus.startPerks, rollOpts({ noSpecial: true })) : [];
-  for (const u of head) { game.owned[u.id] = (game.owned[u.id] || 0) + 1; u.apply(stats, player); }
+  freeQueue.length = 0; hideFreePerk();
+  for (const u of head) { queueFreePerk(u, 'Head Start'); game.owned[u.id] = (game.owned[u.id] || 0) + 1; u.apply(stats, player); }
   startWave(1);
-  if (touch.enabled && settings.autoaim === false) setTimeout(() => toast('Auto-aim off: drag a second finger to aim and throw'), head.length ? 1700 : 0);
-  if (head.length) toast(`🎒 Head Start: ${head.map((u) => u.name).join(' + ')}`);
+  if (touch.enabled && settings.autoaim === false) setTimeout(() => toast('Auto-aim off: drag a second finger to aim and throw'), 0);
 }
 
 function clearWorld() {
@@ -329,6 +329,7 @@ function startWave(n) {
   sound.setIntensity(1); sound.setMuffled(false);
   game.state = 'playing';
   showScreen(null);
+  flushFreePerks();
 }
 
 // One big banner at a time: later ones wait their turn instead of stacking.
@@ -360,7 +361,7 @@ function waveCleared() {
   const fine = isStory() ? doorReward(game.wingN, game.wave, game.door) : 1 + Math.floor(game.wave / 5) + (game.wave % 5 === 0 ? 15 : 0);
   game.fines += fine;
   const wingDone = isStory() && game.wave >= BOSS_ROOM;
-  banner(wingDone ? 'WING CLEARED!' : 'SHELF CLEARED!', `+${bonus.toLocaleString()} · +${fine} 🪙${game.noHitWave ? ' · flawless!' : ''}`);
+  banner(wingDone ? 'WING CLEARED!' : 'SHELF CLEARED!', `${isStory() ? '' : `+${bonus.toLocaleString()} · `}+${fine} 🪙${game.noHitWave ? ' · flawless!' : ''}`);
   if (stats.regenPerWave && player.hp < stats.maxHp) {
     player.hp = Math.min(stats.maxHp, player.hp + stats.regenPerWave);
     floatText(player.x, player.y - 24, '+1 ♥ Lifetime Membership', '#ff6b81', 13, 1.4);
@@ -386,12 +387,11 @@ function resolveMystery() {
   const prize = mysteryPrize(game.seed, game.wingN, game.wave, game.owned, { banned: game.banished, lights: settings.lights });
   if (prize.kind === 'cursed') {
     const u = byId(prize.id);
+    queueFreePerk(u, 'Mystery Shelf');   // shown as a card once the next room starts
     game.owned[u.id] = 1; u.apply(stats, player);
-    toast(`🎲 Mystery Shelf: ${u.icon} ${u.name}! ${u.desc}`);
     sound.play('upgrade');
   } else {
-    game.bonusPicks++;
-    toast('🎲 Mystery Shelf: a bonus perk!');
+    game.bonusPicks++;   // the bonus pick screen is labelled "1 of 2" / "2 of 2"
   }
 }
 
@@ -401,10 +401,14 @@ function showUpgrades() {
   sound.setMuffled(true);
   const bonus = game.bonusPicks > 0;
   if (bonus) game.bonusPicks--;
+  const second = !bonus && game.afterBonus;   // the normal pick that follows a Mystery bonus pick
+  if (bonus) game.afterBonus = true; else game.afterBonus = false;
   game.pickIsBonus = bonus;
   const choices = rollUpgrades(rng, game.owned, game.cards || 3, rollOpts());
   if (!choices.length) return bonus ? showUpgrades() : nextRoom();
-  $('#upgradeTitle').textContent = bonus ? '🎲 Mystery Shelf: bonus perk!' : isStory() ? `Room ${game.wave}/${ROOMS_PER_WING} cleared — choose a perk` : `Wave ${game.wave} cleared — choose a perk`;
+  const title = $('#upgradeTitle');
+  title.textContent = bonus ? '🎲 Mystery prize: bonus pick (1 of 2)' : second ? `Room ${game.wave} cleared — your normal pick (2 of 2)` : isStory() ? `Room ${game.wave}/${ROOMS_PER_WING} cleared — choose a perk` : `Wave ${game.wave} cleared — choose a perk`;
+  if (bonus || second) { const p = document.createElement('span'); p.className = 'pick-pips'; p.textContent = bonus ? '●○' : '●●'; p.setAttribute('aria-hidden', 'true'); title.appendChild(p); }
   renderCards(choices);
   showScreen('upgrade');
   if (!touch.enabled) $('#cards button').focus();
@@ -417,10 +421,12 @@ function afterPick() {
 }
 
 function nextRoom() {
-  game.pickIsBonus = false;
+  game.pickIsBonus = false; game.afterBonus = false;
   const full = player.hp >= stats.maxHp;
   const offer = isStory() ? doorOffer(game.seed, game.wingN, game.wave, { atFullHp: full }) : [];
   if (!offer.length) { game.door = null; return startWave(game.wave + 1); }
+  const only = soleDoor(offer);
+  if (only) return enterDoor(only, true);   // fixed Elite / Author door: nothing to choose, so skip the screen
   showDoors(offer);
 }
 
@@ -456,10 +462,16 @@ function showDoors(offer) {
 
 function chooseDoor(id) {
   if (!cardsArmed() || game.state !== 'doors') return;
+  sound.play('click');
+  enterDoor(id, false);
+}
+
+/** Walk through a door: apply it and start the next room. `auto` = no screen was shown, so announce it. */
+function enterDoor(id, auto) {
   const d = DOORS[id];
   game.door = id;
-  sound.play('click');
   startWave(game.wave + 1);
+  if (auto) toast(d.banner, 2600);
   // Break Room: a heart back on entering (never above max).
   if (d.heal && player.hp < stats.maxHp) {
     player.hp = Math.min(stats.maxHp, player.hp + d.heal);
@@ -500,77 +512,23 @@ function showPerkTip(choices) {
   markTip(tip.id);
 }
 
+/** Ids of cards this player had never seen when dealt; the NEW ribbon shows only when some (not all) cards are new. */
+let newIds = new Set();
+function applyNew() {
+  const all = currentChoices.length > 0 && currentChoices.every((u) => newIds.has(u.id));
+  document.querySelectorAll('#cards .card').forEach((b, i) => b.classList.toggle('new', !all && newIds.has(currentChoices[i]?.id)));
+}
+
 function renderCards(choices) {
   currentChoices = choices;
   const box = $('#cards');
   box.textContent = '';
   cardsArmedAt = performance.now() + 550;
   box.classList.remove('dealing'); void box.offsetWidth; box.classList.add('dealing');
-  choices.forEach((u, i) => {
-    const wrap = document.createElement('div');
-    wrap.className = 'card-wrap';
-    const b = document.createElement('button');
-    b.className = `card ${u.kind}`;
-    const lvl = (game.owned[u.id] || 0) + 1;
-    b.innerHTML = '<span class="key"></span><span class="stamp"></span><span class="icon"></span><strong></strong><span class="why"></span><span class="gain"></span><span class="hint"></span><span class="lvl"></span><span class="mw"></span>';
-    b.querySelector('.key').textContent = String(i + 1);
-    b.querySelector('.icon').textContent = u.icon;
-    b.querySelector('.stamp').textContent = KIND_LABEL[u.kind] || '';
-    b.querySelector('strong').textContent = u.name;
-    // Option B: just the gain, in plain words. Specials describe their unique effect instead.
-    const gain = u.kind === 'perk' || u.kind === 'cursed' ? gainText(u, stats, player) : [];
-    b.querySelector('.gain').textContent = gain.length ? gain.join(' · ') : u.desc;
-    // Combo hints: loud when this card completes a combo now, quiet when it just has a partner to look for.
-    const partners = comboPartners(u, game.owned), hint = b.querySelector('.hint');
-    if (partners[0]?.partnerOwned) { hint.textContent = `🔗 Completes a combo! + your ${partners[0].partner.icon} ${partners[0].partner.short} → ${partners[0].combo.icon} ${partners[0].combo.name}`; hint.classList.add('ready'); }
-    else if (partners.length) hint.textContent = `🔗 Combos with ${partners.map((x) => `${x.partner.icon} ${x.partner.short}`).join(' or ')}`;
-    else hint.textContent = '';
-    const mw = u.kind === 'perk' && lvl === u.max ? masterworkFor(u.id) : null;
-    // v1.11.0: say why a special card is here, show "now → after" pips, and tease Masterworks without revealing them.
-    b.querySelector('.why').textContent = specialReason(u, game.owned);
-    const info = levelInfo(u, game.owned);
-    b.querySelector('.lvl').textContent = info.pips;
-    b.querySelector('.mw').textContent = info.mwText;
-    if (info.mw) b.classList.add(info.mw === 'finale' ? 'finale' : 'near');
-    if (!codex.seen.has(u.id)) { b.classList.add('new'); codex.seen.add(u.id); }
-    b.addEventListener('click', () => {
-      if (!cardsArmed() || game.state !== 'upgrade') return;
-      game.owned[u.id] = lvl;
-      u.apply(stats, player);
-      sound.play('upgrade');
-      if (u.kind === 'combo' || u.kind === 'master') { codex.found.add(u.id); saveCodex(); }
-      if (u.kind === 'combo') toast(`📚 ${u.name} added to your Collected Works`);
-      else if (u.kind === 'master') toast(`🏆 Masterwork: ${u.name}`);
-      if ((u.kind === 'combo' || u.kind === 'master') && !tipSeen('codex')) setTimeout(() => { if (game.state === 'gameover' || tipSeen('codex')) return; markTip('codex'); toast(TIPS.codex); }, 1700);
-      if (u.kind === 'perk' && mw) toast(`🏆 ${u.name} mastered! ${mw.name} will be offered next`);
-      afterPick();
-    });
-    wrap.appendChild(b);
-    // Banish: remove a normal perk from this run's pool, and deal a replacement.
-    if (game.banishes > 0 && (u.kind === 'perk' || u.kind === 'cursed')) {
-      const x = document.createElement('button');
-      x.className = 'banish';
-      x.type = 'button';
-      x.textContent = '✕ Banish';
-      x.title = `Never offer ${u.name} again this run`;
-      x.addEventListener('click', () => {
-        if (!cardsArmed() || !(game.banishes > 0)) return;
-        game.banishes--; game.banished.add(u.id);
-        const keep = new Set(currentChoices.map((c) => c.id));
-        const [repl] = rollUpgrades(rng, game.owned, 1, rollOpts({ exclude: keep, noSpecial: true }));
-        const next = currentChoices.slice();
-        if (repl) next[i] = repl; else next.splice(i, 1);
-        sound.play('click');
-        toast(`✕ ${u.name} banished for this run`);
-        renderCards(next);
-        cardsArmedAt = performance.now() + 150;
-      });
-      wrap.appendChild(x);
-    } else {
-      const slot = document.createElement('span'); slot.className = 'banish-slot'; slot.setAttribute('aria-hidden', 'true'); wrap.appendChild(slot);
-    }
-    box.appendChild(wrap);
-  });
+  newIds = new Set(choices.filter((u) => !codex.seen.has(u.id)).map((u) => u.id));
+  choices.forEach((u, i) => box.appendChild(buildCard(u, i)));
+  for (const u of choices) codex.seen.add(u.id);
+  applyNew();
   saveCodex();
   showPerkTip(choices);
   const renew = $('#btnRenew');
@@ -578,6 +536,127 @@ function renderCards(choices) {
   renew.textContent = `↻ Renew (${game.renews || 0})`;
   renderBuild($('#buildStrip'), choices);
 }
+
+/** Banish one card: only that card leaves (✕ stamp) and the replacement deals into the same slot. */
+function banishCard(wrap, u) {
+  if (!cardsArmed() || !(game.banishes > 0) || $('#cards .leaving')) return;
+  game.banishes--; game.banished.add(u.id);
+  const i = currentChoices.indexOf(u);
+  const keep = new Set(currentChoices.map((c) => c.id));
+  const [repl] = rollUpgrades(rng, game.owned, 1, rollOpts({ exclude: keep, noSpecial: true }));
+  const next = currentChoices.slice();
+  if (repl) next[i] = repl; else next.splice(i, 1);
+  sound.play('click');
+  toast(`✕ ${u.name} banished for this run`);
+  cardsArmedAt = performance.now() + 150;
+  const done = () => {
+    currentChoices = next;
+    const box = $('#cards');
+    if (repl) {
+      if (!codex.seen.has(repl.id)) newIds.add(repl.id);
+      codex.seen.add(repl.id); saveCodex();
+      const fresh = buildCard(repl, i);
+      fresh.classList.add('dealt-one');
+      wrap.replaceWith(fresh);
+    } else wrap.remove();
+    box.querySelectorAll('.card .key').forEach((k, n) => { k.textContent = String(n + 1); });
+    cardsArmedAt = Math.max(cardsArmedAt, performance.now() + 150);
+    applyNew(); showPerkTip(next); renderBuild($('#buildStrip'), next);
+  };
+  currentChoices = next;
+  wrap.classList.add('leaving');
+  const stamp = wrap.querySelector('.card .stamp'); if (stamp) stamp.textContent = '✕';
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) done(); else setTimeout(done, 320);
+}
+
+function buildCard(u, i) {
+  const wrap = document.createElement('div');
+  wrap.className = 'card-wrap';
+  const b = document.createElement('button');
+  b.className = `card ${u.kind}`;
+  const lvl = (game.owned[u.id] || 0) + 1;
+  b.innerHTML = '<span class="key"></span><span class="stamp"></span><span class="icon"></span><strong></strong><span class="why"></span><span class="gain"></span><span class="hint"></span><span class="lvl"></span><span class="mw"></span>';
+  b.querySelector('.key').textContent = String(i + 1);
+  b.querySelector('.icon').textContent = u.icon;
+  b.querySelector('.stamp').textContent = KIND_LABEL[u.kind] || '';
+  b.querySelector('strong').textContent = u.name;
+  // Option B: just the gain, in plain words. Specials describe their unique effect instead.
+  const gain = u.kind === 'perk' || u.kind === 'cursed' ? gainText(u, stats, player) : [];
+  b.querySelector('.gain').textContent = gain.length ? gain.join(' · ') : u.desc;
+  // Combo hints: loud when this card completes a combo now, quiet when it just has a partner to look for.
+  const partners = comboPartners(u, game.owned), hint = b.querySelector('.hint');
+  if (partners[0]?.partnerOwned) { hint.textContent = `🔗 Completes a combo! + your ${partners[0].partner.icon} ${partners[0].partner.short} → ${partners[0].combo.icon} ${partners[0].combo.name}`; hint.classList.add('ready'); }
+  else if (partners.length) hint.textContent = `🔗 Combos with ${partners.map((x) => `${x.partner.icon} ${x.partner.short}`).join(' or ')}`;
+  else hint.textContent = '';
+  const mw = u.kind === 'perk' && lvl === u.max ? masterworkFor(u.id) : null;
+  // v1.11.0: say why a special card is here, show "now → after" pips, and tease Masterworks without revealing them.
+  b.querySelector('.why').textContent = specialReason(u, game.owned);
+  const info = levelInfo(u, game.owned);
+  b.querySelector('.lvl').textContent = info.pips;
+  b.querySelector('.mw').textContent = info.mwText;
+  if (info.mw) b.classList.add(info.mw === 'finale' ? 'finale' : 'near');
+  b.addEventListener('click', () => {
+    if (!cardsArmed() || game.state !== 'upgrade' || wrap.classList.contains('leaving')) return;
+    game.owned[u.id] = lvl;
+    u.apply(stats, player);
+    sound.play('upgrade');
+    if (u.kind === 'combo' || u.kind === 'master') { codex.found.add(u.id); saveCodex(); }
+    if (u.kind === 'combo') toast(`📚 ${u.name} added to your Collected Works`);
+    else if (u.kind === 'master') toast(`🏆 Masterwork: ${u.name}`);
+    if ((u.kind === 'combo' || u.kind === 'master') && !tipSeen('codex')) setTimeout(() => { if (game.state === 'gameover' || tipSeen('codex')) return; markTip('codex'); toast(TIPS.codex); }, 1700);
+    if (u.kind === 'perk' && mw) toast(`🏆 ${u.name} mastered! ${mw.name} will be offered next`);
+    afterPick();
+  });
+  wrap.appendChild(b);
+  // Banish: remove a normal perk from this run's pool, and deal a replacement.
+  if (game.banishes > 0 && (u.kind === 'perk' || u.kind === 'cursed')) {
+    const x = document.createElement('button');
+    x.className = 'banish';
+    x.type = 'button';
+    x.textContent = '✕ Banish';
+    x.title = `Never offer ${u.name} again this run`;
+    x.addEventListener('click', () => banishCard(wrap, u));
+    wrap.appendChild(x);
+  } else {
+    const slot = document.createElement('span'); slot.className = 'banish-slot'; slot.setAttribute('aria-hidden', 'true'); wrap.appendChild(slot);
+  }
+  return wrap;
+}
+
+// ---- Free perks (Head Start, Mystery Shelf cursed book): a small card for ~3 s, never blocks play ----
+const freeQueue = [];
+let freeTimer = 0, freeEl = null;
+const freeFresh = new Set();   // chips to pulse the next time the build strip is drawn
+function queueFreePerk(u, label) {
+  const gain = gainText(u, stats, player);   // read before the perk is applied: it is the gain this perk gives
+  freeQueue.push({ id: u.id, icon: u.icon, name: u.name, gain: gain.length ? gain.join(' · ') : u.desc, label });
+  freeFresh.add(u.id);
+}
+function flushFreePerks() { if (!freeEl && freeQueue.length) showNextFree(); }
+function hideFreePerk() { clearTimeout(freeTimer); freeTimer = 0; if (freeEl) { freeEl.remove(); freeEl = null; } }
+function showNextFree() {
+  hideFreePerk();
+  const f = freeQueue.shift();
+  if (!f) return;
+  const el = document.createElement('button');
+  el.type = 'button'; el.className = 'free-perk';
+  el.innerHTML = '<span class="fp-label"></span><span class="fp-icon"></span><strong></strong><span class="fp-gain"></span>';
+  el.querySelector('.fp-label').textContent = f.label;
+  el.querySelector('.fp-icon').textContent = f.icon;
+  el.querySelector('strong').textContent = f.name;
+  el.querySelector('.fp-gain').textContent = f.gain;
+  el.addEventListener('click', (e) => { e.stopPropagation(); showNextFree(); });
+  $('#freePerks').appendChild(el);
+  freeEl = el;
+  sound.play('upgrade');
+  freeTimer = setTimeout(showNextFree, 3000);
+}
+
+/** Title-screen hint is for brand-new players only: gone once a first run has finished (or saves show they have played). */
+function hasFinishedRun() {
+  return tipSeen('firstrun') || progress.lifetime > 0 || Object.keys(progress.best).length > 0 || !!loadJSON(BEST_KEY).score;
+}
+function updateFirstHint() { const h = $('#firstHint'); if (h) h.hidden = hasFinishedRun(); }
 
 /**
  * "Your build": one chip per owned upgrade (icon + short name + pips). `offered` = the cards on screen, so chips
@@ -594,7 +673,7 @@ function renderBuild(el, offered = []) {
   for (const c of chips) {
     const item = document.createElement('button');
     item.type = 'button';
-    item.className = `build-item ${c.kind}${c.linked ? ' linked' : ''}`;
+    item.className = `build-item ${c.kind}${c.linked ? ' linked' : ''}${el.id === 'buildStrip' && freeFresh.has(c.id) ? ' fresh' : ''}`;
     item.dataset.id = c.id;
     item.title = c.name;
     item.setAttribute('aria-label', `${c.name}, tap for details`);
@@ -611,6 +690,7 @@ function renderBuild(el, offered = []) {
     });
     el.appendChild(item);
   }
+  if (el.id === 'buildStrip') freeFresh.clear();
 }
 
 // ---- Build chip details popover ----
@@ -1308,10 +1388,10 @@ function damageEnemy(e, dmg, kx, ky, crit) {
   if (prev && prev.life > prev.max - 0.25 && texts.includes(prev)) {
     prev.sum += dmg; prev.crit = prev.crit || crit;
     const tot = Number.isInteger(prev.sum) ? prev.sum : prev.sum.toFixed(1);
-    prev.text = prev.crit ? `${tot}!` : `${tot}`; prev.life = prev.max; prev.x = clamp(e.x, 70, W - 70);
+    prev.text = `${tot}`; prev.life = prev.max; prev.x = clamp(e.x, 70, W - 70);
     if (crit) { prev.color = '#ffd54a'; prev.size = 18; }
   } else if (crit || e.type === 'boss' || texts.length < 8) {
-    floatText(e.x + (Math.random() - 0.5) * 10, e.y - e.r, crit ? `${shown}!` : `${shown}`, crit ? '#ffd54a' : '#e8e0cc', crit ? 18 : 11, crit ? 0.7 : 0.5);
+    floatText(e.x + (Math.random() - 0.5) * 10, e.y - e.r, `${shown}`, crit ? '#ffd54a' : '#e8e0cc', crit ? 18 : 11, crit ? 0.7 : 0.5);
     e.dmgText = texts[texts.length - 1]; e.dmgText.sum = dmg; e.dmgText.crit = crit;
   }
   sound.play(crit ? 'crit' : 'hit', e.type === 'boss' ? 0.6 : 1);
@@ -1993,7 +2073,7 @@ function drawHUD() {
   // Fines collected this run
   txt(`🪙 ${game.fines}`, 14, 48, 13, '#ffd54a');
   // Score + combo
-  txt(Math.floor(game.score).toLocaleString(), W - 16, 32, 24, '#fff', 'right');
+  if (!isStory()) txt(Math.floor(game.score).toLocaleString(), W - 16, 32, 24, '#fff', 'right');   // story runs aren't ranked: no score
   const m = comboMult();
   if (game.combo > 1) {
     txt(`${game.combo} combo  ×${m}`, W - 16, 52, 13, m >= 3 ? '#ffd54a' : '#9be7dc', 'right');
@@ -2272,12 +2352,12 @@ document.querySelectorAll('#settings input[data-k]').forEach((box) => {
 });
 
 let toastTimer = 0;
-function toast(msg) {
+function toast(msg, ms = 1600) {
   const el = $('#toast');
   if (game.state === 'gameover') return; // v1.12.1: toasts never sit on the end-screen headings
   el.textContent = msg; el.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (el.hidden = true), 1600);
+  toastTimer = setTimeout(() => (el.hidden = true), ms);
 }
 
 document.addEventListener('click', (e) => {
@@ -2302,7 +2382,7 @@ document.addEventListener('click', (e) => {
   else if (act === 'quit' || act === 'menu') {
     // Quitting mid-run still banks what you earned: every run counts.
     if (act === 'quit' && inRun()) { const res = bankRun(); if (res.banked) setTimeout(() => toast(`🪙 +${res.banked} fines banked`), 50); }
-    game.state = 'title'; sound.setIntensity(0); sound.setMuffled(false); clearWorld(); player = makePlayer(); showScreen('title');
+    game.state = 'title'; sound.setIntensity(0); sound.setMuffled(false); clearWorld(); freeQueue.length = 0; hideFreePerk(); player = makePlayer(); showScreen('title');
   }
 });
 
@@ -2345,6 +2425,7 @@ function showGameOver() {
   game.state = 'gameover';
   sound.setMuffled(true);
   if (won) sound.play('wave');
+  markTip('firstrun'); updateFirstHint(); freeQueue.length = 0; hideFreePerk();
   const score = Math.floor(game.score);
   // Personal best + Hall of Fame stay endless-only, so the numbers keep meaning the same thing.
   const best = loadJSON(BEST_KEY);
@@ -2358,7 +2439,7 @@ function showGameOver() {
     ...(story ? [['Wing', `${game.wingN} · ${wingDef().name}`], ['Room reached', won ? `${ROOMS_PER_WING}/${ROOMS_PER_WING} ✓` : `${game.wave}/${ROOMS_PER_WING}`]] : []),
     ['Fines banked', fineLine], ['Fines to spend', `${progress.fines.toLocaleString()} 🪙`],
     ...(res.unlockedWing ? [['Unlocked', `🔓 Wing ${res.unlockedWing}: ${WINGS[res.unlockedWing - 1].name}`]] : []),
-    ['Score', score.toLocaleString() + (isBest ? ' ★ new personal best' : '')],
+    ...(story ? [] : [['Score', score.toLocaleString() + (isBest ? ' ★ new personal best' : '')]]),
     ...(story ? [] : [['Wave reached', game.wave]]), ['Disturbances shushed', game.kills], ['Best combo', game.bestCombo],
     ['Time on shift', `${Math.floor(game.playTime / 60)}m ${Math.floor(game.playTime % 60)}s`],
     ...(Object.keys(game.owned).length ? [] : [['Perks', 'none']]),
@@ -2452,6 +2533,7 @@ setInterval(() => { if (game.state === 'title' || game.state === 'gameover' || g
 // iPhones have no Fullscreen API: hide the button rather than show one that does nothing.
 if (!document.fullscreenEnabled) document.querySelectorAll('.fs-only').forEach((el) => el.remove());
 updateSourceBadge();
+updateFirstHint();
 showScreen('title');
 document.body.classList.add('ready');
 requestAnimationFrame(frame);
@@ -2467,7 +2549,7 @@ if (DEBUG) {
     god: () => { player.hp = 999; stats.maxHp = 999; },
     grant: (id) => { const u = UPGRADES.find((x) => x.id === id); game.owned[id] = (game.owned[id] || 0) + 1; u.apply(stats, player); },
     showCards: (ids) => renderCards(ids.map(byId)),
-    showUpgrades, showDoors, nextRoom, texts, get door() { return game.door; },
+    showFreePerk: (id, label) => { queueFreePerk(byId(id), label); flushFreePerks(); }, showUpgrades, showDoors, nextRoom, texts, get door() { return game.door; },
     // ---- balance bot (scripts/balance.mjs): drives the sim headless, faster than real time ----
     actions, hazards, STEP, books, touch, settings, setSetting, get W() { return W; }, get H() { return H; }, isSolid: (x, y) => isSolidPx(arena.solid, x, y),
     get choices() { return currentChoices; }, get doors() { return currentDoors; },
