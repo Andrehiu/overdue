@@ -115,6 +115,7 @@ Morning brief: `docs/plans/morning-brief.md`. Room Atlas (private): https://clau
 Ranked proposals for 1.8+ with draft handoffs: `docs/plans/next-ideas.md` (story beats → room goals → balance pass → Daily Shift → weapons).
 
 ## Parked ideas
+- **More ways to spend fines (owner, 2026-11-23, later):** cosmetics (librarian outfits/hats, book skins, lantern colours, rug/floor themes), maybe a few more Renovations. Rules to respect: cosmetics never change gameplay or hitboxes; books stay library blue and enemies stay in enemy hues (palette rule); new saved data in its own additive key (no reshape of `overdue.progress.v1`). Pairs well with Daily Shift (streak rewards).
 - **Room goals (story):** survive 30s, rescue stolen books, defend the returns desk, catch a thief. Fixes "every room plays the same".
 - **Weapon types:** Paperback (4 × 1 = 4 dmg/s), Encyclopedia (1.3 × 3.5 = 4.6, slow, knockback), Index Cards (10 × 0.4 = 4, flurry),
   Card Catalogue Drawer (5-card shotgun, 4.8), Ink Pot (lobbed, puddle). Keep damage per second within ±25%; every perk must work with
