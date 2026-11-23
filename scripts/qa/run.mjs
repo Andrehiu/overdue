@@ -109,6 +109,12 @@ const PINNED_CHECK = (id) => {
   const tops = [...row.querySelectorAll('button')].filter((b) => !b.hidden && b.offsetParent).map((b) => Math.round(b.getBoundingClientRect().top));
   if (Math.max(...tops) - Math.min(...tops) > 4) bad.push(`row wraps onto ${new Set(tops).size} lines`);
   if (rr.right > innerWidth + 1 || rr.left < -1) bad.push('row wider than the screen');
+  // v1.12.1: while the list is scrolled the dark band must reach the bottom edge and span the full width (nothing shows around it)
+  if (scr.scrollHeight > scr.clientHeight + 1) {
+    const sr = scr.getBoundingClientRect();
+    if (Math.abs(rr.bottom - sr.bottom) > 1.5) bad.push(`band ends ${Math.round(sr.bottom - rr.bottom)}px above the screen bottom`);
+    if (rr.left - sr.left > 1.5 || sr.right - rr.right > 1.5) bad.push(`band spans ${Math.round(rr.left)}-${Math.round(rr.right)} of ${Math.round(sr.left)}-${Math.round(sr.right)}px`);
+  }
   const w = document.createTreeWalker(scr, NodeFilter.SHOW_TEXT);
   for (let n; (n = w.nextNode());) {
     if (!n.textContent.trim()) continue;
@@ -262,7 +268,9 @@ async function screensFlow(name, opts, full) {
     else record(area, 'pause opens', false);
 
     // Boss fight renders with name plate
-    await page.evaluate(() => { __overdue.startWave(5); __overdue.god(); }); await page.waitForTimeout(4200);
+    await page.evaluate(() => { __overdue.startWave(5); __overdue.god(); });
+    // v1.12.1: wait on the condition, not the wall clock (slow CI runners spawn the boss late)
+    await page.waitForFunction(() => __overdue.enemies.some((e) => e.type === 'boss'), null, { timeout: 30000 }).catch(() => {});
     await shot(page, `${name}-5-boss`);
     record(area, 'boss spawns', await page.evaluate(() => __overdue.enemies.some((e) => e.type === 'boss')));
     }
@@ -394,9 +402,11 @@ async function screensFlow(name, opts, full) {
     }
     // A real build (8 perks) on the way into the boss: the end screen must still fit (iPad bug: buttons fell off-screen)
     await page.evaluate(() => { const O = __overdue; for (const id of ['trilogy', 'trilogy', 'dewey', 'speedreader', 'interlibrary', 'hardcover', 'hardcover', 'hardcover', 'extendedloan', 'footnotes']) O.grant(id); O.startWave(7); O.god(); });
-    await page.waitForTimeout(3600);
+    // v1.12.1: poll every frame until the boss AND its floating taunt exist (the taunt lives 2.5 s, so a late look misses it)
+    const TAUNTS = () => __overdue.texts.filter((t) => /: /.test(t.text) && t.size >= 12).map((t) => t.text);
+    await page.waitForFunction(() => __overdue.enemies.some((e) => e.type === 'boss'), null, { timeout: 30000, polling: 'raf' }).catch(() => {});
     record(area, 'room 7 boss spawns', await page.evaluate(() => __overdue.enemies.some((e) => e.type === 'boss')));
-    const taunt = await page.evaluate(() => __overdue.texts.filter((t) => /: /.test(t.text) && t.size >= 12).map((t) => t.text));
+    const taunt = await page.evaluate(TAUNTS);
     record(area, 'story boss shows its taunt', taunt.length > 0, taunt.join(' | '));
     await clearRoom(); await page.waitForTimeout(3400);
     await shot(page, `${name}-13-wing-cleared`);
@@ -531,6 +541,32 @@ async function menusFlow(name, opts) {
       }
       await page.click(`#${id} [data-act=${back}]`); await page.waitForTimeout(250);
     }
+    // v1.12.1: 4 and 5 card hands sit in ONE row, nothing scrolls, the build strip stays on screen (every size)
+    await page.evaluate(() => { __overdue.startRun('endless'); __overdue.god(); for (const id of ['trilogy', 'dewey', 'speedreader']) __overdue.grant(id); });
+    await page.waitForTimeout(500);
+    for (const n of [4, 5]) {
+      await page.evaluate((n) => { __overdue.game.cards = n; __overdue.showUpgrades(); }, n); await page.waitForTimeout(900);
+      const r = await page.evaluate(() => {
+        const s = document.getElementById('upgrade'), cards = [...document.querySelectorAll('#cards .card')], cs = cards.map((c) => c.getBoundingClientRect());
+        const tops = cards.map((c) => c.closest('.card-wrap').offsetTop);
+        const strip = document.getElementById('buildStrip'), sb = strip && strip.getBoundingClientRect();
+        return { n: cs.length, rows: new Set(tops).size, // offsetTop ignores the deal-in animation transform, so a slow runner can't fake a second row
+           scroll: s.scrollHeight - s.clientHeight, inX: cs.every((c) => c.left >= -1 && c.right <= innerWidth + 1),
+          strip: !!sb && sb.height > 0 && sb.bottom <= innerHeight + 1 && sb.top >= 0, hasStrip: !!strip };
+      });
+      if (n === 5) await shot(page, `${name}-perks-5-cards`);
+      record(area, `${n}-card hand: one row, no scroll, build strip visible`, r.n === n && r.rows === 1 && r.scroll <= 1 && r.inX && r.strip, JSON.stringify(r));
+    }
+    // v1.12.1: no toast may sit on the game-over headings
+    await page.evaluate(() => { __overdue.game.cards = 3; __overdue.drive(false); __overdue.die(); });
+    await page.waitForFunction(() => __overdue.game.state === 'gameover', null, { timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(400);
+    const toastOk = await page.evaluate(() => {
+      const t = document.getElementById('toast'); if (t.hidden) return true;
+      const tr = t.getBoundingClientRect();
+      return ![...document.querySelectorAll('#gameover h2, #gameover h3')].filter((h) => h.offsetParent).some((h) => { const r = h.getBoundingClientRect(); return r.bottom > tr.top && r.top < tr.bottom && r.right > tr.left && r.left < tr.right; });
+    });
+    record(area, 'game over: no toast over the headings', toastOk);
   } catch (e) { record(area, 'menus flow completed', false, e.message.split('\n')[0]); }
   await ctx.close();
   return record.list;
@@ -578,9 +614,9 @@ async function rotateOverlayFlow() {
 
 // ---------------------------------------------------------------- 3c. rotation sequences (v1.11.1): same fill, no title overflow
 const ROTATIONS = [
-  ['iphone-13', [390, 844], [844, 390], ['portrait→landscape', 'landscape→portrait→landscape']],
-  ['iphone-se', [375, 667], [667, 331], ['portrait→landscape', 'landscape→portrait→landscape']],
-  ['iphone-15-pro-max', [430, 932], [932, 430], ['portrait→landscape', 'landscape→portrait→landscape']],
+  ['iphone-13', [390, 844], [844, 390], ['portrait→landscape', 'landscape→portrait→landscape', 'app switch (hidden, portrait-sized, back)']],
+  ['iphone-se', [375, 667], [667, 331], ['portrait→landscape', 'landscape→portrait→landscape', 'app switch (hidden, portrait-sized, back)']],
+  ['iphone-15-pro-max', [430, 932], [932, 430], ['portrait→landscape', 'landscape→portrait→landscape', 'app switch (hidden, portrait-sized, back)']],
 ].flatMap(([label, port, land, seq]) => seq.map((kind) => [label, port, land, kind]));
 async function rotationFlow(label, port, land, kind) {
   const record = recorder();
@@ -592,9 +628,19 @@ async function rotationFlow(label, port, land, kind) {
   try {
     await page.goto(URL0); await page.waitForTimeout(600);
     if (kind === 'landscape→portrait→landscape') { await page.setViewportSize({ width: port[0], height: port[1] }); await page.waitForTimeout(400); }
-    await page.setViewportSize({ width: land[0], height: land[1] }); await page.waitForTimeout(600);
+    if (kind.startsWith('app switch')) {
+      // v1.12.1: iOS reports a portrait-sized viewport while the page is in the app switcher and may send NO resize on return.
+      const setHidden = (h) => page.evaluate((h) => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => h }); document.dispatchEvent(new Event('visibilitychange')); }, h);
+      await setHidden(true);
+      await page.setViewportSize({ width: port[0], height: port[1] }); await page.waitForTimeout(300);
+      await page.setViewportSize({ width: land[0], height: land[1] }); await page.waitForTimeout(300);
+      // Worst case: the page was shown the portrait overlay before the OS hid it
+      await page.evaluate(() => { document.body.classList.add('rotate-needed'); document.getElementById('rotate').hidden = false; });
+      await setHidden(false); await page.waitForTimeout(700);
+    }
+    else await page.setViewportSize({ width: land[0], height: land[1] }); await page.waitForTimeout(600);
     const r = await page.evaluate(`({ fill: (${FILL_JS})(), fit: (${TITLE_FIT_JS})(), grid: __overdue.grid(), rot: document.getElementById('rotate').hidden })`);
-    if (label === 'iphone-13') await shot(page, `rotate-${kind.startsWith('portrait') ? 'p2l' : 'l2p2l'}`);
+    if (label === 'iphone-13') await shot(page, `rotate-${kind.startsWith('portrait') ? 'p2l' : kind.startsWith('app') ? 'appswitch' : 'l2p2l'}`);
     record(area, `${kind}: fill ≥ ${FILL_MIN * 100}% and title fits`, r.rot && r.fill >= FILL_MIN && r.fit.length === 0, `${Math.round(r.fill * 100)}% · ${r.grid} · ${r.fit.join(' | ')}`);
   } catch (e) { record(area, `${kind}: flow completed`, false, e.message.split('\n')[0]); }
   record(area, `${kind}: no page errors`, errors.length === 0, errors.slice(0, 2).join(' | '));
