@@ -4,7 +4,7 @@ The plan and the owner's decisions, kept current by the planner session. **Plann
 Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <topic>`; their prompts are saved in `docs/handoffs/`.
 
 ## Handover note (2026-11-22, from "Overdue · planning" to "Overdue · planning 2")
-**State (updated 2026-11-23):** v1.12.2 shipped (1.12.1 bugs + 1.12.2 polish). Original note: v1.11.2 was live (`0e037ea`, shipped with the QA trim). Nothing is merged-but-unshipped and no coder is running.
+**State (updated 2026-11-23):** v1.12.2 live (bd030ec, Pages green; 1.12.1 bugs + 1.12.2 polish). Original note: v1.11.2 was live (`0e037ea`, shipped with the QA trim). Nothing is merged-but-unshipped and no coder is running.
 The planner's working branch is `claude/brave-galileo-jyg38o` (equal to `main` plus docs). Work for a new release goes on a new
 coder branch from `origin/main`, then the planner merges into its own working branch, runs QA and ships with `git push origin HEAD:main`
 only when the owner says "ship".
