@@ -92,6 +92,29 @@ test('a Survive room is never easier than the same room played plain, and its sp
   assert.ok(found >= 8);
 });
 
+test('Survive rooms build up: every spawn lands well before the buzzer and the budget arrives in a rising crescendo', async () => {
+  const { roomGoal, composeRoom, WINGS, ROOMS_PER_WING, SURVIVE_SECONDS, SURVIVE_CHUNKS } = await load('story');
+  const { ENEMY_TYPES } = await load('waves');
+  const { Rng } = await load('util');
+  const [c1, c2] = [SURVIVE_CHUNKS[1].from, SURVIVE_CHUNKS[2].from];   // phase boundaries
+  let rooms = 0;
+  for (let w = 1; w <= WINGS.length; w++) for (let r = 1; r <= ROOMS_PER_WING; r++) {
+    if (roomGoal(w, r) !== 'survive') continue;
+    rooms++;
+    let early = 0, mid = 0, late = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const sp = composeRoom(w, r, new Rng(seed)).spawns;
+      assert.ok(sp.length > 0);
+      assert.ok(sp.at(-1).t <= SURVIVE_SECONDS - 1, `wing ${w} room ${r} seed ${seed}: last spawn at ${sp.at(-1).t}s`);
+      assert.ok(sp[0].t >= 0 && sp.every((s, i) => i === 0 || s.t >= sp[i - 1].t), 'sorted, non-negative');
+      for (const s of sp) { const c = ENEMY_TYPES[s.type].cost; if (s.t < c1) early += c; else if (s.t < c2) mid += c; else late += c; }
+    }
+    const all = early + mid + late;
+    assert.ok(late >= 0.45 * all && late > mid && mid > early * 1.2, `wing ${w} room ${r}: budget by phase ${[early, mid, late].map((x) => (100 * x / all).toFixed(0)).join('/')}%`);
+  }
+  assert.ok(rooms >= 8);
+});
+
 test('fines: a full 7-room wing pays within 10% of the old 10-room wing, elite and boss stay the biggest', async () => {
   const { roomReward, ROOMS_PER_WING, ELITE_ROOM, BOSS_ROOM } = await load('story');
   for (let w = 1; w <= 10; w++) {

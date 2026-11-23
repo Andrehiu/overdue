@@ -4,7 +4,7 @@ The plan and the owner's decisions, kept current by the planner session. **Plann
 Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <topic>`; their prompts are saved in `docs/handoffs/`.
 
 ## Handover note (2026-11-22, from "Overdue · planning" to "Overdue · planning 2")
-**State:** v1.11.2 is live (`0e037ea`, shipped with the QA trim). Nothing is merged-but-unshipped and no coder is running.
+**State (updated):** v1.11.3 live (4fda8ab). Original note: v1.11.2 was live (`0e037ea`, shipped with the QA trim). Nothing is merged-but-unshipped and no coder is running.
 The planner's working branch is `claude/brave-galileo-jyg38o` (equal to `main` plus docs). Work for a new release goes on a new
 coder branch from `origin/main`, then the planner merges into its own working branch, runs QA and ships with `git push origin HEAD:main`
 only when the owner says "ship".
@@ -79,8 +79,9 @@ only when the owner says "ship".
 | 1.11.0 | **Learn perks as you go:** one-time tips (stack to 3/3, combos), Masterwork previews at 2/3, UNLOCKED + reason on special cards, level-up pips, Perks box in How to play, "Show tips again" (new key `overdue.tips.v1`) | Shipped 2026-11-22 with 1.11.1 (416b4d4) |
 | 1.11.1 | **Fill the screen:** arena widens to the phone's shape (no black side bars; iPhones were at 81–88% fill), title fits on iPad mini / iPad Safari, QA fill ≥ 95% + more phone sizes + rotation checks | Shipped 2026-11-22 (416b4d4) |
 | 1.11.2 | **Polish:** door key numbers off the icons; touching shelves draw as one solid wall (bridge/maze/reading) | Shipped 2026-11-22 (0e037ea) with the QA trim |
-| 1.11.3 | **Balance pass (bot-driven):** bot now reports per-room death share + reach-conditional death rate (handles Survive); Survive budget ×1.15 → ×1.2 (only outlier; partly fixed, capped by the difficulty-only-goes-up test). Elite room 4 and Rare Books: fine | Merged into planner branch (d04bba9), reviewed: 67/67 tests, QA all green 2m50s. Owner said ship (2026-11-22); push to main blocked by auto-mode, waiting on explicit "push to main". Open: Survive still easy (6/15 cells < 0.6×), wing 4 room 5 spike (54% of deaths), wing 1 room 6 (40%). Reports: `docs/balance/1.11.3-*.md` |
-| 1.11.4 | **Survive rooms build up + spike rooms:** Survive spawns weighted to the second half (same total), find and smooth wing 4 room 5 and wing 1 room 6 | Coder "Overdue · v1.11.4 survive + spikes" started 2026-11-22 (owner: "do your pick"). Handoff: `docs/handoffs/1.11.4-survive-and-spikes.md` |
+| 1.11.3 | **Balance pass (bot-driven):** bot now reports per-room death share + reach-conditional death rate (handles Survive); Survive budget ×1.15 → ×1.2 (only outlier; partly fixed, capped by the difficulty-only-goes-up test). Elite room 4 and Rare Books: fine | Merged into planner branch (d04bba9), reviewed: 67/67 tests, QA all green 2m50s. Shipped 2026-11-22 (4fda8ab; Pages deploy green 1st attempt). Open: Survive still easy (6/15 cells < 0.6×), wing 4 room 5 spike (54% of deaths), wing 1 room 6 (40%). Reports: `docs/balance/1.11.3-*.md` |
+| 1.11.4 | **Survive rooms build up + spike rooms:** Survive spawns 20/30/50% over 0–20 s (same total; pooled Survive death rate 0.55× → 0.68× of plain rooms, 11/16 cells ≥ 0.6×); reading-room openings 2 → 4 cells (story only); elite room budget ×0.6 → ×0.75. Wing 4 room 5 rate 67% → 53%; wing 1 room 6 18% → 8% but still 50% share (few deaths overall) | Merged into planner branch (5f2bd78), reviewed: 68/68 tests, QA all green. Not shipped: waiting on owner. Handoff: `docs/handoffs/1.11.4-survive-and-spikes.md` |
+| 1.12.0 | **Enemy readability (proposal):** 3 looks built behind `?art=a|b|c` (+ `&eyes=1`) on `claude/enemy-art` (6304ebc): A Shapes, B Characters, C Blend. All 61 fps, ≥ 0.89× speed. Planner pick: C, eyes no for now | Waiting on owner's pick. Proposal page (private): https://claude.ai/artifact/XPUr5hiXnYQykSCDUvz5c4. Specs: `docs/plans/art-directions-enemies.md`. Next: a coder makes the pick the only look, deletes the others, removes the flag, bumps 1.12.0 |
 | — | **QA trim** (tooling): full flow on 3 devices, fit-only on 4, parallel contexts; target ~5 min | Merged: QA 11 min → 3 min (full flow on 3 devices, fit-only on 4, parallel); `--full` ~3.5 min |
 | — | **Bigger map (parked):** ~40×24 cells (1.7× floor), camera follows the player with a dead zone; light layer screen-sized (same look; owner OK needed since CLAUDE.md says keep lighting); auto-aim only on screen; spawns just off-screen; edge arrows for off-screen enemies; perf budget must hold. Build behind `?bigmap=1` first | Parked: 1.3.1 fixed the cramped feeling. Revisit only if it comes back |
 
@@ -91,6 +92,7 @@ only when the owner says "ship".
 Report problems as "row + wing/room + what happened".
 
 ## Next ideas
+**Known CI flake:** GitHub CI runner (`qa --ci`) failed `iphone-se-landscape · room 7 boss spawns` + `boss taunt` on 0e037ea (slow runner timing; local QA green). Fix with deterministic `stepN` when next touching QA.
 **Waiting on owner playtest:** Survive difficulty (×1.15 budget), wing 1 room 5 spike, Rare Books from wing 4, wider phone arena edges, tip timing. Then a balance pass (B), Daily Shift (C), Rescue rooms (D). Room Atlas regenerated for v1.11.2 (2026-11-22).
 Morning brief: `docs/plans/morning-brief.md`. Room Atlas (private): https://claude.ai/artifact/5kXSXFYFDShVAGw81fPhzS
 Ranked proposals for 1.8+ with draft handoffs: `docs/plans/next-ideas.md` (story beats → room goals → balance pass → Daily Shift → weapons).

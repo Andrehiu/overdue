@@ -229,13 +229,13 @@ const SHAPE_GEN = {
     return { cands, target: Math.max(2, Math.ceil(cands.length * Math.min(1, perHalf / 7))) };
   },
   // Reading room: a closed ring around the spawn rug with an opening at the top, bottom, left and right
-  // (each 2 cells wide), plus a few shelves outside it.
+  // (each 4 cells wide), plus a few shelves outside it.
   reading(rng, perHalf) {
     const half = COLS >> 1, xl = SAFE.x0 - 2, yt = SAFE.y0 - 2, yb = SAFE.y1 + 2;
-    const gy = (ROWS >> 1) - 1; // side opening rows gy, gy+1
+    const gy = (ROWS >> 1) - 2; // side opening rows gy .. gy+3
     const ring = [
-      [{ x: xl, y: yt, w: half - 1 - xl, h: 1 }, { x: xl, y: yt + 1, w: 1, h: gy - yt - 1 }],   // top bar + upper side bar (closed corner)
-      [{ x: xl, y: yb, w: half - 1 - xl, h: 1 }, { x: xl, y: gy + 2, w: 1, h: yb - gy - 2 }],   // bottom bar + lower side bar
+      [{ x: xl, y: yt, w: half - 2 - xl, h: 1 }, { x: xl, y: yt + 1, w: 1, h: gy - yt - 1 }],   // top bar + upper side bar (closed corner)
+      [{ x: xl, y: yb, w: half - 2 - xl, h: 1 }, { x: xl, y: gy + 4, w: 1, h: yb - gy - 4 }],   // bottom bar + lower side bar
     ];
     const out = [];
     for (let i = 0; i < 14; i++) {
