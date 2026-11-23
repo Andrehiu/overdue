@@ -93,6 +93,7 @@ only when the owner says "ship".
 Report problems as "row + wing/room + what happened".
 
 ## Next ideas
+**Queued fix (owner, 2026-11-23):** when the door screen has only one door (e.g. the fixed ★ elite door), don't make the player tap it: skip the screen and go straight in, with a short banner/toast ("★ Elite room next") so it isn't a surprise. Code: `showDoors()` in `src/main.js` already detects `offer.length === 1` ("the next door"). Batch with the next small polish session (Codex toast over game-over heading, CI iPhone SE boss flake).
 **Known CI flake:** GitHub CI runner (`qa --ci`) failed `iphone-se-landscape · room 7 boss spawns` + `boss taunt` on 0e037ea (slow runner timing; local QA green). Fix with deterministic `stepN` when next touching QA.
 **Waiting on owner playtest:** Survive difficulty (×1.15 budget), wing 1 room 5 spike, Rare Books from wing 4, wider phone arena edges, tip timing. Then a balance pass (B), Daily Shift (C), Rescue rooms (D). Room Atlas regenerated for v1.11.2 (2026-11-22).
 Morning brief: `docs/plans/morning-brief.md`. Room Atlas (private): https://claude.ai/artifact/5kXSXFYFDShVAGw81fPhzS
