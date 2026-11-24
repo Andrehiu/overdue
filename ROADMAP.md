@@ -35,6 +35,7 @@ running. Planner working branch: `claude/brave-galileo-jyg38o` (= main + docs). 
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-24 | Old playtest list dropped; replaced by one focused playtest after 1.14.0 (wings 7–8 + an Orbit run) | Owner: 'drop it' (bot covers it) |
 | 2026-11-24 | New perks (1.15.0): bosses are immune to freeze and stun (they take +25% damage while chilled instead); elites and normal enemies get a 3 s cooldown after a freeze. Applies to Cold Storage/Deep Freeze, Superconductor, Static, Library Cat/Stray Colony, Orbit. Balance-review changes accepted (Margin Notes side books don't home, Last Chapter cap, Crossfire +50% radius capped, chains never start chains, Static L1 / Cat L2 buffs). Status colours: 3-option page before 1.15.0; static not gold (clashes with elite outline and crits) | Owner picked A |
 | 2026-11-24 | Bigger rooms (+20%) apply to story only; endless keeps today's grid (seeds and Hall of Fame stay comparable) | Owner picked A |
 | 2026-11-24 | Rooms 20% bigger (phone grid 34×16 → ~40×19): HUD/buttons keep their size, lamps and shelves scale with the room. First part of 1.14.0, before balance tuning. Bigger-map-with-camera stays parked | Owner (mock-ups of today / +20% / +40%) |
@@ -136,7 +137,7 @@ Report problems as "row + wing/room + what happened".
 - **Sound after app switch (medium, check first):** iOS can leave the AudioContext suspended/interrupted after switching apps; today `sound.init()` only resumes it at run start (`src/audio.js` ~30). Resume on `visibilitychange` (visible) and on the next touch.
 **Queued feature (owner, 2026-11-23):** Rare Books reward option A (see Decisions). Planner splits all queued items into releases when the owner's playtest is done (Codex toast over game-over heading, CI iPhone SE boss flake).
 **Known CI flake:** GitHub CI runner (`qa --ci`) failed `iphone-se-landscape · room 7 boss spawns` + `boss taunt` on 0e037ea (slow runner timing; local QA green). Fix with deterministic `stepN` when next touching QA.
-**Waiting on owner playtest:** Survive difficulty (×1.15 budget), wing 1 room 5 spike, Rare Books from wing 4, wider phone arena edges, tip timing. Then a balance pass (B), Daily Shift (C), Rescue rooms (D). Room Atlas regenerated for v1.11.2 (2026-11-22).
+**Old playtest list (Survive difficulty, wing 1 room 5 spike, Rare Books from wing 4, wider phone arena edges, tip timing): dropped by owner 2026-11-24**; the 1.14.0 bot rebalance remeasures the first three, the last two had no complaints. After 1.14.0: owner playtests wings 7–8 + one Orbit run. Then a balance pass (B), Daily Shift (C), Rescue rooms (D). Room Atlas regenerated for v1.11.2 (2026-11-22).
 Morning brief: `docs/plans/morning-brief.md`. Room Atlas (private): https://claude.ai/artifact/5kXSXFYFDShVAGw81fPhzS
 Ranked proposals for 1.8+ with draft handoffs: `docs/plans/next-ideas.md` (story beats → room goals → balance pass → Daily Shift → weapons).
 
