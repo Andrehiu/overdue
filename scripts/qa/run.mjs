@@ -378,7 +378,7 @@ async function screensFlow(name, opts, full) {
     await page.waitForTimeout(700);
     await page.locator('#doorCards .door[data-door=rare]').click(); await page.waitForTimeout(400);
     const rare = await page.evaluate(() => ({ state: __overdue.game.state, door: __overdue.game.door, elite: __overdue.game.diff.eliteChance, hp: __overdue.player.hp, sub: __overdue.game.bannerSub }));
-    record(area, 'Rare Books raises the next room\'s elite share, no heal', rare.state === 'playing' && rare.door === 'rare' && rare.elite >= 0.5 && rare.hp === 2 && /Rare Books/.test(rare.sub), JSON.stringify(rare));
+    record(area, 'Rare Books raises the next room\'s elite share, no heal', rare.state === 'playing' && rare.door === 'rare' && rare.elite >= 0.35 && rare.hp === 2 && /Rare Books/.test(rare.sub), JSON.stringify(rare));
     await page.evaluate(() => { const O = __overdue; O.player.hp = 2; O.showDoors(['rest', 'mystery']); });
     await page.waitForTimeout(700);
     await page.keyboard.press('Digit1'); await page.waitForTimeout(400);

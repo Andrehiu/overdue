@@ -9,7 +9,7 @@ import { UPGRADES, comboHints, masterworkFor } from './upgrades.js';
 // id · icon · name · line (plain words, shown on the card) · banner (room banner subtitle)
 // eliteAdd: extra elite share · budgetMult: spawn budget multiplier · biteWing: from this wing elites also get +50% HP and fire 30% faster · fineMult: fines multiplier · fineMin: floor for the reduced fines
 export const DOORS = {
-  rare:    { id: 'rare', icon: '💰', name: 'Rare Books', line: 'More enemies, more elites · ×2 fines + a better pick', banner: '💰 Rare Books: double fines, better pick', eliteAdd: 0.5, budgetMult: 1.3, biteWing: 4, eliteHpMult: 1.5, eliteFireMult: 1.3, fineMult: 2 },
+  rare:    { id: 'rare', icon: '💰', name: 'Rare Books', line: 'More enemies, more elites · ×2 fines + a better pick', banner: '💰 Rare Books: double fines, better pick', eliteAdd: 0.35, budgetMult: 1.15, biteWing: 4, eliteHpMult: 1.3, eliteFireMult: 1.15, fineMult: 2 },
   rest:    { id: 'rest', icon: '☕', name: 'Break Room', line: 'Heal 1 ♥ · fewer fines', banner: '☕ Break Room: +1 ♥, fewer fines', fineMult: 0.5, fineMin: 3, heal: 1 },
   mystery: { id: 'mystery', icon: '🎲', name: 'Mystery Shelf', line: 'Same room · 50/50: bonus perk or a cursed book', banner: '🎲 Mystery Shelf: 50/50 bonus perk or cursed book' },
   stacks:  { id: 'stacks', icon: '🚪', name: 'The Stacks', line: 'A normal room · normal fines', banner: '🚪 The Stacks: a normal room' },

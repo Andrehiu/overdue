@@ -49,7 +49,7 @@ test('doors follow ELITE_ROOM / BOSS_ROOM: fixed elite door, fixed author door, 
   assert.ok(DOORS.elite.fixed && DOORS.author.fixed);
 });
 
-test('doors never make a room easier, and Rare Books adds exactly +0.5 elite share (capped at 1)', async () => {
+test('doors never make a room easier, and Rare Books adds exactly +0.35 elite share (capped at 1)', async () => {
   const { DOORS, applyDoor } = await load('doors');
   const { difficulty, threat, ROOMS_PER_WING } = await load('story');
   for (let wing = 1; wing <= 10; wing++) for (let room = 1; room <= ROOMS_PER_WING; room++) {
@@ -59,7 +59,7 @@ test('doors never make a room easier, and Rare Books adds exactly +0.5 elite sha
       assert.equal(applyDoor(d, id).hpMult, d.hpMult, 'doors never weaken or strengthen individual enemies');
     }
     const rare = applyDoor(d, 'rare');
-    assert.equal(rare.eliteChance, Math.min(1, d.eliteChance + (d.kind === 'normal' ? 0.5 : 0)));
+    assert.equal(rare.eliteChance, Math.min(1, d.eliteChance + (d.kind === 'normal' ? 0.35 : 0)));
     assert.ok(rare.eliteChance <= 1);
     assert.equal(applyDoor(d, 'rest').eliteChance, d.eliteChance, 'Break Room does not weaken enemies');
   }
@@ -113,10 +113,10 @@ test('Rare Books (v1.7.1): strictly harder in every wing and room; the bite star
     const d = difficulty(wing, room), r = applyDoor(d, 'rare');
     if (d.kind !== 'normal') { assert.deepEqual(r, d, 'elite and boss rooms have no door effect'); continue; }
     assert.ok(threat(r) > threat(d), `Rare Books not harder at wing ${wing} room ${room}`);
-    assert.ok(Math.abs(r.budget - d.budget * 1.3) < 1e-9, 'spawn budget x1.3');
+    assert.ok(Math.abs(r.budget - d.budget * 1.15) < 1e-9, 'spawn budget x1.15');
     assert.equal(r.hpMult, d.hpMult);
     if (wing < 4) { assert.equal(r.eliteHpMult, undefined); assert.equal(r.eliteShootEvery, d.eliteShootEvery); }
-    else { assert.equal(r.eliteHpMult, 1.5); assert.ok(Math.abs(r.eliteShootEvery - d.eliteShootEvery / 1.3) < 1e-9); }
+    else { assert.equal(r.eliteHpMult, 1.3); assert.ok(Math.abs(r.eliteShootEvery - d.eliteShootEvery / 1.15) < 1e-9); }
   }
   // Other doors leave budget and elite stats alone.
   const d = difficulty(5, 3);
@@ -145,10 +145,10 @@ test('Rare pick (v1.14.1): completes a combo first, else advances a Masterwork p
     assert.equal(rarePick(r(), {}), null, 'nothing owned: no guarantee');
     assert.equal(rarePick(r(), { dewey: 1 }).id, 'bookmark', 'bookmark completes Dewey combo (also the only combo partner)');
     // Owning two perks at 1/3 each with no combo path: the closest to max is advanced, ties are allowed
-    const a = rarePick(r(), { hardcover: 2, coffee: 1 });
-    assert.ok(['hardcover', 'coffee'].includes(a.id));
-    assert.equal(a.id, 'hardcover', 'closest to its Masterwork wins');
-    assert.equal(rarePick(r(), { hardcover: 3 }), null, 'a maxed perk is not a path (Masterworks come as specials)');
+    assert.equal(rarePick(r(), { coffee: 1 }).id, 'graceperiod', 'completing a combo beats advancing a perk');
+    const a = rarePick(r(), { extendedloan: 2, speedreader: 1 });
+    assert.equal(a.id, 'extendedloan', 'closest to its Masterwork wins');
+    assert.equal(rarePick(r(), { extendedloan: 3 }), null, 'a maxed perk is not a path (Masterworks come as specials)');
     // banned perks are skipped
     assert.notEqual(rarePick(r(), { dewey: 1 }, { banned: new Set(['bookmark']) })?.id, 'bookmark');
   }
