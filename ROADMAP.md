@@ -23,8 +23,12 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 - **Running (1.15.1, no player change):** reliable QA timing checks (session_014kswNhyh6FhfYfdqVSDcAv, `claude/qa-reliable`;
   owner sees before/after table before merge) and stronger privacy scan (session_014kswNmAW3nNXpnspbCpvkk, `claude/privacy-scan`;
   owner then adds `QA_PRIVATE_TERMS` secret). Handoffs in `docs/handoffs/1.15.1-*.md`.
-- **Owner phone checks for 1.15.0:** What's new card once; status icons readable; zap/pop visible in the dark; stacked boss
-  smooth; cat visible; new icons distinct in the build strip; Last Chapter worth taking. Then 1.15.x tuning from the playtest.
+- **Owner playtest 1.15.0 (done):** 1 enemies too small, 2 orbit books too small/hard, 3 Margin angle halve, 4 Crossfire text,
+  5 boss phase change blocks player (owner: player free, boss can't be hit during transformation), 6 wing 2 hard at 65% Renovations,
+  7 idea: late bosses one shelf-piercing attack (parked), 8 difficulty −5%. Owner said go on the split:
+  **1.15.1 look & feel** (1–5, `docs/handoffs/1.15.1-look-feel.md`, `claude/look-feel-1151`) + QA reliable + privacy scan (36ed5da,
+  reviewed 132/132, waiting to merge with 1.15.1); then **1.15.2 difficulty**: story enemy HP −5% every wing (endless unchanged),
+  bot re-measure at 65% Renovations to explain bot-vs-owner gap at wing 2.
 - **Owner to do when convenient:** playtest wings 7–8 + an Orbit run on v1.14.1; phone checks: Take it / Walk away tap comfort,
   5-card Rare hand readability, Surround dimmed-book cue, Settings captions fit. Optional: add the CI docs `paths-ignore` to
   `.github/workflows/ci.yml` (auto-mode blocked coders from it; the owner can edit it on GitHub).
