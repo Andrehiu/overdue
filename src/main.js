@@ -1006,9 +1006,9 @@ function addLight(x, y, r, life, color = null, big = false) {
 function floatText(x, y, text, color = '#fff', size = 14, life = 0.8) {
   texts.push({ x: clamp(x, 70, W - 70), y: Math.max(y, (game.boss && PORTRAIT ? 120 : 78) * uiK), text, color, size: size * uiK, life, max: life, vy: -40 });
 }
-function particle(p) { if (particles.length < 320) particles.push(p); }
+function particle(p) { if (particles.length < 220) particles.push(p); }   // v1.15.0: 320 -> 220 (canvas raster is the late-game cost)
 function burst(x, y, n, colors, speed = 160, life = 0.6, shape = 'sq') {
-  if (particles.length > 160) n = Math.ceil(n * (particles.length > 240 ? 0.25 : 0.5));
+  if (particles.length > 110) n = Math.ceil(n * (particles.length > 170 ? 0.25 : 0.5));
   for (let i = 0; i < n; i++) {
     const a = Math.random() * TAU, s = speed * (0.3 + Math.random() * 0.7);
     particle({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: life * (0.5 + Math.random() * 0.5), max: life,
@@ -1242,9 +1242,8 @@ function spawnBook(x, y, a, extra = {}) {
 }
 
 let currentLook = bookLook({});
-const MARGIN_DMG = 1.5;   // side and rear books hit 50% harder than a normal book: they never home, so most miss (bot-tuned)
 const MARGIN_SIDE = [Math.PI / 4], MARGIN_WIDE = [Math.PI / 6, Math.PI / 3];   // Margin Notes angles: ±45°, then ±30° and ±60°
-function marginBook(p, a) { spawnBook(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a, { bonus: true, nohome: true, margin: true, dmgMult: MARGIN_DMG }); }
+function marginBook(p, a) { spawnBook(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a, { bonus: true, nohome: true, margin: true, pierce: stats.pierce + 1 }); }
 function fire() {
   const p = player, n = stats.projectiles;
   currentLook = bookLook(game.owned); // perks change how books look (cheap: a few flags per throw)
@@ -1292,10 +1291,14 @@ function inkBurst(x, y, radius, dmg, color = '#e8d9b0', src = 'burst') {
     const d = Math.hypot(e.x - x, e.y - y);
     if (d < radius + e.r) damageEnemy(e, dmg, ((e.x - x) / (d || 1)) * 120, ((e.y - y) / (d || 1)) * 120, false, src);
   }
+  // Visual budget (v1.15.0): a crowd of shelf bursts (Margin Notes, Crossfire, Demolition) keeps its damage but stops adding rings,
+  // pages and lights once 12 rings are already on screen. Each ring is a big canvas draw, a light and a stroke.
   burst(x, y, 7, [color, '#3a2a1a'], 140, 0.35);
-  pages(x, y, 3);
-  rings.push({ x, y, r: 4, max: radius, speed: radius * 6, friendly: true, life: 1, faint: true, color: '255,184,107' });
-  addLight(x, y, radius * 1.2, 0.18, color);
+  if (rings.length < 12) {
+    pages(x, y, 3);
+    rings.push({ x, y, r: 4, max: radius, speed: radius * 6, friendly: true, life: 1, faint: true, color: '255,184,107' });
+    addLight(x, y, radius * 1.2, 0.18, color);
+  }
   sound.play('hit', 0.7);
 }
 
@@ -1718,7 +1721,7 @@ function updateBooks(dt) {
           const s = Math.hypot(b.vx, b.vy) || 1;
           damageEnemy(e, dmg, (b.vx / s) * 160, (b.vy / s) * 160, crit, crit ? 'crit' : 'throw');
           b.hitAny = true;
-          burst(b.x, b.y, 5, [b.color, '#fff'], 120, 0.3);
+          if (!b.bonus || particles.length < 110) burst(b.x, b.y, 5, [b.color, '#fff'], 120, 0.3);   // side/rear/fan books skip hit sparks in a busy screen
           if (crit && stats.critBurst) inkBurst(e.x, e.y, stats.critBurst, stats.damage, '#7a5cff', 'splash');
           if (b.pierce > 0) {
             b.pierce--;

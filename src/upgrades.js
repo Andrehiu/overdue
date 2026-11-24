@@ -63,7 +63,7 @@ export const UPGRADES = [
 
   // ---- v1.15.0 part B: angles, nerve, a cat ----
   perk({ id: 'margin', icon: '↗️', short: 'Margin Notes', name: 'Margin Notes', desc: 'Extra books fly off at an angle', max: 3, weight: 5, apply: (s) => { s.marginLvl += 1; } }),
-  perk({ id: 'lastchapter', icon: '📉', short: 'Last Chapter', name: 'Last Chapter', desc: 'More damage for every heart you are missing', max: 3, weight: 5, apply: (s) => { s.lastChapter = s.lastChapter ? s.lastChapter + 0.1 : 0.15; } }),
+  perk({ id: 'lastchapter', icon: '📉', short: 'Last Chapter', name: 'Last Chapter', desc: 'More damage for every heart you are missing', max: 3, weight: 5, apply: (s) => { s.lastChapter = s.lastChapter ? s.lastChapter + 0.1 : 0.2; } }),
   perk({ id: 'librarycat', icon: '🐈', short: 'Library Cat', name: 'Library Cat', desc: 'A cat pounces on enemies', max: 3, weight: 5, apply: (s) => { s.catLvl += 1; } }),
 
   // ---- cursed books: big upside, real cost ----

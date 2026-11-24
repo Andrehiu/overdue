@@ -20,9 +20,9 @@ test('Margin Notes: 2 diagonal books, then 1 behind, then 2 more diagonal; Compa
   assert.equal(byId('margin').weight, 5);
 });
 
-test('Last Chapter: +15 / 25 / 35% per missing heart, Cliffhanger is the Masterwork', () => {
-  assert.deepEqual([1, 2, 3].map((n) => +take('lastchapter', n).lastChapter.toFixed(2)), [0.15, 0.25, 0.35]);
-  assert.match(gainText(byId('lastchapter'), baseStats(), null)[0], /^\+15% damage per missing heart/);
+test('Last Chapter: +20 / 30 / 40% per missing heart, Cliffhanger is the Masterwork', () => {
+  assert.deepEqual([1, 2, 3].map((n) => +take('lastchapter', n).lastChapter.toFixed(2)), [0.2, 0.3, 0.4]);
+  assert.match(gainText(byId('lastchapter'), baseStats(), null)[0], /^\+20% damage per missing heart/);
   assert.equal(masterworkFor('lastchapter').id, 'm_cliffhanger');
   assert.ok(take('lastchapter', 1).cliffhanger === false);
   const s = baseStats(); byId('m_cliffhanger').apply(s); assert.ok(s.cliffhanger);
