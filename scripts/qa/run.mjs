@@ -854,6 +854,26 @@ async function newPlayerFlow(name, opts) {
   return record.list;
 }
 // ---------------------------------------------------------------- 4c. app basics (v1.13.1): offline play, update, kill switch, backup code, Home Screen nudge
+/** v1.13.1 basics flow: the worker taking control / the update reload navigates the page on its own, which destroys an evaluate that is running.
+ *  Every evaluate on these pages waits for the planned navigation to settle and retries (reads and idempotent steps only). */
+async function steadyContext(opts) {
+  const ctx = await browser.newContext(opts), np = ctx.newPage.bind(ctx);
+  ctx.newPage = async () => {
+    const page = await np(), ev = page.evaluate.bind(page);
+    page.evaluate = async (...a) => {
+      for (let i = 0; ; i++) {
+        try { return await ev(...a); }
+        catch (e) {
+          if (i >= 3 || !/Execution context was destroyed|navigation/i.test(String(e.message))) throw e;
+          await page.waitForLoadState('load').catch(() => {}); await page.waitForSelector('body.ready', { timeout: 10000 }).catch(() => {}); await page.waitForTimeout(150);
+        }
+      }
+    };
+    return page;
+  };
+  return ctx;
+}
+
 async function basicsFlow() {
   const record = recorder(); const area = 'basics';
   const dir = join(OUT, 'site-live'); await cp(SITE, dir, { recursive: true });
@@ -869,7 +889,7 @@ async function basicsFlow() {
   const phone = devices['iPhone 13 landscape'];
   try {
     // ---- offline play ----
-    const ctx = await browser.newContext({ ...phone, permissions: ['clipboard-read', 'clipboard-write'] });
+    const ctx = await steadyContext({ ...phone, permissions: ['clipboard-read', 'clipboard-write'] });
     const page = await ctx.newPage(); const errs = [];
     page.on('pageerror', (e) => errs.push(e.message));
     await page.goto(`${base}?debug=1`); await page.waitForTimeout(400);
@@ -942,7 +962,7 @@ async function basicsFlow() {
     record(area, 'fragment build: no worker file, no sw stamp', !existsSync(join(fragDir, 'sw.js')) && !/"sw":/.test(frag));
 
     // ---- backup code: copy, restore, bad code ----
-    const c2 = await browser.newContext({ ...phone, permissions: ['clipboard-read', 'clipboard-write'] });
+    const c2 = await steadyContext({ ...phone, permissions: ['clipboard-read', 'clipboard-write'] });
     const bp = await c2.newPage(); await bp.goto(`http://localhost:${server.address().port}/?debug=1`); await bp.waitForSelector('body.ready');
     await bp.evaluate(() => { localStorage.setItem('overdue.progress.v1', JSON.stringify({ fines: 4321, unlocked: 2 })); localStorage.setItem('overdue.name.v1', JSON.stringify({ name: 'Ada' })); localStorage.setItem('overdue.tips.v1', JSON.stringify({ seen: ['firstrun'] })); });
     await bp.tap('#title [data-act=settings]'); await bp.waitForTimeout(200); await bp.tap('#btnBackup'); await bp.waitForTimeout(200);
@@ -972,7 +992,7 @@ async function basicsFlow() {
 
     // ---- Home Screen nudge ----
     const nudgeRun = async (init, secs, label, expectShow, setup) => {
-      const c = await browser.newContext(phone);
+      const c = await steadyContext(phone);
       if (init) await c.addInitScript(init);
       const p = await c.newPage(); await p.goto(`http://localhost:${server.address().port}/?debug=1`); await p.waitForSelector('body.ready');
       if (setup) await p.evaluate(setup);
@@ -1006,7 +1026,7 @@ async function basicsFlow() {
     record(area, 'nudge: never shown when running as an installed app (navigator.standalone)', !r.shown && !r.tips.includes('a2hs')); await r.c.close();
     r = await nudgeRun(() => { const mm = window.matchMedia.bind(window); window.matchMedia = (q) => (/display-mode:\s*standalone/.test(q) ? { matches: true, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} } : mm(q)); }, 200, 'display-mode', false);
     record(area, 'nudge: never shown when display-mode is standalone', !r.shown && !r.tips.includes('a2hs')); await r.c.close();
-    const cw = await browser.newContext(phone); const wp = await cw.newPage(); await wp.goto(`http://localhost:${server.address().port}/?debug=1`); await wp.waitForSelector('body.ready');
+    const cw = await steadyContext(phone); const wp = await cw.newPage(); await wp.goto(`http://localhost:${server.address().port}/?debug=1`); await wp.waitForSelector('body.ready');
     record(area, 'nudge: a cleared story wing triggers it (rule check)', await wp.evaluate(() => __overdue.maybeNudge(true, 5) === true)); await cw.close();
   } catch (e) { record(area, 'basics flow completed', false, e.message.split('\n')[0]); }
   srv.close();
@@ -1034,7 +1054,7 @@ async function basicsFlow() {
 // ---------------------------------------------------------------- 4. performance budget
 // Late-game boss with a stacked build: this once ran at 0.4x game speed (chained hit-stop) and ~40fps.
 if (want('perf')) {
-  const ctx = await browser.newContext(devices['iPhone 13 landscape']);
+  const ctx = await steadyContext(devices['iPhone 13 landscape']);
   const page = await ctx.newPage();
   await page.goto(URL0); await page.evaluate(RETURNING_SAVE_JS); await page.reload(); await page.waitForTimeout(500);
   await page.tap('[data-act=play]'); await page.waitForTimeout(300);
