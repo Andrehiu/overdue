@@ -18,6 +18,8 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
   (usually additive; after a merge run `node --check scripts/qa/run.mjs`). QA seeds a "returning player" save since 1.13.0.
   Coders sometimes report the planner branch name by mistake: verify with `git log origin/<branch>`. Pages runs can sit in
   "waiting" a minute. "Show tips again" also clears the 1.13.0 unlock flags (small follow-up if the owner notices).
+- **Planner handover:** once 1.14.0 parts A+B are reviewed and pushed, planning 3 starts "Overdue · planning 4" with
+  `docs/handoffs/planning-4.md` (includes the owner's new working rules), updates this section first, then stops.
 - **Next:** 1.14.0 (A then B) → owner playtest wings 7–8 + an Orbit run → 1.14.1 Rare Books + cursed → 1.15.0 new perks
   (+ What's new card / NEW badges; status-colour 3-option page first) → 1.16.0 Book Bag → 1.17.0 player look.
 
