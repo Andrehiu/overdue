@@ -62,9 +62,9 @@ export const UPGRADES = [
   perk({ id: 'interlibrary', icon: '🔁', short: 'Loan', name: 'Interlibrary Loan', desc: 'Books leaving the library come back through the opposite wall', max: 3, weight: 5, apply: (s) => { s.wraps += 1; } }),
 
   // ---- status perks (v1.15.0): ink, cold and static; they meet each other in the combos below ----
-  perk({ id: 'leakypen', icon: '🖊️', short: 'Leaky Pen', name: 'Leaky Pen', desc: 'Hits soak enemies in ink', max: 3, weight: 5, apply: (s) => { s.ink = !s.ink ? 0.65 : s.ink < 0.7 ? 0.75 : 1; s.inkDur = s.ink >= 1 ? 3 : 2; } }),
-  perk({ id: 'coldstorage', icon: '❄️', short: 'Cold Storage', name: 'Cold Storage', desc: 'Hits slow enemies', max: 3, weight: 5, apply: (s) => { s.chill = !s.chill ? 0.25 : s.chill < 0.28 ? 0.3 : 0.4; } }),
-  perk({ id: 'static', icon: '🔌', short: 'Static Cling', name: 'Static Cling', desc: 'Hits sometimes zap a nearby enemy', max: 3, weight: 5, apply: (s) => { s.staticChance = [0.4, 0.45, 0.5][Math.min(2, s.staticLvl)]; s.staticLvl++; s.staticJumps = s.staticLvl >= 3 ? 2 : 0; } }),
+  perk({ id: 'leakypen', icon: '🖊️', short: 'Leaky Pen', name: 'Leaky Pen', desc: 'Hits soak enemies in ink', max: 3, weight: 5, apply: (s) => { s.ink = !s.ink ? 0.8 : s.ink < 0.85 ? 0.85 : 1; s.inkDur = s.ink >= 1 ? 3 : 2; } }),
+  perk({ id: 'coldstorage', icon: '❄️', short: 'Cold Storage', name: 'Cold Storage', desc: 'Hits slow enemies', max: 3, weight: 5, apply: (s) => { s.chill = !s.chill ? 0.3 : s.chill < 0.33 ? 0.35 : 0.4; } }),
+  perk({ id: 'static', icon: '🔌', short: 'Static Cling', name: 'Static Cling', desc: 'Hits sometimes zap a nearby enemy', max: 3, weight: 5, apply: (s) => { s.staticChance = [0.45, 0.5, 0.55][Math.min(2, s.staticLvl)]; s.staticLvl++; s.staticJumps = s.staticLvl >= 3 ? 2 : 0; } }),
   perk({ id: 'popup', icon: '🎉', short: 'Pop-up Book', name: 'Pop-up Book', desc: 'Defeated enemies pop, hurting enemies nearby', max: 3, weight: 5, apply: (s) => { s.popLvl = Math.min(3, s.popLvl + 1); s.popRadius = POP_RADIUS[s.popLvl]; s.popMult = POP_MULT[s.popLvl]; } }),
 
   // ---- cursed books: big upside, real cost ----
