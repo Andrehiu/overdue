@@ -27,11 +27,11 @@ const PERK_ORDER = ['hardcover', 'speedreader', 'extendedloan', 'graceperiod', '
   'footnotes', 'quietplease', 'audiobook', 'readingnook', 'spinebreaker', 'interlibrary'];
 
 /** Index of the card to take. Unlocked Collected Works / Masterworks first, then the priority list, cursed last. */
-export function pickPerk(choices) {
+export function pickPerk(choices, ban = []) {
   let best = 0, bestScore = -Infinity;
   choices.forEach((u, i) => {
     const k = PERK_ORDER.indexOf(u.id);
-    const score = u.kind === 'combo' || u.kind === 'master' ? 1000 : u.kind === 'cursed' ? -100 : k >= 0 ? 100 - k : 0;
+    const score = ban.includes(u.id) ? -500 : u.kind === 'combo' || u.kind === 'master' ? 1000 : u.kind === 'cursed' ? -100 : k >= 0 ? 100 - k : 0;
     if (score > bestScore) { bestScore = score; best = i; }
   });
   return best;
@@ -98,7 +98,7 @@ export function poolMetrics(runs) {
   let m = null;
   for (const r of runs) {
     const x = r.metrics; if (!x) continue;
-    if (!m) m = { n: 0, dealt: {}, taken: {}, thrown: 0, ended: 0, thrownHit: 0, evict: 0, flight: [], life: [], pages: { hits: 0, crossed: 0, crossedHit: 0 }, bossKills: [], seconds: 0 };
+    if (!m) m = { n: 0, dealt: {}, taken: {}, thrown: 0, ended: 0, thrownHit: 0, evict: 0, flight: [], life: [], pages: { hits: 0, crossed: 0, crossedHit: 0, blocked: 0, blockedHit: 0 }, bossKills: [], seconds: 0 };
     m.n += x.n || 1; m.dealt = addMaps(m.dealt, x.dealt); m.taken = addMaps(m.taken, x.taken);
     for (const k of ['thrown', 'ended', 'thrownHit', 'evict', 'seconds']) m[k] += x[k] || 0;
     m.flight = addArrays(m.flight, x.flight); m.life = addArrays(m.life, x.life);
@@ -120,7 +120,7 @@ export function summariseMetrics(m) {
     lifeP95: histP(m.life, 0.95, 0.1), flightP95: histP(m.flight, 0.95, 1),
     evictPerSec: m.seconds ? m.evict / m.seconds : null,
     orbitShareOfDamage: share.orbit,
-    pagesBlockedShare: m.pages.hits ? m.pages.crossedHit / m.pages.hits : null,   // of the pages that hit you, how many first flew through an orbit book
+    pagesBlockedShare: (m.pages.blockedHit || 0) + m.pages.hits ? (m.pages.blockedHit || 0) / ((m.pages.blockedHit || 0) + m.pages.hits) : null,   // pages an orbit book caught / (caught + hit you)
     pagesCrossed: m.pages.crossed, pagesHit: m.pages.hits,
     bossKillTime: m.bossKills.length ? avg(m.bossKills) : null, bossKills: m.bossKills.length,
   };
@@ -267,7 +267,7 @@ export function metricsSection(rows) {
     for (const { w, s } of sums) if (s) L.push(`| ${w} | ${s.n} | ${Math.round(s.dealtPerRun)} | ${DEALT_SOURCES.map((k) => pct(s.dealtShare[k])).join(' | ')} |`);
     L.push('', 'Hearts lost by source (share of all hearts lost):', '', '| Wing | Top sources |', '|---|---|');
     for (const { w, s } of sums) if (s) L.push(`| ${w} | ${s.takenList.slice(0, 6).map((t) => `${t.src} ${pct(t.share)}`).join(' · ') || '–'} |`);
-    L.push('', 'Throw and orbit metrics:', '', '| Wing | Thrown-book hit rate | Book life p95 (s) | Books in flight p95 | Evictions/s | Orbit share of damage | Pages through an orbit book that still hit you (share of hits) | Boss kill time (s, n) |', '|---|---|---|---|---|---|---|---|');
+    L.push('', 'Throw and orbit metrics:', '', '| Wing | Thrown-book hit rate | Book life p95 (s) | Books in flight p95 | Evictions/s | Orbit share of damage | Pages caught by an orbit book (share of pages that would have hit you) | Boss kill time (s, n) |', '|---|---|---|---|---|---|---|---|');
     for (const { w, s } of sums) if (s) L.push(`| ${w} | ${pct(s.hitRate)} | ${f1(s.lifeP95)} | ${f1(s.flightP95, 0)} | ${f1(s.evictPerSec, 2)} | ${pct(s.orbitShareOfDamage)} | ${pct(s.pagesBlockedShare)} (${s.pagesHit} hits) | ${f1(s.bossKillTime)} (${s.bossKills}) |`);
     L.push('');
   }

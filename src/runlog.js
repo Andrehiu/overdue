@@ -20,7 +20,7 @@ export function newCounters() {
     dealt, taken: {},
     thrown: 0, thrownHit: 0, ended: 0, evict: 0,                 // thrown books: ended = finished flying, thrownHit = ones that hurt something
     life: new Uint32Array(LIFE_BINS), flight: new Uint32Array(FLIGHT_BINS), samples: 0,   // histograms: book age at end, books in flight per step
-    pages: { hits: 0, crossed: 0, crossedHit: 0 },                // pages that hit you; pages that flew through an orbit book; ...and went on to hit you
+    pages: { hits: 0, crossed: 0, crossedHit: 0, blocked: 0, blockedHit: 0 },              // pages that hit you; pages that flew through an orbit book; ...and went on to hit you
     bossKills: [], steps: 0,
   };
 }

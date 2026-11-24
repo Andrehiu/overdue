@@ -6,7 +6,7 @@ const WEIGHT = { boss: 2.5, golem: 1.5, coin: 0.4 };
 const DECIDE_EVERY = 4;                 // steps (1/120 s each): the bot re-thinks at 30 Hz
 
 /** Play one run. progress = the save to start from. Never throws: failures come back as outcome 'error'. */
-export function playRun(o, { wing, policy, progress, force = [], roomTimeout = 180, wallMs = 180000 }) {
+export function playRun(o, { wing, policy, progress, force = [], ban = [], roomTimeout = 180, wallMs = 180000 }) {
   const g = o.game, errors = [];
   try {
     o.drive(true);
@@ -21,7 +21,7 @@ export function playRun(o, { wing, policy, progress, force = [], roomTimeout = 1
       if (st === 'gameover') break;
       if (st === 'upgrade') {
         const before = g.wave;
-        o.pickCard(pickPerk(o.choices));
+        o.pickCard(pickPerk(o.choices, ban));
         if (g.state === 'upgrade' && g.wave === before && ++stuck > 20) { outcome = 'error'; errors.push('perk screen would not close'); }
         continue;
       }

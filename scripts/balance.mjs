@@ -9,6 +9,7 @@
 //   npm run balance -- --renos=none|half|max|both   (default both = none+half; csv works too: --renos=none,max)
 //   npm run balance -- --wings=6,7,8,9,10 --renos=max --policies=rare --runs=60
 //   npm run balance -- --force-perks=dewey:3,interlibrary:3   (bot only: grant perks at run start; the bot still picks the rest)
+//   npm run balance -- --ban-perks=audiobook   (bot only: never pick these perks; for no-orbit baselines)
 //   npm run balance -- --rooms=old|new --viewport=844x390 --out=balance-report-x   (old = pre-1.14.0 room size, debug flag)
 //   npm run balance -- --policies=rare,rest --jobs=4
 import { chromium } from 'playwright';
@@ -31,6 +32,7 @@ const WINGS = arg('wings', WINGS_TESTED.join(',')).split(',').map(Number).filter
 const PICKED = arg('policies', POLICIES.join(',')).split(',').filter((p) => POLICIES.includes(p));
 const RENOS = arg('renos', 'both') === 'both' ? ['none', 'half'] : arg('renos', 'both').split(',').filter((r) => RENO_PRESETS.includes(r));
 const FORCE = parseForce(arg('force-perks', ''));
+const BAN = arg('ban-perks', '').split(',').filter((x) => /^[a-z_]+$/.test(x));   // bot only: never pick these (baseline runs, e.g. no orbit)
 const ROOMS_FLAG = arg('rooms', 'new') === 'old' ? '&legacyrooms=1' : '';
 const [VW, VH] = arg('viewport', '1280x720').split('x').map(Number);
 const JOBS = Math.max(1, Number(arg('jobs', Math.min(4, cpus().length))));
@@ -90,13 +92,13 @@ async function worker(id) {
     const job = order[next++];
     let r;
     try {
-      r = await page.evaluate(async ({ wing, policy, progress, force, seed }) => {
+      r = await page.evaluate(async ({ wing, policy, progress, force, ban, seed }) => {
         // Seeded randomness: run k of a cell gets the same seed in every batch, so old-vs-new room size compares like with like.
         let a = (seed * 2654435761) >>> 0;
         Math.random = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
         const m = await import('/__bot/balance-bot.mjs');
-        return m.playRun(window.__overdue, { wing, policy, progress, force });
-      }, { wing: job.wing, policy: job.policy, progress: saves[job.renos], force: FORCE, seed: job.seed });
+        return m.playRun(window.__overdue, { wing, policy, progress, force, ban });
+      }, { wing: job.wing, policy: job.policy, progress: saves[job.renos], force: FORCE, ban: BAN, seed: job.seed });
       if (page.pageErrors.length) { r.errors = [...(r.errors || []), ...page.pageErrors.splice(0)]; }
     } catch (e) {
       r = { wing: job.wing, policy: job.policy, outcome: 'error', room: 0, hearts: 0, fines: 0, time: 0, errors: [String(e.message || e).slice(0, 200)] };

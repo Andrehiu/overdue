@@ -122,11 +122,11 @@ test('v1.14.0 tooling: force-perks parsing, histogram percentiles, pooled run-lo
   assert.deepEqual(L.parseForce(''), []); assert.deepEqual(L.parseForce('none'), []);
   assert.deepEqual(L.RENO_PRESETS, ['none', 'half', 'max']);
   assert.equal(L.histP([0, 0, 0], 0.5), null); assert.equal(L.histP([5, 0, 5], 0.5, 0.1), 0); assert.equal(L.histP([5, 0, 5], 0.95, 0.1), 0.2);
-  const run = (o) => ({ dealt: { throw: 80, crit: 20, orbit: 0 }, taken: { bunny: 2 }, thrown: 10, ended: 10, thrownHit: 4, evict: 3, flight: [0, 5, 5], life: [2, 8], pages: { hits: 2, crossed: 3, crossedHit: 1 }, bossKills: [30], seconds: 100, ...o });
+  const run = (o) => ({ dealt: { throw: 80, crit: 20, orbit: 0 }, taken: { bunny: 2 }, thrown: 10, ended: 10, thrownHit: 4, evict: 3, flight: [0, 5, 5], life: [2, 8], pages: { hits: 2, crossed: 3, crossedHit: 1, blocked: 2, blockedHit: 2 }, bossKills: [30], seconds: 100, ...o });
   const m = L.poolMetrics([{ metrics: run() }, { metrics: run({ taken: { 'page:fan': 1 }, bossKills: [] }) }, { outcome: 'error' }]);
   assert.equal(m.n, 2); assert.equal(m.dealt.throw, 160); assert.deepEqual(m.taken, { bunny: 2, 'page:fan': 1 }); assert.deepEqual(m.bossKills, [30]);
   const s = L.summariseMetrics(m);
-  assert.equal(s.hitRate, 0.4); assert.equal(s.evictPerSec, 6 / 200); assert.equal(s.pagesBlockedShare, 0.5); assert.equal(s.dealtShare.throw, 0.8);
+  assert.equal(s.hitRate, 0.4); assert.equal(s.evictPerSec, 6 / 200); assert.equal(s.pagesBlockedShare, 0.5)   // blocked 4 of (4 blocked + 4 hit); assert.equal(s.dealtShare.throw, 0.8);
   assert.equal(s.takenList[0].src, 'bunny'); assert.equal(s.bossKillTime, 30);
   assert.equal(L.summariseMetrics(null), null);
   const rows = L.aggregate([{ renos: 'max', wing: 7, policy: 'rare', outcome: 'clear', room: 7, hearts: 3, fines: 50, time: 100, metrics: run() }]);

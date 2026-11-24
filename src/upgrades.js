@@ -39,16 +39,16 @@ const master = (perkId, o) => ({ kind: 'master', max: 1, weight: 0, requires: [p
 export const UPGRADES = [
   // ---- core (rebalanced: no single card should carry a run) ----
   perk({ id: 'hardcover', icon: '📕', short: 'Hardcover', name: 'Hardcover Edition', desc: '+50% book damage', max: 3, weight: 9, apply: (s) => { s.damage += 0.5; } }),
-  perk({ id: 'speedreader', icon: '⚡️', short: 'Speed Reader', name: 'Speed Reader', desc: '+20% throw rate', max: 3, weight: 9, apply: (s) => { s.fireRate *= 1.2; } }),
+  perk({ id: 'speedreader', icon: '⚡️', short: 'Speed Reader', name: 'Speed Reader', desc: '+30% of your starting throw rate', max: 3, weight: 9, apply: (s) => { s.fireRate += 1.2; } }),
   perk({ id: 'trilogy', icon: '📚', short: 'Trilogy', name: 'Trilogy Box Set', desc: '+1 book per throw', max: 3, weight: 6, apply: (s) => { s.projectiles += 1; s.spread = Math.max(0.14, s.spread * 0.9); } }),
   perk({ id: 'bookmark', icon: '🔖', short: 'Bookmark', name: 'Bouncy Bookmark', desc: 'Books ricochet off shelves & walls (+1 bounce)', max: 3, apply: (s) => { s.bounces += 1; } }),
   perk({ id: 'plottwist', icon: '🌀', short: 'Plot Twist', name: 'Plot Twist', desc: 'Books pierce through +1 enemy', max: 3, apply: (s) => { s.pierce += 1; } }),
-  perk({ id: 'dewey', icon: '🧭', short: 'Dewey', name: 'Dewey Decimal Guidance', desc: 'Books home in on enemies. Each level turns harder and reaches further.', max: 3, weight: 6, apply: (s) => { s.homing += 2.4; s.homingRange = s.homingRange ? s.homingRange + 80 : 240; } }),
+  perk({ id: 'dewey', icon: '🧭', short: 'Dewey', name: 'Dewey Decimal Guidance', desc: 'Books home in on enemies. Each level turns harder and reaches further. Homing stops once a book comes back through a wall.', max: 3, weight: 6, apply: (s) => { s.homing += 2.4; s.homingRange = s.homingRange ? s.homingRange + 80 : 240; } }),
   perk({ id: 'coffee', icon: '☕', short: 'Espresso', name: 'Double Espresso', desc: '+12% move speed, −15% dash cooldown', max: 3, weight: 8, apply: (s) => { s.speed *= 1.12; s.dashCd *= 0.85; } }),
   perk({ id: 'extendedloan', icon: '❤️', short: 'Ext. Loan', name: 'Extended Loan', desc: '+1 max heart and fully heal', max: 3, apply: (s, p) => { s.maxHp += 1; if (p) p.hp = s.maxHp; } }),
   perk({ id: 'quietplease', icon: '🤫', short: 'Quiet Please', name: 'Quiet Please', desc: 'SHHH! recharges 25% faster and reaches 20% further', max: 3, weight: 6, apply: (s) => { s.shhhCd *= 0.75; s.shhhRadius *= 1.2; } }),
-  perk({ id: 'footnotes', icon: '✳️', short: 'Footnotes', name: 'Footnotes', desc: '+12% chance to crit for 2.5× damage', max: 3, apply: (s) => { s.critChance += 0.12; } }),
-  perk({ id: 'audiobook', icon: '🎧', short: 'Audiobook', name: 'Audiobook Orbit', desc: '+1 book orbits you, smacking enemies', max: 3, weight: 5, apply: (s) => { s.orbiters += 1; } }),
+  perk({ id: 'footnotes', icon: '✳️', short: 'Footnotes', name: 'Footnotes', desc: '+15% chance to crit for 2.5× damage', max: 3, apply: (s) => { s.critChance += 0.15; } }),
+  perk({ id: 'audiobook', icon: '🎧', short: 'Audiobook', name: 'Audiobook Orbit', desc: 'Books orbit you, smacking enemies (first pick: 2 books, then +1)', max: 3, weight: 5, apply: (s) => { s.orbiters = s.orbiters ? s.orbiters + 1 : 2; } }),
   perk({ id: 'graceperiod', icon: '🕊️', short: 'Grace Period', name: 'Grace Period', desc: 'Heal 1 heart; +0.3s invulnerability after a hit', max: 3, weight: 6, apply: (s, p) => { s.iframes += 0.3; if (p) p.hp = Math.min(s.maxHp, p.hp + 1); } }),
 
   // ---- shelf play: the shelves are part of your arsenal ----
@@ -80,11 +80,11 @@ export const UPGRADES = [
   master('extendedloan', { id: 'm_lifetime', icon: '💳', short: 'Lifetime', name: 'Lifetime Membership', desc: 'Heal 1 heart every time you clear a wave.', apply: (s) => { s.regenPerWave = 1; } }),
   master('quietplease', { id: 'm_silence', icon: '🔇', short: 'Silence', name: 'Absolute Silence', desc: 'SHHH! freezes every enemy in the library for 2.5s.', apply: (s) => { s.shhhGlobal = true; } }),
   master('footnotes', { id: 'm_biblio', icon: '📑', short: 'Biblio', name: 'Bibliography', desc: 'Critical hits deal 5× damage instead of 2.5×.', apply: (s) => { s.critMult = 5; } }),
-  master('audiobook', { id: 'm_surround', icon: '🔊', short: 'Surround', name: 'Surround Sound', desc: 'Double your orbiting books; their orbit pulses outward.', apply: (s) => { s.orbiters *= 2; s.orbitPulse = true; } }),
+  master('audiobook', { id: 'm_surround', icon: '🔊', short: 'Surround', name: 'Surround Sound', desc: 'Double the orbit. Each book blocks a page, then rests 2.5s.', apply: (s) => { s.orbiters *= 2; s.orbitPulse = true; } }),
   master('graceperiod', { id: 'm_amnesty', icon: '🛡️', short: 'Amnesty', name: 'Amnesty', desc: 'Once per wave, a hit that would kill you is forgiven.', apply: (s) => { s.amnesty = true; } }),
   master('spinebreaker', { id: 'm_demolition', icon: '🧨', short: 'Demolition', name: 'Demolition Crew', desc: 'Shelf bursts are twice as big and hit 3× harder.', apply: (s) => { s.shelfBurst *= 2; s.burstMult = 3; } }),
   master('readingnook', { id: 'm_fortress', icon: '🏰', short: 'Fortress', name: 'Fortress of Solitude', desc: 'Next to a shelf you also deal double damage.', apply: (s) => { s.nookDamage = 1; } }),
-  master('interlibrary', { id: 'm_interdim', icon: '🌌', short: 'Interdim.', name: 'Interdimensional Loan', desc: 'Books that come back through a wall home in and hit twice as hard.', apply: (s) => { s.wrapHoming = true; } }),
+  master('interlibrary', { id: 'm_interdim', icon: '🌌', short: 'Interdim.', name: 'Interdimensional Loan', desc: 'Looped books home in once and hit twice as hard.', apply: (s) => { s.wrapHoming = true; } }),
 ];
 
 // What a card changes, in player words: multipliers, plain-word tiers, counts and seconds
@@ -138,7 +138,7 @@ const GAIN = [
   ['projectiles', (a, b) => `+${b - a} book per throw`],
   ['bounces', (a, b) => `+${b - a} bounce${b - a > 1 ? 's' : ''}`],
   ['pierce', (a, b) => (b >= 99 ? 'Books pierce everything' : `Pierce +${b - a} enemy`)],
-  ['homing', (a, b) => (a === 0 ? 'Books home in on enemies' : b > 10 ? 'Perfect homing' : 'Stronger homing, longer reach')],
+  ['homing', (a, b) => (a === 0 ? 'Books home in on enemies. Homing stops once a book comes back through a wall' : b > 10 ? 'Perfect homing' : 'Stronger homing, longer reach')],
   ['critChance', (a, b) => `+${pct(b - a)} crit chance`],
   ['critMult', (a, b) => `Crits hit ×${b}`],
   ['speed', (a, b) => `+${pct(b / a - 1)} move speed`],
@@ -146,7 +146,7 @@ const GAIN = [
   ['dashCharges', (a, b) => `+${b - a} dash charge`],
   ['shhhCd', (a, b) => (a / b >= 2 ? `SHHH! recharges ${+(a / b).toFixed(1)}× faster` : `−${pct(1 - b / a)} SHHH! cooldown`)],
   ['shhhRadius', (a, b) => `+${pct(b / a - 1)} SHHH! size`],
-  ['orbiters', (a, b) => (a > 0 && b === a * 2 ? 'Doubles your orbiting books' : `+${b - a} orbiting book`)],
+  ['orbiters', (a, b) => (a > 0 && b === a * 2 ? 'Doubles your orbiting books' : `+${b - a} orbiting book${b - a > 1 ? 's' : ''}`)],
   ['iframes', (a, b) => `+${+(b - a).toFixed(1)}s safety after a hit`],
   ['shelfBurst', (a, b) => (a === 0 ? 'Books burst when they hit shelves' : 'Bigger shelf bursts')],
   ['nook', (a, b) => `+${pct(b - a)} throw speed next to shelves`],

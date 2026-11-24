@@ -30,7 +30,7 @@ test('every wing is harder than the previous wing, room for room', async () => {
 });
 
 test('wing 1 plays like the opening of endless (mapped onto the old curve); room 4 is elite and room 7 a boss', async () => {
-  const { difficulty, roomKind, composeRoom, WINGS, CURVE, curveRoom, ROOMS_PER_WING, ELITE_ROOM, BOSS_ROOM } = await load('story');
+  const { difficulty, roomKind, composeRoom, WINGS, CURVE, curveRoom, ROOMS_PER_WING, ELITE_ROOM, BOSS_ROOM, wingHp, BOSS_BUDGET_STEP } = await load('story');
   const { Rng } = await load('util');
   assert.deepEqual(CURVE, [1, 2, 4, 5, 7, 8, 10]);
   assert.equal(CURVE.length, ROOMS_PER_WING);
@@ -47,8 +47,8 @@ test('wing 1 plays like the opening of endless (mapped onto the old curve); room
     const boss = composeRoom(w, BOSS_ROOM, new Rng(w));
     assert.equal(boss.spawns.filter((s) => s.type === 'boss').length, 1);
     for (let r = 1; r < BOSS_ROOM; r++) assert.ok(!composeRoom(w, r, new Rng(r)).spawns.some((s) => s.type === 'boss'));
-    // The boss and the opening are as hard as the old wing's boss and opening.
-    assert.equal(difficulty(w, BOSS_ROOM).bossHp, Math.round(330 * (1 + 0.22 * (w - 1)) * (1 + 0.12 * (w - 1))));
+    // Boss HP follows the flattened wing curve (v1.14.0); wing 1 is still 330.
+    assert.equal(difficulty(w, BOSS_ROOM).bossHp, Math.round(330 * wingHp(w - 1) * (1 + BOSS_BUDGET_STEP * (w - 1))));
   }
 });
 

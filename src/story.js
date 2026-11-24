@@ -21,7 +21,7 @@ export const curveRoom = (room) => CURVE[Math.min(CURVE.length, Math.max(1, room
 // Survive rooms: 30 s on the clock while enemies keep coming. Handmade per wing, never room 1, the elite
 // room or the boss room; at most one per wing (v1.13.0, plain early rooms for new players). Fines are the plain room's.
 export const SURVIVE_SECONDS = 30;
-export const SURVIVE_BUDGET_MULT = 1.2;    // total spawn budget vs the plain room: never easier
+export const SURVIVE_BUDGET_MULT = 1.05;   // total spawn budget vs the plain room: never easier
 export const SURVIVE_END = SURVIVE_SECONDS - 10;     // no spawn after this, so the last enemies still have time to be fought
 // Budget shares and the time slice of the 30 s each chunk fills (thin start, heavy finish).
 export const SURVIVE_CHUNKS = [{ share: 0.2, from: 0.8, to: 6 }, { share: 0.3, from: 6.5, to: 12 }, { share: 0.5, from: 12.5, to: SURVIVE_END }];
@@ -43,7 +43,7 @@ export const WINGS = [
     weights: { notice: 2.6 }, gapMult: 0.9, floorHue: 18, rug: '#2c3a1d' },
   { id: 'reference', shapes: ['reading', 'pillars'], icon: '📖', name: 'Reference Section', blurb: 'Loud patrons shout from behind the encyclopedias.',
     intro: "Loud patrons, louder opinions. Bring a SHHH.", taunt: "Ahem. As I said in footnote 4,182...", cleared: "Reference closed. Citations: needed no longer.",
-    weights: { patron: 2.2 }, unlockShift: 1, floorHue: 30, rug: '#3b1f4a' },
+    weights: { patron: 1.7 }, unlockShift: 1, floorHue: 30, rug: '#3b1f4a' },
   { id: 'stacks', shapes: ['aisles', 'maze'], icon: '📚', name: 'The Stacks', blurb: 'Tight aisles. Bookworms burrow between the shelves.',
     intro: "Aisles so long the bookworms brought snacks.", taunt: "I've read every book in here. Twice. Through the spine.", cleared: "The Stacks stand still. Mind the worm holes.",
     weights: { worm: 2.2 }, unlockShift: 1, density: 2, floorHue: 22, rug: '#4a3216' },
@@ -55,13 +55,13 @@ export const WINGS = [
     unlockShift: 3, gapMult: 0.85, floorHue: 28, rug: '#4a1f1f' },
   { id: 'vault', shapes: ['reading', 'maze'], icon: '💎', name: 'Rare Books Vault', blurb: 'Elite collectors who fight back. Fines galore.',
     intro: "Behind glass, first editions with teeth.", taunt: "Mint condition. Unlike you, shortly.", cleared: "The Vault is sealed. Priceless, and quiet.",
-    weights: { golem: 1.6 }, unlockShift: 4, eliteBonus: 0.08, floorHue: 270, rug: '#3a2050' },
+    weights: { golem: 1.1 }, unlockShift: 4, eliteBonus: 0.04, floorHue: 270, rug: '#3a2050' },
   { id: 'maproom', shapes: ['pillars'], icon: '🗺️', name: 'Map Room', blurb: 'Wide open floor and nowhere to hide from the crowd.',
     intro: "Wide open floor. Nowhere to hide. Nowhere.", taunt: "You are here. Not for long.", cleared: "Map Room charted. You are, in fact, here.",
-    unlockShift: 5, density: -2, gapMult: 0.8, floorHue: 160, rug: '#173d38' },
+    unlockShift: 5, density: -1, gapMult: 0.8, floorHue: 160, rug: '#173d38' },
   { id: 'restricted', shapes: ['maze', 'bridge', 'aisles'], icon: '🔒', name: 'The Restricted Section', blurb: 'The last door. Everything that was banned is awake.',
     intro: "The last door. Everything banned is awake.", taunt: "Every story ends. Yours ends overdue.", cleared: "The library sleeps. Shift complete. SHHH.",
-    unlockShift: 5, eliteBonus: 0.1, gapMult: 0.85, floorHue: 0, rug: '#3d0d14' },
+    unlockShift: 5, eliteBonus: 0.07, gapMult: 0.85, floorHue: 0, rug: '#3d0d14' },
 ];
 
 export const roomKind = (room) => (room === BOSS_ROOM ? 'boss' : room === ELITE_ROOM ? 'elite' : 'normal');
@@ -70,27 +70,35 @@ export const roomKind = (room) => (room === BOSS_ROOM ? 'boss' : room === ELITE_
  * Every number that makes a room hard. Endless mode uses the same base curve for `room`, so wing 1
  * plays like the first ten endless waves; each later wing multiplies on top.
  */
+// v1.14.0: enemy HP per wing used to compound 1 + 0.22w with the budget (wing 8 needed ~6x the damage per second of wing 1).
+// The first two steps stay as they were; later wings climb more gently so the late game is reachable. Never decreases.
+export const HP_EARLY_STEP = 0.22, HP_LATE_STEP = 0.05;
+export const BUDGET_EARLY_STEP = 0.08, BUDGET_LATE_STEP = 0.05;
+export const wingBudget = (w) => 1 + BUDGET_EARLY_STEP * Math.min(w, 2) + BUDGET_LATE_STEP * Math.max(0, w - 2);
+export const wingHp = (w) => 1 + HP_EARLY_STEP * Math.min(w, 2) + HP_LATE_STEP * Math.max(0, w - 2);
+export const BOSS_BUDGET_STEP = 0.08;
+
 export function difficulty(wing, room) {
   const w = wing - 1, r = curveRoom(room);   // r: position on the old 10-room curve
   const def = WINGS[w] || WINGS[WINGS.length - 1];
   const kind = roomKind(room);
   const goal = roomGoal(wing, room);
   const base = baseBudget(r);
-  const budgetMult = 1 + 0.08 * w;
+  const budgetMult = wingBudget(w);
   const budget = base * budgetMult * (kind === 'boss' ? 0.35 : kind === 'elite' ? 0.75 : 1) * (goal === 'survive' ? SURVIVE_BUDGET_MULT : 1);
   return {
     wing, room, kind, goal, pos: r,
     budget,
-    hpMult: (1 + 0.08 * (r - 1)) * (1 + 0.22 * w),
-    speedMult: (1 + Math.min(0.35, r * 0.015)) * (1 + 0.03 * w),
-    eliteChance: kind === 'elite' ? 1 : Math.min(0.5, 0.035 * w + 0.008 * (r - 1) + Math.max(...WINGS.slice(0, w + 1).map((x) => x.eliteBonus || 0))),
-    hazardSpeed: 1 + 0.04 * w + 0.01 * (r - 1),
+    hpMult: (1 + 0.08 * (r - 1)) * wingHp(w),
+    speedMult: (1 + Math.min(0.35, r * 0.015)) * (1 + 0.02 * w),
+    eliteChance: kind === 'elite' ? 1 : Math.min(0.5, 0.025 * w + 0.008 * (r - 1) + Math.max(...WINGS.slice(0, w + 1).map((x) => x.eliteBonus || 0))),
+    hazardSpeed: 1 + 0.03 * w + 0.01 * (r - 1),
     // Spawn pressure never relaxes: a wing keeps the tightest pacing of any wing before it.
-    gapMult: Math.max(0.65, Math.min(...WINGS.slice(0, w + 1).map((x) => x.gapMult || 1)) * (1 - 0.025 * w)),
+    gapMult: Math.max(0.65, Math.min(...WINGS.slice(0, w + 1).map((x) => x.gapMult || 1)) * (1 - 0.015 * w)),
     eliteShootEvery: Math.max(1.5, 3.2 - 0.15 * w),
-    deathBurst: w >= 3 ? 4 + w : 0,          // from wing 4, elites burst into pages when they go down
+    deathBurst: w >= 3 ? 2 + w : 0,          // from wing 4, elites burst into pages when they go down
     bossTier: Math.floor(w / 3),             // 0..3: bosses learn a new pattern every 3 wings
-    bossHp: kind === 'boss' ? Math.round(330 * (1 + 0.22 * w) * (1 + 0.12 * w)) : 0,
+    bossHp: kind === 'boss' ? Math.round(330 * wingHp(w) * (1 + BOSS_BUDGET_STEP * w)) : 0,
     shelvesPerHalf: Math.max(1, Math.min(7, 2 + Math.floor((r + 1) / 2) + (def.density || 0))),
   };
 }

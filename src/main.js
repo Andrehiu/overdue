@@ -1564,7 +1564,9 @@ function updateBooks(dt) {
     const b = books[i];
     b.life -= dt; b.age += dt;
     b.rot += b.spin * dt;
-    const homing = b.homingBoost ? Math.max(stats.homing, 8) : stats.homing;
+    // Homing only on a book's first trip; Interdimensional Loan gives one homing trip (at 6) after the first wrap.
+    const trips = b.wrapN || 0;
+    const homing = trips === 0 ? stats.homing : trips === 1 && stats.wrapHoming ? 6 : 0;
     if (homing > 0) {
       const t = nearestEnemy(b.x, b.y, Math.max(stats.homingRange, 240));
       if (t) {
@@ -1580,8 +1582,9 @@ function updateBooks(dt) {
     // Interlibrary Loan: leave through one wall, come back through the opposite one.
     if (b.wraps > 0 && (b.x < 0 || b.y < 0 || b.x >= W || b.y >= H)) {
       b.x = (b.x + W) % W; b.y = (b.y + H) % H; ox = b.x; oy = b.y;
-      b.wraps--; b.life = Math.max(b.life, 0.9); b.hit.clear();
-      if (stats.wrapHoming) { b.homingBoost = true; b.dmgMult = Math.min(4, b.dmgMult * 2); b.color = PLAYER.wrapped; }
+      b.wraps--; b.life += 0.4; b.hit.clear(); b.wrapN = trips + 1;
+      b.dmgMult = Math.min(2, b.dmgMult * 1.25);   // +25% per trip, capped at x2
+      if (stats.wrapHoming) { if (trips === 0) b.dmgMult = 2; b.color = PLAYER.wrapped; }
       burst(b.x, b.y, 6, ['#9be7dc', '#fff'], 90, 0.3);
     }
     if (isSolidPx(arena.solid, b.x, b.y)) {
@@ -1633,24 +1636,31 @@ function updateBooks(dt) {
   }
 }
 
+// Audiobook Orbit (v1.14.0 fair version): no page blocking, no stun. Only Surround Sound blocks, one page per book, then it rests.
+const ORBIT_RADIUS = 64, ORBIT_SPIN = 3.6, ORBIT_DAMAGE = 1.25, ORBIT_REHIT = 0.3, ORBIT_KNOCK = 90, ORBIT_CRIT_MAX = 2.5, ORBIT_BLOCK_REST = 2.5;
+const orbitRest = [];   // Surround Sound: seconds until each book can block another page
 function orbiterPositions() {
   const n = stats.orbiters, out = [];
   for (let i = 0; i < n; i++) {
-    const a = game.time * 3.2 + (i / n) * TAU;
-    const rad = 48 + (stats.orbitPulse ? 30 * (0.5 + 0.5 * Math.sin(game.time * 2.2)) : 0);
+    const a = game.time * ORBIT_SPIN + (i / n) * TAU;
+    const rad = ORBIT_RADIUS + (stats.orbitPulse ? 30 * (0.5 + 0.5 * Math.sin(game.time * 2.2)) : 0);
     out.push({ x: player.x + Math.cos(a) * rad, y: player.y + Math.sin(a) * rad, a });
   }
   return out;
 }
-function updateOrbiters() {
+function updateOrbiters(dt) {
   if (!stats.orbiters || game.state === 'dying') return;
+  for (let i = 0; i < orbitRest.length; i++) orbitRest[i] = Math.max(0, orbitRest[i] - dt);
   for (const o of orbiterPositions()) {
     for (const e of enemies) {
       if (e.dead || e.orbitHit > 0) continue;
       if ((e.x - o.x) ** 2 + (e.y - o.y) ** 2 < (e.r + 8) ** 2) {
-        e.orbitHit = 0.35;
+        e.orbitHit = ORBIT_REHIT;
         const dx = e.x - player.x, dy = e.y - player.y, d = Math.hypot(dx, dy) || 1;
-        damageEnemy(e, stats.damage, (dx / d) * 220, (dy / d) * 220, false, 'orbit');
+        // Crits use your crit chance but never more than x2.5 (Bibliography doesn't apply, and no Annotated splash).
+        const crit = Math.random() < stats.critChance;
+        const dmg = stats.damage * ORBIT_DAMAGE * (crit ? Math.min(stats.critMult, ORBIT_CRIT_MAX) : 1);
+        damageEnemy(e, dmg, (dx / d) * ORBIT_KNOCK, (dy / d) * ORBIT_KNOCK, crit, 'orbit');
       }
     }
   }
@@ -1662,8 +1672,18 @@ function updateHazards(dt) {
     const h = hazards[i];
     if (!h) continue;   // Second Wind (in hurtPlayer) empties this list mid-loop
     h.life -= dt; h.x += h.vx * dt; h.y += h.vy * dt; h.rot += dt * 6;
-    if (orbs && !h.orb) for (const o of orbs) if ((o.x - h.x) ** 2 + (o.y - h.y) ** 2 < (h.r + 9) ** 2) { h.orb = true; rl.pages.crossed++; break; }
-    let remove = h.life <= 0 || h.x < -20 || h.x > W + 20 || h.y < -20 || h.y > H + 20;
+    let blockedByBook = false;
+    if (orbs && !h.orb) for (let k = 0; k < orbs.length; k++) {
+      const o = orbs[k];
+      if ((o.x - h.x) ** 2 + (o.y - h.y) ** 2 < (h.r + 9) ** 2) {
+        // Surround Sound only: a book that is ready catches this page, then rests.
+        if (stats.orbitPulse && !(orbitRest[k] > 0)) { orbitRest[k] = ORBIT_BLOCK_REST; blockedByBook = true; rl.pages.blocked++;
+          { const px = player.x - h.x, py = player.y - h.y, sp = Math.hypot(h.vx, h.vy) || 1;   // run log: would this page have hit you? (heading at you, passing within reach)
+            if (px * h.vx + py * h.vy > 0 && Math.abs(px * h.vy - py * h.vx) / sp < h.r + player.r) rl.pages.blockedHit++; } burst(h.x, h.y, 4, ['#9be7dc', '#fff'], 80, 0.25); break; }
+        h.orb = true; rl.pages.crossed++; break;
+      }
+    }
+    let remove = blockedByBook || h.life <= 0 || h.x < -20 || h.x > W + 20 || h.y < -20 || h.y > H + 20;
     if (!remove && isSolidPx(arena.solid, h.x, h.y) && h.x > 0 && h.y > 0 && h.x < W && h.y < H) { remove = true; burst(h.x, h.y, 3, ['#ff6b6b'], 60, 0.25); }
     if (!remove && (h.x - player.x) ** 2 + (h.y - player.y) ** 2 < (h.r + player.r - 2) ** 2 && player.inv <= 0 && player.dashT <= 0) {
       rl.pages.hits++; if (h.orb) rl.pages.crossedHit++; hurtPlayer(h.x, h.y, h.pat, h.pat.startsWith('page:elite')); remove = true;
@@ -1897,7 +1917,7 @@ function render() {
   for (let i = enemies.length - 1; i >= 0; i--) drawEnemy(enemies[i]);
   for (const b of books) drawThrownBook(b);
   if (game.state !== 'title' && game.state !== 'gameover' && !(game.state === 'dying' && game.deathT < 1.5)) {
-    for (const o of orbiterPositions()) drawBook(o.x, o.y, o.a * 2, PLAYER.orbit, 1.1);
+    orbiterPositions().forEach((o, k) => { if (orbitRest[k] > 0) ctx.globalAlpha = 0.4; drawBook(o.x, o.y, o.a * 2, PLAYER.orbit, 1.1); ctx.globalAlpha = 1; });
     drawPlayer();
   }
   drawHazards();

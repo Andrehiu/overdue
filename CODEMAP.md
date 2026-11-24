@@ -29,7 +29,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 
 | File | Lines | What it is |
 |---|---|---|
-| `index.html` | 249 | Page shell: menus and screens as `<section id>` |
+| `index.html` | 251 | Page shell: menus and screens as `<section id>` |
 | `src/arena.js` | 396 | Procedural, mirrored library layouts on a grid. Pure module (no DOM) so it is unit-testable. |
 | `src/audio.js` | 173 | 100% procedural audio: every sound effect and the adaptive soundtrack are synthesised |
 | `src/backend.js` | 84 | Score storage. The game is fully static, so there are two places a Hall of Fame can live: |
@@ -38,12 +38,12 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/doors.js` | 68 | Story doors: after most rooms you pick the next room from 2 doors. Pure module (no DOM) so it is unit-tested. |
 | `src/enemy-art.js` | 396 | Enemy art (v1.12.0): every enemy except the boss is drawn here. Look "Blend": library characters (own face per type) |
 | `src/flowfield.js` | 102 | Dijkstra flow field: one search from the player gives every enemy a path around the shelves. |
-| `src/main.js` | 2791 | OVERDUE! — Night Shift at the Meme Library |
+| `src/main.js` | 2811 | OVERDUE! — Night Shift at the Meme Library |
 | `src/meta.js` | 99 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
 | `src/newplayer.js` | 59 | New-player help (v1.13.0): which menus a player has earned, and the scripted first room. Pure module (no DOM), unit-tested. |
 | `src/palette.js` | 52 | Projectile colours. Pure module (no DOM), unit-tested. |
 | `src/runlog.js` | 103 | Run log (v1.14.0): one compact record per finished run, kept on this phone, plus the "Share stats" code. |
-| `src/story.js` | 154 | Story mode: ten handmade library wings (7 rooms each), unlocked in order. Pure module (no DOM) so it is unit-tested. |
+| `src/story.js` | 162 | Story mode: ten handmade library wings (7 rooms each), unlocked in order. Pure module (no DOM) so it is unit-tested. |
 | `src/upgrades.js` | 301 | Perks offered between waves. Pure data + a seeded roller (no DOM), so it is unit-tested. |
 | `src/util.js` | 132 | Small, dependency-free helpers shared by the game and its unit tests. |
 | `src/version.js` | 22 | Which build of the game is running. The build script injects the real values |
@@ -64,7 +64,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 
 ## index.html
 
-Screens: title:23 · howto:44 · settings:79 · backup:107 · leaderboard:124 · upgrade:130 · doors:139 · pause:146 · codex:157 · story:167 · shop:184 · gameover:192
+Screens: title:23 · howto:44 · settings:79 · backup:109 · leaderboard:126 · upgrade:132 · doors:141 · pause:148 · codex:159 · story:169 · shop:186 · gameover:194
 
 ## src/arena.js
 
@@ -107,10 +107,10 @@ NEIGH:4 · canStep:44 · computeFlowField:54 · lineOfSight:91
 - **Run / wave flow** (282–848): keepAwake:286 · startRun:292 · clearWorld:319 · startWave:325 · bannerQueue:356 · banner:357 · isSurvive:363 · endSurvive:366 · waveCleared:377 · resolveMystery:406 · showUpgrades:418 · afterPick:438 · nextRoom:443 · currentDoors:454 · showDoors:455 · chooseDoor:483 · enterDoor:490 · KIND_LABEL:502 · saveTips:507 · tipSeen:508 · markTip:509 · codex:513 · saveCodex:514 · cardsArmed:518 · currentChoices:520 · rollOpts:521 · showPerkTip:524 · newIds:536 · applyNew:537 · renderCards:542 · banishCard:562 · cap:594 · buildCard:596 · freeQueue:654 · freeFresh:656 · queueFreePerk:657 · flushFreePerks:662 · hideFreePerk:663 · showNextFree:664 · hasFinishedRun:683 · updateFirstHint:686 · renderBuild:692 · pop:724 · closeBuildPop:725 · openBuildPop:729 · renderReach:779 · renderCodex:797 · pause:821 · resume:831 · die:838
 - **Spawning** (849–932): DEF:852 · hpScaleNow:863 · makeEnemy:864 · spawnPoint:883 · updateSpawning:893 · materialise:911
 - **Effects helpers** (933–961): shake:936 · addLight:939 · floatText:943 · particle:946 · burst:947 · pages:955
-- **Update** (962–1721): step:965 · playerSaves:1000 · startGuideBeat:1004 · updateGuide:1011 · endGuide:1029 · moveInput:1039 · nearestEnemy:1052 · updatePlayer:1062 · collideWorld:1151 · spawnBook:1164 · fire:1180 · abilityReady:1202 · inkBurst:1213 · nextToShelf:1227 · doShhh:1235 · updateFlow:1272 · seek:1283 · updateEnemies:1295 · bossAI:1385 · shootHazard:1438 · fan:1443 · radial:1444 · damageEnemy:1446 · killEnemy:1476 · buzz:1517 · hurtPlayer:1522 · updateBooks:1561 · orbiterPositions:1636 · updateOrbiters:1645 · updateHazards:1659 · updateRings:1675 · updatePickups:1689 · updateParticles:1706
-- **Rendering** (1722–2306): BOOK_PALETTE:1725 · buildBackground:1727 · lampPositions:1816 · lightSprite:1828 · glowCache:1834 · glowSprite:1835 · renderLights:1844 · render:1883 · drawThrownBook:1933 · drawBook:1966 · drawPlayer:1974 · rim:2017 · drawEnemy:2022 · drawBoss:2032 · drawTelegraph:2066 · drawPickup:2074 · hazardSprite:2087 · drawHazards:2095 · drawRing:2112 · drawParticles:2119 · heartPath:2132 · FONT:2142 · txt:2143 · drawHUD:2149 · drawSurviveTimer:2218 · drawGuidePrompt:2235 · cooldown:2248 · btnCache:2264 · setTouchButton:2265 · drawCrosshair:2277 · drawStick:2286 · drawAimStick:2294
-- **DOM screens, settings, leaderboard** (2307–2689): SCREENS:2310 · showScreen:2312 · pinnedObservers:2322 · fitPinnedRow:2323 · renderMenus:2348 · renderFineBadges:2361 · renderShop:2366 · defaultWing:2400 · wingStatus:2404 · renderStory:2410 · logRun:2443 · bankRun:2455 · inRun:2463 · backupMsg:2468 · readAllKeys:2481 · setSetting:2529 · toast:2543 · toggleFullscreen:2579 · loadLeaderboard:2589 · isStandalone:2612 · maybeNudge:2613 · closeNudge:2619 · showGameOver:2623
-- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2690–2791): frame:2695 · checkForUpdate:2718 · applyUpdate:2738
+- **Update** (962–1741): step:965 · playerSaves:1000 · startGuideBeat:1004 · updateGuide:1011 · endGuide:1029 · moveInput:1039 · nearestEnemy:1052 · updatePlayer:1062 · collideWorld:1151 · spawnBook:1164 · fire:1180 · abilityReady:1202 · inkBurst:1213 · nextToShelf:1227 · doShhh:1235 · updateFlow:1272 · seek:1283 · updateEnemies:1295 · bossAI:1385 · shootHazard:1438 · fan:1443 · radial:1444 · damageEnemy:1446 · killEnemy:1476 · buzz:1517 · hurtPlayer:1522 · updateBooks:1561 · orbitRest:1641 · orbiterPositions:1642 · updateOrbiters:1651 · updateHazards:1669 · updateRings:1695 · updatePickups:1709 · updateParticles:1726
+- **Rendering** (1742–2326): BOOK_PALETTE:1745 · buildBackground:1747 · lampPositions:1836 · lightSprite:1848 · glowCache:1854 · glowSprite:1855 · renderLights:1864 · render:1903 · drawThrownBook:1953 · drawBook:1986 · drawPlayer:1994 · rim:2037 · drawEnemy:2042 · drawBoss:2052 · drawTelegraph:2086 · drawPickup:2094 · hazardSprite:2107 · drawHazards:2115 · drawRing:2132 · drawParticles:2139 · heartPath:2152 · FONT:2162 · txt:2163 · drawHUD:2169 · drawSurviveTimer:2238 · drawGuidePrompt:2255 · cooldown:2268 · btnCache:2284 · setTouchButton:2285 · drawCrosshair:2297 · drawStick:2306 · drawAimStick:2314
+- **DOM screens, settings, leaderboard** (2327–2709): SCREENS:2330 · showScreen:2332 · pinnedObservers:2342 · fitPinnedRow:2343 · renderMenus:2368 · renderFineBadges:2381 · renderShop:2386 · defaultWing:2420 · wingStatus:2424 · renderStory:2430 · logRun:2463 · bankRun:2475 · inRun:2483 · backupMsg:2488 · readAllKeys:2501 · setSetting:2549 · toast:2563 · toggleFullscreen:2599 · loadLeaderboard:2609 · isStandalone:2632 · maybeNudge:2633 · closeNudge:2639 · showGameOver:2643
+- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2710–2811): frame:2715 · checkForUpdate:2738 · applyUpdate:2758
 
 ## src/meta.js
 
@@ -130,7 +130,7 @@ DEALT_SOURCES:11 · newCounters:16 · addDealt:29 · addTaken:31 · bookEnded:33
 
 ## src/story.js
 
-CURVE:18 · curveRoom:19 · SURVIVE_CHUNKS:27 · SURVIVE_ROOMS:28 · roomGoal:30 · WINGS:34 · roomKind:67 · difficulty:73 · threat:102 · composeRoom:107 · layoutSeed:129 · forcedRoom:131 · roomShape:137 · roomReward:148 · firstClearBonus:153
+CURVE:18 · curveRoom:19 · SURVIVE_CHUNKS:27 · SURVIVE_ROOMS:28 · roomGoal:30 · WINGS:34 · roomKind:67 · wingBudget:77 · wingHp:78 · difficulty:81 · threat:110 · composeRoom:115 · layoutSeed:137 · forcedRoom:139 · roomShape:145 · roomReward:156 · firstClearBonus:161
 
 ## src/upgrades.js
 
