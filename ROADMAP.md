@@ -4,7 +4,7 @@ The plan and the owner's decisions, kept current by the planner session. **Plann
 Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <topic>`; their prompts are saved in `docs/handoffs/`.
 
 ## Handover note (2026-11-24, from "Overdue · planning 2" to the next planner)
-**State:** v1.13.1 shipped to `main` (04cdae9; confirm the Pages run is green before saying live). Nothing merged-but-unshipped, no coder
+**State:** v1.13.1 live (04cdae9, Pages run green 2026-11-24). Nothing merged-but-unshipped, no coder
 running. Planner working branch: `claude/brave-galileo-jyg38o` (= main + docs). The owner wrapped up this planner after 1.13.1.
 
 **How this owner works (still true, plus this week):**
@@ -15,7 +15,7 @@ running. Planner working branch: `claude/brave-galileo-jyg38o` (= main + docs). 
 - Going to sleep → schedule an 08:00 SGT morning update (what's live, where to look on the phone, what only a device can confirm).
 
 **Next for the new planner (approved order, see Plan):**
-1. Confirm the 1.13.1 Pages deploy is green. Ask the owner for the iPhone-only checks: Add to Home Screen, open in airplane mode,
+1. Ask the owner for the iPhone-only checks: Add to Home Screen, open in airplane mode,
    copy backup code in Safari (service worker shipped for the first time in 1.13.1).
 2. Write the **1.14.0** handoffs as two sequential coder sessions: (a) rooms +20% (phone grid ~40×19; HUD/buttons keep size, lamps and
    shelves scale) + run analytics A (on-device run log + "Share stats" code, schema reusable by the bot) + bot tooling (maxed-Renovations
