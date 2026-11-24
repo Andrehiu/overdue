@@ -19,7 +19,7 @@ export const ZAP_POOL = 12;           // at most this many zap arcs on screen
 export const ZAP_LIFE = 0.12;
 export const DEEP_FREEZE_EVERY = 5, DEEP_FREEZE_TIME = 1, SUPER_FREEZE_TIME = 0.5;
 export const POP_CHAIN_HITS = 6;      // one pop chain (a pop + its Grand Finale round) hurts at most this many enemies
-export const SPLASH_RADIUS = 70, SPLASH_STRENGTH = 0.5;
+export const SPLASH_RADIUS = 70, SPLASH_STRENGTH = 0.4;
 
 /** Damage sources that are "status damage": silent, and they never start another status effect or burst. */
 export const STATUS_SOURCES = new Set(['ink', 'zap', 'pop', 'cleanup']);
