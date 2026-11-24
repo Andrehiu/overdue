@@ -1,5 +1,6 @@
 // OVERDUE! — Night Shift at the Meme Library
 // Engine: fixed-timestep loop, flow-field AI, dynamic lighting, procedural audio, roguelite perks.
+import { chooseTarget, leadPoint } from './autoaim.js';
 import { W, H, CELL, COLS, ROWS, SAFE, PORTRAIT, setGrid, gridForAspect, areaK, generateArena, isSolidPx, cellOf, edgeCells, idx } from './arena.js';
 import { RUN_KEY, newCounters, addDealt, addTaken, bookEnded, sampleFlight, buildRecord, pushRun, normalizeRuns, encodeStats } from './runlog.js';
 import { createBackend } from './backend.js';
@@ -1122,6 +1123,8 @@ function moveInput() {
   return l > 1 ? { x: x / l, y: y / l } : { x, y };
 }
 
+let autoTarget = null;   // sticky auto-aim target (v1.15.3)
+let aimVariant = 'all';  // balance measuring only (debug hook): 'today' | 'open' | 'sticky' | 'all'
 function nearestEnemy(x, y, maxD = Infinity) {
   let best = null, bd = maxD * maxD;
   for (const e of enemies) {
@@ -1146,11 +1149,15 @@ function updatePlayer(dt) {
   if (src === 'pad') { p.aim = Math.atan2(pad.ay, pad.ax); firing = pad.fire; }
   else if (src === 'touch') { p.aim = stick.angle; firing = true; }
   else if (src === 'auto') {
-    const t = nearestEnemy(p.x, p.y, PORTRAIT ? 600 : 460);
+    const vis = (e) => lineOfSight(arena.solid, COLS, ROWS, CELL, p.x, p.y, e.x, e.y);
+    const rng = PORTRAIT ? 600 : 460;
+    const t = aimVariant === 'today' ? nearestEnemy(p.x, p.y, rng) : chooseTarget(p, enemies, rng, vis, aimVariant === 'open' ? null : autoTarget);
+    autoTarget = t;
     if (t) {
-      p.aim = Math.atan2(t.y - p.y, t.x - p.x); firing = true;
-      if (DEBUG) { const d = Math.hypot(t.x - p.x, t.y - p.y); p.autoAim = { n: (p.autoAim?.n || 0) + 1, nearest: enemies.every((e) => Math.hypot(e.x - p.x, e.y - p.y) >= d - 1e-9) }; } // QA only
-    }
+      const L = aimVariant === 'all' ? leadPoint(t, p, stats.projSpeed) : t;
+      p.aim = Math.atan2(L.y - p.y, L.x - p.x); firing = true;
+      if (DEBUG) { p.autoAim = { n: (p.autoAim?.n || 0) + 1, ok: (p.autoAim?.ok ?? true) && (vis(t) || !enemies.some(vis)) }; } // QA only
+    } else autoTarget = null;
   } else if (src === 'mouse') {
     p.aim = Math.atan2(mouse.y - p.y, mouse.x - p.x);
     firing = mouse.down;
@@ -1618,6 +1625,9 @@ function updateEnemies(dt) {
   for (const e of enemies) {
     if (e.type === 'boss') { e.x = clamp(e.x, e.r, W - e.r); e.y = clamp(e.y, e.r, H - e.r); }
     else if (!(e.type === 'worm' && e.leader)) collideWorld(e, e.r);
+    // observed velocity (smoothed) for auto-aim lead; capped so teleports/boss charges stay sane
+    if (e.lx !== undefined && dt > 0) { const k = 0.4; e.pvx = clamp((e.pvx || 0) * (1 - k) + ((e.x - e.lx) / dt) * k, -450, 450); e.pvy = clamp((e.pvy || 0) * (1 - k) + ((e.y - e.ly) / dt) * k, -450, 450); }
+    e.lx = e.x; e.ly = e.y;
     // Contact damage
     if (game.state === 'playing' || game.state === 'waveclear') {
       const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy);
@@ -1876,6 +1886,7 @@ function updateBooks(dt) {
       burst(b.x, b.y, 6, ['#9be7dc', '#fff'], 90, 0.3);
     }
     if (isSolidPx(arena.solid, b.x, b.y)) {
+      if (!b.shelf) { b.shelf = true; rl.shelf = (rl.shelf || 0) + 1; }   // run log: books that reached a shelf/wall (balance measuring)
       if (b.bounces > 0) {
         b.bounces--;
         if (stats.bounceAccel) { b.vx *= 1 + stats.bounceAccel; b.vy *= 1 + stats.bounceAccel; }
@@ -3179,7 +3190,7 @@ if (DEBUG) {
     showCards: (ids) => renderCards(ids.map(byId)),
     showFreePerk: (id, label) => { queueFreePerk(byId(id), label); flushFreePerks(); }, showUpgrades, showDoors, nextRoom, texts, get cursedOffer() { return game.cursedOffer; }, takeCursed: (take) => { cardsArmedAt = 0; resolveCursedOffer(take); }, get rareId() { return game.rareId; }, get door() { return game.door; },
     // ---- balance bot (scripts/balance.mjs): drives the sim headless, faster than real time ----
-    actions, hazards, STEP, books, touch, settings, setSetting, get W() { return W; }, get H() { return H; }, isSolid: (x, y) => isSolidPx(arena.solid, x, y),
+    actions, hazards, STEP, books, touch, settings, setSetting, get W() { return W; }, get H() { return H; }, isSolid: (x, y) => isSolidPx(arena.solid, x, y), setAimVariant: (v) => { aimVariant = v; autoTarget = null; }, setSolid: (x, y, v) => { const [cx, cy] = cellOf(x, y); arena.solid[cy * COLS + cx] = v ? 1 : 0; },
     get choices() { return currentChoices; }, get doors() { return currentDoors; },
     setBotInput: (mv) => { botInput = mv; }, drive: (on) => { botDrive = !!on; if (!on) botInput = null; },
     stepN: (n) => { for (let i = 0; i < n; i++) step(STEP); },

@@ -567,9 +567,20 @@ async function screensFlow(name, opts, full) {
         t.aimId = 99; t.ax0 = O.W - 150; t.ay0 = 280; t.ax = t.ax0 - 40; t.ay = t.ay0 - 25; });
       await page.waitForTimeout(300); await shot(page, `${name}-aim-stick`);
       await page.evaluate(() => { const t = __overdue.touch; t.aimId = null; t.moveId = null; });
-      const auto = await sim(`O.setSetting('autoaim', true); O.touch.enabled = true; O.touch.aimId = null; const p = O.player; const t0 = p.throws; p.autoAim = { n: 0, nearest: true }; O.stepN(120);
-        return { throws: p.throws - t0, aimedFrames: p.autoAim.n, aimedAtNearest: p.autoAim.nearest };`);
-      record(area, 'auto-aim on: throws at the nearest enemy with no finger (unchanged)', auto.throws >= 1 && auto.aimedFrames >= 1 && auto.aimedAtNearest, JSON.stringify(auto));
+      const auto = await sim(`O.setSetting('autoaim', true); O.touch.enabled = true; O.touch.aimId = null; const p = O.player; const t0 = p.throws; p.autoAim = { n: 0, ok: true }; O.stepN(120);
+        return { throws: p.throws - t0, aimedFrames: p.autoAim.n, ok: p.autoAim.ok };`);
+      record(area, 'auto-aim on: throws with no finger, at a visible enemy (or the nearest when none is visible)', auto.throws >= 1 && auto.aimedFrames >= 1 && auto.ok, JSON.stringify(auto));
+      // v1.15.3: a far enemy in the open is chosen over a nearer one behind a shelf
+      const vis = await sim(`O.killAll(); const p = O.player; const clear = (a, d) => { for (let r = 10; r <= d; r += 8) if (O.isSolid(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r)) return false; return true; };
+        let aF = null; for (let i = 0; i < 16 && aF === null; i++) { const a = i * Math.PI / 8, b = a + Math.PI; if (clear(a, 260) && clear(b, 110)) aF = a; }
+        if (aF === null) return { skipped: true };
+        const aN = aF + Math.PI, wx = p.x + Math.cos(aN) * 60, wy = p.y + Math.sin(aN) * 60, was = O.isSolid(wx, wy); O.setSolid(wx, wy, true);
+        const far = O.makeEnemy('bunny', p.x + Math.cos(aF) * 250, p.y + Math.sin(aF) * 250), near = O.makeEnemy('bunny', p.x + Math.cos(aN) * 100, p.y + Math.sin(aN) * 100);
+        for (const e of [far, near]) { e.hp = e.maxHp = 999; e.stun = 99; }
+        O.setSetting('autoaim', true); O.touch.aimId = null; O.books.length = 0; p.throws = 0; O.stepN(4);
+        const d = Math.abs(Math.atan2(Math.sin(p.aim - aF), Math.cos(p.aim - aF))), dn = Math.abs(Math.atan2(Math.sin(p.aim - aN), Math.cos(p.aim - aN)));
+        O.setSolid(wx, wy, was); return { skipped: false, toFar: +d.toFixed(2), toNear: +dn.toFixed(2), throws: p.throws };`);
+      record(area, 'auto-aim: a far enemy in line of sight is chosen over a nearer one behind a shelf', vis.skipped === true || vis.toFar < 0.1, JSON.stringify(vis));
       const over = await sim(`${angOff} const p = O.player; O.touch.aimId = 99; O.touch.ax0 = p.x + 300; O.touch.ay0 = p.y; O.touch.ax = O.touch.ax0 - 60; O.touch.ay = O.touch.ay0; const t0 = p.throws;
         O.stepN(60); O.touch.aimId = null; return { throws: p.throws - t0, diff: dd(p.lastThrow, Math.PI) };`);
       record(area, 'auto-aim on + deflected stick: throws follow the stick', over.throws >= 1 && over.diff < 0.15, JSON.stringify(over));

@@ -58,7 +58,7 @@ npm run build   # dist/overdue.html (single file) + dist/version.json; this is e
 ## Product rules (owner decisions, don't change without asking)
 - **Mobile only, landscape** (since v1.10.1): iPhone landscape is the main target; iPad must also fill the screen. In portrait, touch devices show a rotate overlay. **Desktop is unsupported:** it may keep working, but it isn't tested, designed for or fixed; keep the keyboard/mouse code (handy for debugging) but don't build desktop features. Gamepads stay supported (they work with phones and iPads).
 - **Keep the dynamic lighting** (dark room, lamp pools, lantern) as it is.
-- **Auto-aim deliberately ignores line of sight.** Firing into shelves is a feature (and feeds Spine Breaker).
+- **Auto-aim prefers enemies in line of sight** (sticky, 50% lead); with none visible it targets the nearest enemy behind shelves (feeds Spine Breaker).
 - **Perk cards speak plainly:** "just the gain" (e.g. "+50% damage"). Never show internal units (px, rad/s).
 - Perks stack to 3/3; 3/3 unlocks that perk's Masterwork. Combos ("Collected Works") unlock from pairs.
 - The app icon and name ("Overdue!") are baked in when players add to Home Screen; changing them

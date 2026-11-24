@@ -39,6 +39,7 @@ const BAN = arg('ban-perks', '').split(',').filter((x) => /^[a-z_]+$/.test(x)); 
 const ROOMS_FLAG = arg('rooms', 'new') === 'old' ? '&legacyrooms=1' : '';
 const [VW, VH] = arg('viewport', '1280x720').split('x').map(Number);
 const HUMAN = arg('human', '0') === '1';   // human-like bot: reaction delay, sloppy dodging (v1.15.2)
+const AIM = arg('aim', 'all');   // auto-aim variant for measuring: today | open | sticky | all (v1.15.3)
 const JOBS = Math.max(1, Number(arg('jobs', Math.min(4, cpus().length))));
 
 // A mid-game save: about half of every multi-level Renovation (one-off expensive ones, like Second Wind, not yet bought).
@@ -98,13 +99,13 @@ async function worker(id) {
     const job = order[next++];
     let r;
     try {
-      r = await page.evaluate(async ({ wing, policy, progress, force, ban, seed, cursed, human }) => {
+      r = await page.evaluate(async ({ wing, policy, progress, force, ban, seed, cursed, human, aim }) => {
         // Seeded randomness: run k of a cell gets the same seed in every batch, so old-vs-new room size compares like with like.
         let a = (seed * 2654435761) >>> 0;
         Math.random = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
         const m = await import('/__bot/balance-bot.mjs');
-        return m.playRun(window.__overdue, { wing, policy, progress, force, ban, cursed, human });
-      }, { wing: job.wing, policy: job.policy, progress: saves[job.renos], force: FORCE, ban: BAN, seed: job.seed, cursed: CURSED, human: HUMAN });
+        return m.playRun(window.__overdue, { wing, policy, progress, force, ban, cursed, human, aim });
+      }, { wing: job.wing, policy: job.policy, progress: saves[job.renos], force: FORCE, ban: BAN, seed: job.seed, cursed: CURSED, human: HUMAN, aim: AIM });
       if (page.pageErrors.length) { r.errors = [...(r.errors || []), ...page.pageErrors.splice(0)]; }
     } catch (e) {
       r = { wing: job.wing, policy: job.policy, outcome: 'error', room: 0, hearts: 0, fines: 0, time: 0, errors: [String(e.message || e).slice(0, 200)] };

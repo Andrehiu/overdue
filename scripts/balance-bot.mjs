@@ -7,10 +7,11 @@ const HUMAN_DECIDE_EVERY = 20;          // human-like: re-thinks every ~170 ms (
 const DECIDE_EVERY = 4;                 // steps (1/120 s each): the bot re-thinks at 30 Hz
 
 /** Play one run. progress = the save to start from. Never throws: failures come back as outcome 'error'. */
-export function playRun(o, { wing, policy, progress, force = [], ban = [], cursed = 'take', human = false, roomTimeout = 180, wallMs = 180000 }) {
+export function playRun(o, { wing, policy, progress, force = [], ban = [], cursed = 'take', human = false, aim = 'all', roomTimeout = 180, wallMs = 180000 }) {
   const g = o.game, errors = [];
   try {
     o.drive(true);
+    o.setAimVariant(aim);
     o.setProgress(progress);
     o.startRun('story', wing);
     for (const [id, lvl] of force) for (let i = 0; i < lvl; i++) o.grant(id);   // --force-perks: bot only, never in the game
@@ -47,7 +48,7 @@ export function playRun(o, { wing, policy, progress, force = [], ban = [], curse
     if (!outcome) outcome = g.state !== 'gameover' ? 'error' : won ? 'clear' : 'death';
     const banked = g.banked ? g.banked.banked - (g.banked.firstClear ? 30 + 10 * wing : 0) : null;
     const c = o.runCounters;   // the same counters the game's run log uses (src/runlog.js)
-    const metrics = { dealt: { ...c.dealt }, taken: { ...c.taken }, thrown: c.thrown, ended: c.ended, thrownHit: c.thrownHit, evict: c.evict, flight: Array.from(c.flight), life: Array.from(c.life), pages: { ...c.pages }, bossKills: c.bossKills.slice(), seconds: g.playTime, lcHits: c.lcHits || 0, lcSum: c.lcSum || 0, lcT: c.lcT || 0, lcLow: c.lcLow || 0 };
+    const metrics = { dealt: { ...c.dealt }, taken: { ...c.taken }, thrown: c.thrown, ended: c.ended, thrownHit: c.thrownHit, evict: c.evict, shelf: c.shelf || 0, flight: Array.from(c.flight), life: Array.from(c.life), pages: { ...c.pages }, bossKills: c.bossKills.slice(), seconds: g.playTime, lcHits: c.lcHits || 0, lcSum: c.lcSum || 0, lcT: c.lcT || 0, lcLow: c.lcLow || 0 };
     const sm = o.statusMetrics;   // v1.15.0 status perks: stun shares, chain and burst numbers (src/status.js)
     if (sm) metrics.status = { kills: sm.kills, inkKills: sm.inkKills, bursts: sm.bursts, burstHist: sm.burstHist.slice(), maxStatusKills1s: sm.maxStatusKills1s, maxPopChain: sm.maxPopChain, bossSec: sm.bossSec, bossFrozenSec: sm.bossFrozenSec, eliteSec: sm.eliteSec, eliteFrozenSec: sm.eliteFrozenSec };
     return { wing, policy, outcome, room, hearts: o.player.hp, fines: banked ?? Math.round(g.fines), time: Math.round(g.playTime), kills: g.kills, errors, trace, metrics, record: g.lastRun };
