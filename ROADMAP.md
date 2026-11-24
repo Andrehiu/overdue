@@ -17,8 +17,9 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
   (usually additive; after a merge run `node --check scripts/qa/run.mjs`). QA seeds a "returning player" save since 1.13.0.
   Coders sometimes report the planner branch name by mistake: verify with `git log origin/<branch>`. Pages runs can sit in
   "waiting" a minute. "Show tips again" also clears the 1.13.0 unlock flags (small follow-up if the owner notices).
-- **Owner's priority: 1.15.0 new perks** ("all the new major items"). First: the status-colour 3-option page (ink, chill,
-  static; static not gold), then the 1.15.0 handoffs (likely 2 coders: shared status system, then perks + combos + What's new
+- **Owner's priority: 1.15.0 new perks** ("all the new major items"). Status-colour page published (planning 4, private):
+  https://claude.ai/artifact/9mMLXf7yUJ9Je2TgHw9Vhs (A violet ink / cyan chill / lime static = pick; B black ink; C cyan static),
+  waiting for the owner's letter. Pop-up Book ring becomes teal + white (not gold). Then the 1.15.0 handoffs (likely 2 coders: shared status system, then perks + combos + What's new
   card / NEW badges). Spec: `docs/plans/perks-new-and-fixes.md` + `docs/plans/perks-balance-review.md` + Decisions 2026-11-24.
 - **Owner to do when convenient:** playtest wings 7–8 + an Orbit run on v1.14.1; phone checks: Take it / Walk away tap comfort,
   5-card Rare hand readability, Surround dimmed-book cue, Settings captions fit. Optional: add the CI docs `paths-ignore` to
