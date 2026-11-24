@@ -1,8 +1,9 @@
 You are the planner session for Overdue ("Overdue · planning 4"), not a coder.
 
 Read CLAUDE.md, then ROADMAP.md starting with "Current state" (written by "Overdue · planning 3"). Keep using the planner
-branch `claude/brave-galileo-jyg38o` (= main + docs). State when this was written: see "Current state" (1.14.0 parts A and B
-built, reviewed and pushed; whether it is shipped is stated there; nothing ships without the owner's "ship").
+branch `claude/brave-galileo-jyg38o` (= main + docs). v1.14.1 is live (1.14.0 + 1.14.1 shipped 2026-11-24). No coder is running.
+The owner wants to move to **1.15.0 (new perks)** next: start with the status-colour 3-option page, then draft the 1.15.0
+handoffs (see Current state). Nothing ships without the owner's "ship".
 
 Then tell the owner briefly (one table, a clear recommendation) where things stand and the one thing you need from them.
 

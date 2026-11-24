@@ -3,8 +3,9 @@
 The plan and the owner's decisions, kept current by the planner session. **Planners: read this after CLAUDE.md.**
 Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <topic>`; their prompts are saved in `docs/handoffs/`.
 
-## Current state (planning 3, 2026-11-24)
-- **Live:** v1.14.1 (1.14.0 + 1.14.1), shipped 2026-11-24; see Plan. Owner wants 1.15.0 (new perks) next; wing 8+ tuning (1.14.2) only if the owner's playtest still finds issues.
+## Current state (planning 3 → planning 4, 2026-11-24)
+- **Live:** v1.14.1 (c36ac35, Pages run green 2026-11-24) = 1.14.0 (bigger story rooms, run log + Share stats, late-game
+  flattening, perk fixes) + 1.14.1 (Rare pick, softer Rare door, cursed upsides, Mystery take/walk away). No coder running.
 - **Planner branch:** `claude/brave-galileo-jyg38o` (= main + docs).
 - **Owner habits:** short replies (tables, a pick, the one word needed); ships only on "ship"; playtest mode = numbered log only;
   3-option pages only for visual choices; 08:00 SGT morning update when going to sleep; max 2 coders (usage).
@@ -16,10 +17,14 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
   (usually additive; after a merge run `node --check scripts/qa/run.mjs`). QA seeds a "returning player" save since 1.13.0.
   Coders sometimes report the planner branch name by mistake: verify with `git log origin/<branch>`. Pages runs can sit in
   "waiting" a minute. "Show tips again" also clears the 1.13.0 unlock flags (small follow-up if the owner notices).
-- **Planner handover:** once 1.14.0 parts A+B are reviewed and pushed, planning 3 starts "Overdue · planning 4" with
-  `docs/handoffs/planning-4.md` (includes the owner's new working rules), updates this section first, then stops.
-- **Next:** 1.14.0 (A then B) → owner playtest wings 7–8 + an Orbit run → 1.14.1 Rare Books + cursed → 1.15.0 new perks
-  (+ What's new card / NEW badges; status-colour 3-option page first) → 1.16.0 Book Bag → 1.17.0 player look.
+- **Owner's priority: 1.15.0 new perks** ("all the new major items"). First: the status-colour 3-option page (ink, chill,
+  static; static not gold), then the 1.15.0 handoffs (likely 2 coders: shared status system, then perks + combos + What's new
+  card / NEW badges). Spec: `docs/plans/perks-new-and-fixes.md` + `docs/plans/perks-balance-review.md` + Decisions 2026-11-24.
+- **Owner to do when convenient:** playtest wings 7–8 + an Orbit run on v1.14.1; phone checks: Take it / Walk away tap comfort,
+  5-card Rare hand readability, Surround dimmed-book cue, Settings captions fit. Optional: add the CI docs `paths-ignore` to
+  `.github/workflows/ci.yml` (auto-mode blocked coders from it; the owner can edit it on GitHub).
+- **Later (only if the playtest still finds issues):** 1.14.2 tuning: wing 8 room 5 maze, wings 7/9 easier than neighbours,
+  3→4 cliff, Orbit L3 too weak (6% of damage), Spine Breaker outlier. Then 1.16.0 Book Bag → 1.17.0 player look.
 
 ## Decisions (newest first)
 | Date | Decision | Why |
