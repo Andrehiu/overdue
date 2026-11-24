@@ -17,18 +17,15 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
   (usually additive; after a merge run `node --check scripts/qa/run.mjs`). QA seeds a "returning player" save since 1.13.0.
   Coders sometimes report the planner branch name by mistake: verify with `git log origin/<branch>`. Pages runs can sit in
   "waiting" a minute. "Show tips again" also clears the 1.13.0 unlock flags (small follow-up if the owner notices).
-- **1.15.0 shipped** to main 2026-11-24 (2a173d3; owner "A": ship with one flaky stress-fps check at 49 vs 50, my QA 816/817).
-  Pages run 29 failed at deploy-pages (GitHub hiccup), re-run attempt 2. Icons changed: Compass Rose 🌐, Brittle 💔, Indelible ✒️,
-  Caffeine 🥤, Conductive 🔋, Congress 🔭. Coders A/B archived.
-- **Running (1.15.1, no player change):** reliable QA timing checks (session_014kswNhyh6FhfYfdqVSDcAv, `claude/qa-reliable`;
-  owner sees before/after table before merge) and stronger privacy scan (session_014kswNmAW3nNXpnspbCpvkk, `claude/privacy-scan`;
-  owner then adds `QA_PRIVATE_TERMS` secret). Handoffs in `docs/handoffs/1.15.1-*.md`.
-- **Owner playtest 1.15.0 (done):** 1 enemies too small, 2 orbit books too small/hard, 3 Margin angle halve, 4 Crossfire text,
-  5 boss phase change blocks player (owner: player free, boss can't be hit during transformation), 6 wing 2 hard at 65% Renovations,
-  7 idea: late bosses one shelf-piercing attack (parked), 8 difficulty −5%. Owner said go on the split:
-  **1.15.1 look & feel** (1–5, `docs/handoffs/1.15.1-look-feel.md`, `claude/look-feel-1151`) + QA reliable + privacy scan (36ed5da,
-  reviewed 132/132, waiting to merge with 1.15.1); then **1.15.2 difficulty**: story enemy HP −5% every wing (endless unchanged),
-  bot re-measure at 65% Renovations to explain bot-vs-owner gap at wing 2.
+- **Live: v1.15.1** (eb6e5de, Pages run 30 green 2026-11-24) = 1.15.0 new perks (2a173d3) + look & feel (bigger story enemies,
+  sprite ×1.2 / hit ×1.1; orbit books ×1.6, radius 56; Margin ±22.5°; Crossfire text; boss phase: small tag, 1 s immune transform)
+  + stronger privacy scan (owner to add `QA_PRIVATE_TERMS` repo secret). Coders for 1.15.0/1.15.1 archived.
+- **Running:** 1.15.2 difficulty (session_014kswNkiQAa7aB3C7fVCJax, `claude/difficulty-1152`): bot at 65% Renovations + human-like
+  bot, wing-2 failure causes, story enemy HP −5% (owner playtest notes 6/8). QA-reliable (session_014kswNhyh6FhfYfdqVSDcAv,
+  `claude/qa-reliable`) BLOCKED on owner A/B/C: medians don't stabilise fps (no GPU in container; game update 0.02–0.16 ms/frame).
+  Planner pick A: fail on update ms + sim speed, fps = warning without GPU.
+- **Owner phone checks (1.15.0 + 1.15.1):** What's new once; status icons readable; enemy size + hitbox fair; orbit books usable;
+  Margin spread; boss transformation; stacked boss smooth; cat visible; new icons distinct. Parked: shelf-piercing late-boss attack.
 - **Owner to do when convenient:** playtest wings 7–8 + an Orbit run on v1.14.1; phone checks: Take it / Walk away tap comfort,
   5-card Rare hand readability, Surround dimmed-book cue, Settings captions fit. Optional: add the CI docs `paths-ignore` to
   `.github/workflows/ci.yml` (auto-mode blocked coders from it; the owner can edit it on GitHub).
