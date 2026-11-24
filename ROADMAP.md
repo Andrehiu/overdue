@@ -31,6 +31,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-24 | Privacy: history audit clean (203 commits: no emails except Claude noreply, no owner name, no save/backup/stats codes, no big binaries). CLAUDE.md rule: tester exports never committed; no new network calls without OK. Queued after 1.15.0: stronger QA scan (`docs/handoffs/1.15.1-privacy-scan.md`); owner to enable GitHub secret scanning + push protection | Owner asked how to verify nothing from players leaks to the public repo |
 | 2026-11-24 | Status colours A: ink violet `#9a6bff`, chill cyan `#74e6ff`, static lime `#c8ff4d`; Pop-up Book ring teal + white (not gold); Annotated Edition card text drops "ink" | Owner picked A (planning 4) |
 | 2026-11-24 | Rare Books door softened (A): elite share +0.5 → +0.35, budget ×1.3 → ×1.15, from wing 4 elite HP +50% → +30% and fire 30% → 15% faster; ×2 fines and the new Rare pick stay. Rare ≈ safe door in wings 4–7 (bot); re-check after the 1.14.0 merge | Owner picked A (1.14.1) |
 | 2026-11-24 | "What's new" for players: a one-time card only for big releases (first use 1.15.0 new perks), plus NEW badges on new perk cards the first time each is offered (cleared once seen/tapped), reusing the 1.13.0 earned-menus pattern. No popup on small releases. Flags additive in `overdue.tips.v1` (last seen release + seen perk ids). Goes into the 1.15.0 handoff | Owner (from a side chat) |

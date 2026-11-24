@@ -85,6 +85,10 @@ npm run build   # dist/overdue.html (single file) + dist/version.json; this is e
 - Never put the owner's personal details (email, full name) in code, docs or commit messages.
 - `.qa-private-terms` (gitignored, one term per line) lets `npm run qa` scan for them locally.
 - No secrets exist or are needed: the game is static. Keep it that way.
+- Player data never enters the repo: tester exports (Share stats `OVS1:` codes, backups `OVD1:`, screenshots of name entry,
+  Hall of Fame rows) go into a chat, never into a commit or a doc. Summarise numbers instead (balance docs carry no names).
+- The game never sends data anywhere except the claude.ai-hosted Hall of Fame copy; adding any other network call, analytics
+  or upload needs the owner's OK first.
 
 ## Also exists
 - A claude.ai-hosted copy (shared Hall of Fame) is built with `npm run build -- --fragment` and
