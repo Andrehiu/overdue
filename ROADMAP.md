@@ -17,11 +17,12 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
   (usually additive; after a merge run `node --check scripts/qa/run.mjs`). QA seeds a "returning player" save since 1.13.0.
   Coders sometimes report the planner branch name by mistake: verify with `git log origin/<branch>`. Pages runs can sit in
   "waiting" a minute. "Show tips again" also clears the 1.13.0 unlock flags (small follow-up if the owner notices).
-- **1.15.0 new perks:** status colours picked (A: ink violet `#9a6bff`, chill cyan `#74e6ff`, static lime `#c8ff4d`; page
-  https://claude.ai/artifact/9mMLXf7yUJ9Je2TgHw9Vhs). Owner said go (2026-11-24); 2 coders running (sessions session_014kswNma1ffcy55DKfyTXLx = A, session_014kswNm1QrbdV3FpTgcFFxh = B), check-in 11:43 UTC: `docs/handoffs/1.15.0a-status-perks.md`
-  (status engine + Leaky Pen, Cold Storage, Static Cling, Pop-up Book + 4 combos, `claude/status-perks-1150`) and
-  `docs/handoffs/1.15.0b-new-perks.md` (Margin Notes, Last Chapter, Library Cat, Crossfire, What's new card, NEW badges,
-  `claude/new-perks-1150`), both from main, in parallel. New perks in endless too (owner OK by go).
+- **1.15.0 new perks:** built and merged on `claude/release-1150` (2194444; parts A+B, coder A did the merge). Planner review:
+  npm test 124/124, QA 817/817, stress build 56 fps, status boss 56 fps / 0.95x, wing 10 58 fps. Screens checked: NEW badges,
+  status effects, What's new card. Icon-fix batch sent to coder A (Compass Rose / Brittle duplicate icons, Indelible not red).
+  Accepted as measured: Leaky Pen/Cold/Static L1 under Hardcover at wing 5 (-14/-20/-20), Margin L3 -16/-19, Last Chapter L3
+  -20/-39 (bot avoids low hearts; owner playtest judges). Lighting untouched (owner question 'cut OK?' moot: stress passed).
+  Waiting for: icon fix, then owner's "ship". Coder B (session_014kswNm1QrbdV3FpTgcFFxh) idle, can be archived after ship.
 - **Owner to do when convenient:** playtest wings 7–8 + an Orbit run on v1.14.1; phone checks: Take it / Walk away tap comfort,
   5-card Rare hand readability, Surround dimmed-book cue, Settings captions fit. Optional: add the CI docs `paths-ignore` to
   `.github/workflows/ci.yml` (auto-mode blocked coders from it; the owner can edit it on GitHub).
