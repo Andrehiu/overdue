@@ -134,3 +134,12 @@ test('a pop chain is capped at 6 hits and the metric tracks it', async () => {
   assert.equal(POP_CHAIN_HITS, 6);
   assert.equal(makeMetrics().maxPopChain, 0);
 });
+
+test('every perk, combo and Masterwork has its own icon (variation selectors ignored)', () => {
+  const seen = new Map();
+  for (const u of UPGRADES) {
+    const key = u.icon.replace(/️/g, '');
+    assert.ok(!seen.has(key), `${u.id} and ${seen.get(key)} share the icon ${u.icon}`);
+    seen.set(key, u.id);
+  }
+});
