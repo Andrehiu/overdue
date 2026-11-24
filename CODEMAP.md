@@ -54,7 +54,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/game-logic.test.js` | 612 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
 | `test/newplayer.test.js` | 87 | New-player help (v1.13.0): menu unlock rules from saves, the guided-room flag, the Survive room table. Pure rules, no DOM. |
 | `test/story-meta.test.js` | 270 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
-| `scripts/qa/run.mjs` | 1087 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
+| `scripts/qa/run.mjs` | 1088 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 50 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
 | `scripts/codemap.mjs` | 113 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
@@ -255,7 +255,7 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 
 ## scripts/qa/run.mjs
 
-results:27 · record:28 · want:32 · recorder:34 · pool:36 · sh:39 · TYPES:55 · TARGETS:65 · FULL_TARGETS:77 · FILL_JS:80 · TITLE_FIT_JS:81 · shot:93 · PINNED_CHECK:101 · RETURNING_SAVE:135 · TITLE_MENUS_JS:141 · screensFlow:145 · menusFlow:546 · rotateOverlayFlow:634 · ROTATIONS:674 · rotationFlow:679 · shapesFlow:710 · newPlayerFlow:738 · basicsFlow:827 · md:1074
+results:27 · record:28 · want:32 · recorder:34 · pool:36 · sh:39 · TYPES:55 · TARGETS:65 · FULL_TARGETS:77 · FILL_JS:80 · TITLE_FIT_JS:81 · shot:93 · PINNED_CHECK:101 · RETURNING_SAVE:135 · TITLE_MENUS_JS:141 · screensFlow:145 · menusFlow:546 · rotateOverlayFlow:634 · ROTATIONS:674 · rotationFlow:679 · shapesFlow:710 · newPlayerFlow:738 · basicsFlow:828 · md:1075
 
 ## scripts/build.mjs
 

@@ -822,6 +822,7 @@ async function newPlayerFlow(name, opts) {
     record(area, 'no script errors', errors.length === 0, errors.join('; ').slice(0, 200));
   } catch (e) { record(area, 'new-player flow ran to the end', false, e.message.split('\n')[0]); }
   await ctx.close();
+  return record.list;
 }
 // ---------------------------------------------------------------- 4c. app basics (v1.13.1): offline play, update, kill switch, backup code, Home Screen nudge
 async function basicsFlow() {
