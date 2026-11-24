@@ -10,6 +10,7 @@ import { composeWave } from './waves.js';
 import { NEW_IN_1_15, baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips, buildChips, specialReason, levelInfo, perkTip, normalizeTips, TIPS } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist, aimSource, aimStick } from './util.js';
 import { PLAYER, bookLook } from './palette.js';
+import { isStatusSource, canProc, procChance, freeze, chillFactor, applyChill, applyInk, tickInk, shouldShatter, statusDamageMult, makeBurstBudget, deepFreezeHit, zapChain, makeMetrics, tickMetrics, ZAP_REACH, ZAP_POOL, ZAP_LIFE, DEEP_FREEZE_TIME, SUPER_FREEZE_TIME, SPLASH_RADIUS, SPLASH_STRENGTH, POP_CHAIN_HITS } from './status.js';
 import { BURST, shadowK, drawEnemy as drawArtEnemy, drawWorms } from './enemy-art.js';
 import { SoundEngine } from './audio.js';
 import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
@@ -302,7 +303,8 @@ function startRun(mode = 'endless', wing = 1, opts = {}) {
     freeze: 0, timeScale: 1, trauma: 0, flash: 0, boss: null, mode, wingN: mode === 'story' ? clamp(wing, 1, WINGS.length) : 1, diff: null,
     guide: null, fines: 0, cards: bonus.cards, banked: null, wingCleared: false, door: null, bonusPicks: 0, pickIsBonus: false, afterBonus: false, rarePick: false, rareId: null, cursedOffer: null });
   stats = applyRenovations(baseStats(), progress);
-  rl = newCounters(); Object.assign(game, { picks: [], doorLog: [], lastHit: null, lastHitElite: false, lastRun: null });
+  rl = newCounters(); sm = makeMetrics(); zaps.length = 0; popGen = 0;
+  Object.assign(game, { picks: [], doorLog: [], lastHit: null, lastHitElite: false, lastRun: null });
   player = makePlayer();
   player.hp = stats.maxHp;
   player.revives = bonus.revives;
@@ -1028,6 +1030,7 @@ function pages(x, y, n) {
 function step(dt) {
   game.time += dt;
   if (game.freeze > 0) { game.freeze -= dt; return; }
+  burstBudget.reset();
   if (game.state !== 'dying') game.timeScale = Math.min(1, game.timeScale + dt * 2);
   const sdt = dt * game.timeScale;
   if (game.state === 'playing' || game.state === 'waveclear') game.playTime += dt;
@@ -1040,6 +1043,7 @@ function step(dt) {
   if (game.state !== 'dying') updatePlayer(sdt);
   updateFlow(dt);
   updateEnemies(sdt);
+  updateStatusFx(sdt);
   updateBooks(sdt);
   updateOrbiters(sdt);
   updateCats(sdt);
@@ -1302,6 +1306,160 @@ function inkBurst(x, y, radius, dmg, color = '#e8d9b0', src = 'burst') {
   sound.play('hit', 0.7);
 }
 
+// ======================================================================
+// Status effects (v1.15.0 part A: ink, chill, static, pops). The maths lives in src/status.js.
+// Chain rule: damage with source ink / zap / pop never starts more ink, zaps or pops (the source travels with the damage).
+// ======================================================================
+const burstBudget = makeBurstBudget();   // at most 6 pops / splashes per frame; extras are dropped
+let sm = makeMetrics();                  // per-second counters (balance bot reads them)
+const zaps = [];                         // pool: at most ZAP_POOL short polylines
+let popGen = 0;                          // while a pop's damage runs: 1 + that pop's generation
+let popBudget = 0, popChain = 0;         // one pop chain (a pop + its Grand Finale round) hurts at most POP_CHAIN_HITS enemies
+const hitsPerSec = () => stats.fireRate * stats.projectiles;
+
+function zapArc(from, targets) {
+  const pts = [from.x, from.y];
+  for (const t of targets) {   // jagged: one random kink per segment, built once
+    const x0 = pts[pts.length - 2], y0 = pts[pts.length - 1], mx = (x0 + t.x) / 2, my = (y0 + t.y) / 2, k = (Math.random() - 0.5) * 18;
+    const d = Math.hypot(t.x - x0, t.y - y0) || 1;
+    pts.push(mx - ((t.y - y0) / d) * k, my + ((t.x - x0) / d) * k, t.x, t.y);
+  }
+  if (zaps.length >= ZAP_POOL) zaps.shift();
+  zaps.push({ pts, life: ZAP_LIFE });
+}
+
+/** A thrown book (or orbit book) hit `e`: maybe ink, chill, Deep Freeze and a zap. Status damage never calls this. */
+function onBookHit(e, base, src) {
+  if (!canProc(src)) return;
+  if (!e.dead) {
+    if (stats.ink) applyInk(e, base, stats.ink, stats.inkDur, 0);
+    if (stats.chill) {
+      if (stats.deepFreeze && e.chillT > 0 && deepFreezeHit(e) && freeze(e, DEEP_FREEZE_TIME, game.time)) burst(e.x, e.y, 6, [PLAYER.chill, '#fff'], 90, 0.3);
+      applyChill(e, stats.chill);
+    }
+  }
+  if (stats.staticChance && Math.random() < procChance(stats.staticChance, hitsPerSec())) doZap(e, base);
+}
+
+function doZap(from, base) {
+  const targets = zapChain(from, enemies, 1 + stats.staticJumps, ZAP_REACH, stats.conductive ? (t) => t.inkT > 0 : null);
+  if (!targets.length) return;
+  zapArc(from, targets);
+  for (const t of targets) {
+    t.staticT = 0.25;
+    damageEnemy(t, base * stats.staticDmg, 0, 0, false, 'zap');
+    if (t.dead) continue;
+    if (stats.conductive && stats.ink) applyInk(t, base, stats.ink * SPLASH_STRENGTH, stats.inkDur, 1);   // Conductive Ink: zaps spread (weaker) ink
+    if (stats.superconductor && t.chillT > 0) freeze(t, SUPER_FREEZE_TIME, game.time);
+  }
+  sound.play('ping', 0.35);
+}
+
+/** Pop-up Book: a defeated enemy pops. gen 0 = a normal pop, 1 = a Grand Finale pop (pops no further). */
+function popAt(x, y, gen) {
+  if (!burstBudget.take()) return;
+  sm.bursts++; sm.burstsThisSec++;
+  const r = stats.popRadius, dmg = stats.damage * stats.popMult, prev = popGen;
+  if (gen === 0) { popBudget = POP_CHAIN_HITS; popChain = 0; }
+  popGen = gen + 1;
+  const n = enemies.length;   // coins a golem drops mid-pop are not hit by the same pop
+  for (let i = 0; i < n; i++) {
+    const e = enemies[i];
+    if (e.dead) continue;
+    const d = Math.hypot(e.x - x, e.y - y);
+    if (d >= r + e.r) continue;
+    if (popBudget <= 0) break;
+    popBudget--;
+    damageEnemy(e, dmg, ((e.x - x) / (d || 1)) * 90, ((e.y - y) / (d || 1)) * 90, false, 'pop');
+    if (e.dead) popChain++;
+    if (stats.inkBombs && stats.ink && !e.dead) applyInk(e, dmg, stats.ink, stats.inkDur, 1);   // Ink Bombs: pops spread ink
+  }
+  popGen = prev;
+  if (gen === 0 && popChain > sm.maxPopChain) sm.maxPopChain = popChain;   // metric: most kills from one pop chain
+  burst(x, y, 6, [PLAYER.pop, '#ffffff'], 120, 0.35);
+  rings.push({ x, y, r: 4, max: r, speed: r * 7, friendly: true, life: 1, faint: true, color: '155,231,220' });
+  addLight(x, y, r * 1.1, 0.14, PLAYER.pop);
+  if (game.time - (game.lastPopSound || -1) > 0.06) { game.lastPopSound = game.time; sound.play('ping', 0.5); }
+}
+
+/** Indelible: an inked enemy that dies splashes half-strength ink on everything nearby (which never splashes again). */
+function inkSplash(e) {
+  if (!burstBudget.take()) return;
+  sm.bursts++; sm.burstsThisSec++;
+  const total = e.inkDps * stats.inkDur;
+  for (const t of enemies) {
+    if (t.dead || t === e) continue;
+    if (Math.hypot(t.x - e.x, t.y - e.y) < SPLASH_RADIUS + t.r) applyInk(t, total, SPLASH_STRENGTH, stats.inkDur, 1);
+  }
+  burst(e.x, e.y, 7, [PLAYER.ink, PLAYER.inkRim], 130, 0.4);
+  rings.push({ x: e.x, y: e.y, r: 4, max: SPLASH_RADIUS, speed: SPLASH_RADIUS * 6, friendly: true, life: 1, faint: true, color: '154,107,255' });
+}
+
+/** Per-enemy status tick (called from updateEnemies only for enemies that have a status). */
+function tickStatus(e, dt) {
+  const due = tickInk(e, dt);
+  if (due > 0) damageEnemy(e, due, 0, 0, false, 'ink');
+  if (e.chillT > 0) { e.chillT -= dt; if (e.chillT <= 0) e.chillHits = 0; }
+  if (e.staticT > 0) e.staticT -= dt;
+  if (e.frozenT > 0) e.frozenT -= dt;
+  if (!e.dead && stats.brittle && shouldShatter(e)) {   // Brittle Pages
+    burst(e.x, e.y, 8, [PLAYER.chill, PLAYER.inkRim, '#fff'], 150, 0.4);
+    damageEnemy(e, e.hp, 0, 0, false, 'ink');
+  }
+}
+
+function updateStatusFx(dt) {
+  for (let i = zaps.length - 1; i >= 0; i--) if ((zaps[i].life -= dt) <= 0) zaps.splice(i, 1);
+  if (game.state === 'playing') tickMetrics(sm, dt);
+}
+
+const statusSprites = {};
+/** One cached 32x32 sprite per status (built once, like glowSprite), drawn small beside the enemy. No shadowBlur. */
+function statusSprite(kind) {
+  if (statusSprites[kind]) return statusSprites[kind];
+  const c = document.createElement('canvas'); c.width = c.height = 32;
+  const g = c.getContext('2d');
+  g.translate(16, 16); g.lineCap = 'round'; g.lineJoin = 'round';
+  if (kind === 'ink') {   // violet drop with a light rim
+    g.beginPath(); g.moveTo(0, -13); g.bezierCurveTo(10, -1, 11, 4, 11, 6); g.arc(0, 6, 11, 0, Math.PI); g.bezierCurveTo(-11, 4, -10, -1, 0, -13); g.closePath();
+    g.fillStyle = PLAYER.ink; g.fill(); g.lineWidth = 2.5; g.strokeStyle = PLAYER.inkRim; g.stroke();
+  } else if (kind === 'chill') {   // snowflake
+    g.strokeStyle = PLAYER.chill; g.lineWidth = 3;
+    for (let k = 0; k < 3; k++) { const a = (k / 3) * Math.PI; g.beginPath(); g.moveTo(Math.cos(a) * 13, Math.sin(a) * 13); g.lineTo(-Math.cos(a) * 13, -Math.sin(a) * 13); g.stroke(); }
+    g.strokeStyle = '#ffffff'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, -13); g.lineTo(0, 13); g.stroke();
+  } else {   // static: a lime spark
+    g.beginPath(); g.moveTo(3, -14); g.lineTo(-7, 2); g.lineTo(0, 2); g.lineTo(-4, 14); g.lineTo(8, -4); g.lineTo(1, -4); g.closePath();
+    g.fillStyle = PLAYER.static; g.fill(); g.lineWidth = 1.5; g.strokeStyle = '#4a5a10'; g.stroke();
+  }
+  return (statusSprites[kind] = c);
+}
+/** Status marks beside an enemy: a faint cold tint on the body, plus one small sprite per active status. */
+function drawStatus(e) {
+  if (e.chillT > 0 || e.frozenT > 0) {
+    ctx.globalAlpha = e.frozenT > 0 ? 0.4 : 0.16; ctx.fillStyle = PLAYER.chill;
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.r * 0.95, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
+  }
+  const kinds = [];
+  if (e.inkT > 0) kinds.push('ink');
+  if (e.chillT > 0 || e.frozenT > 0) kinds.push('chill');
+  if (e.staticT > 0) kinds.push('static');
+  if (!kinds.length) return;
+  const sz = e.type === 'boss' ? 26 : 18, x0 = e.x - (kinds.length * sz) / 2, y0 = e.y - e.r - sz - 2;
+  for (let i = 0; i < kinds.length; i++) ctx.drawImage(statusSprite(kinds[i]), x0 + i * sz, y0, sz, sz);
+}
+function drawZaps() {
+  if (!zaps.length) return;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  for (const z of zaps) {
+    ctx.globalAlpha = clamp(z.life / ZAP_LIFE, 0, 1);
+    ctx.beginPath(); ctx.moveTo(z.pts[0], z.pts[1]);
+    for (let i = 2; i < z.pts.length; i += 2) ctx.lineTo(z.pts[i], z.pts[i + 1]);
+    ctx.strokeStyle = PLAYER.static; ctx.lineWidth = 3; ctx.stroke();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
 /** Reading Nook: is a shelf (not the outer wall) within reach of the player? */
 function nextToShelf(p) {
   for (let k = 0; k < 8; k++) {
@@ -1377,6 +1535,8 @@ function updateEnemies(dt) {
     e.t += dt;
     e.flash = Math.max(0, e.flash - dt);
     e.orbitHit = Math.max(0, e.orbitHit - dt);
+    if (e.inkT > 0 || e.chillT > 0 || e.staticT > 0 || e.frozenT > 0) { tickStatus(e, dt); if (e.dead) continue; }
+    if (e.elite || e.type === 'boss') { const bossy = e.type === 'boss'; if (bossy) sm.bossSec += dt; else sm.eliteSec += dt; if (e.frozenT > 0) { if (bossy) sm.bossFrozenSec += dt; else sm.eliteFrozenSec += dt; } }
     // Knockback decays
     const kd = Math.exp(-dt * 6);
     e.vx *= kd; e.vy *= kd;
@@ -1420,6 +1580,7 @@ function updateEnemies(dt) {
       }
       case 'boss': bossAI(e, dt); break;
     }
+    if (e.chillT > 0) { const f = chillFactor(e); mx *= f; my *= f; }   // Cold Storage (bosses get half the slow)
     // Elites return fire: an aimed page (a 3-page fan from wing 7) when they can see you.
     if (e.elite && e.stun <= 0 && game.state === 'playing') {
       e.shootT -= dt;
@@ -1524,6 +1685,8 @@ function radial(x, y, n, s, off) { for (let i = 0; i < n; i++) shootHazard(x, y,
 
 function damageEnemy(e, dmg, kx, ky, crit, src = 'other') {
   if (e.dead) return;
+  const quiet = isStatusSource(src);   // ink / zap / pop damage is silent and never chains
+  if (e.type === 'boss') dmg *= statusDamageMult(e, stats.brittle);   // chilled bosses take +25%
   addDealt(rl, src, dmg < e.hp ? dmg : e.hp);   // effective damage: overkill is not counted
   e.hp -= dmg;
   e.flash = 0.09;
@@ -1539,21 +1702,22 @@ function damageEnemy(e, dmg, kx, ky, crit, src = 'other') {
     prev.text = `${tot}`; prev.life = prev.max; prev.x = clamp(e.x, 70, W - 70);
     if (crit) { prev.color = '#ffd54a'; prev.size = 18 * uiK; }
   } else if (crit || e.type === 'boss' || texts.length < 8) {
-    floatText(e.x + (Math.random() - 0.5) * 10, e.y - e.r, `${shown}`, crit ? '#ffd54a' : '#e8e0cc', crit ? 18 : 11, crit ? 0.7 : 0.5);
+    floatText(e.x + (Math.random() - 0.5) * 10, e.y - e.r, `${shown}`, crit ? '#ffd54a' : src === 'ink' ? PLAYER.inkRim : src === 'zap' ? PLAYER.static : src === 'pop' ? PLAYER.pop : '#e8e0cc', crit ? 18 : 11, crit ? 0.7 : 0.5);
     e.dmgText = texts[texts.length - 1]; e.dmgText.sum = dmg; e.dmgText.crit = crit;
   }
-  sound.play(crit ? 'crit' : 'hit', e.type === 'boss' ? 0.6 : 1);
+  if (!quiet) sound.play(crit ? 'crit' : 'hit', e.type === 'boss' ? 0.6 : 1);
   // Hit-stop on the boss sells impact, but chained on every hit it slowed late fights to ~0.4x speed.
   // Budget: only crits / big hits, and at most one micro-freeze per 0.3s of game time.
   if (e.type === 'boss' && (crit || dmg >= stats.damage * 3) && game.time - (game.lastBossStop || -1) > 0.3) {
     game.lastBossStop = game.time;
     game.freeze = Math.max(game.freeze, 0.012);
   }
-  if (e.hp <= 0) killEnemy(e);
+  if (e.hp <= 0) killEnemy(e, src);
 }
 
-function killEnemy(e) {
+function killEnemy(e, src = 'other') {
   e.dead = true;
+  sm.kills++; if (isStatusSource(src)) { sm.statusKillsSec++; if (src === 'ink') sm.inkKills++; }
   if (e.type === 'boss') rl.bossKills.push(Math.round(game.waveT * 10) / 10);   // run log: seconds from room start to boss kill
   game.kills++;
   game.combo++;
@@ -1567,6 +1731,9 @@ function killEnemy(e) {
   addLight(e.x, e.y, e.r * 5, 0.35, burstColors[0]);
   sound.play('kill', 1 + Math.min(game.combo, 20) * 0.03);
   if (game.combo > 0 && game.combo % 10 === 0) floatText(player.x, player.y - 34, `${game.combo} COMBO!`, '#ffd54a', 18, 1.1);
+  // Pop-up Book / Indelible: only kills NOT caused by ink, zaps or pops start them (one Grand Finale round: popGen 1 -> one more pop)
+  if (stats.popRadius && (!isStatusSource(src) || (src === 'pop' && stats.finale && popGen === 1))) popAt(e.x, e.y, src === 'pop' ? 1 : 0);
+  if (stats.indelible && e.inkT > 0 && e.inkGen === 0 && !isStatusSource(src)) inkSplash(e);
   if (e.type === 'coin') { game.fines += 1; floatText(e.x, e.y - 12, '+1 🪙', '#ffd54a', 12, 0.7); }
   // From wing 4, elites burst into a ring of pages as they go down: don't stand on them.
   if (e.elite && game.diff && game.diff.deathBurst && game.state === 'playing') { hazPat = 'page:elite-burst'; radial(e.x, e.y, game.diff.deathBurst, 120, Math.random() * TAU); }
@@ -1720,6 +1887,7 @@ function updateBooks(dt) {
           const dmg = crit ? base * stats.critMult : base;
           const s = Math.hypot(b.vx, b.vy) || 1;
           damageEnemy(e, dmg, (b.vx / s) * 160, (b.vy / s) * 160, crit, crit ? 'crit' : 'throw');
+          onBookHit(e, base, 'throw');
           b.hitAny = true;
           if (!b.bonus || particles.length < 110) burst(b.x, b.y, 5, [b.color, '#fff'], 120, 0.3);   // side/rear/fan books skip hit sparks in a busy screen
           if (crit && stats.critBurst) inkBurst(e.x, e.y, stats.critBurst, stats.damage, '#7a5cff', 'splash');
@@ -1763,6 +1931,7 @@ function updateOrbiters(dt) {
         const crit = Math.random() < stats.critChance;
         const dmg = stats.damage * ORBIT_DAMAGE * (crit ? Math.min(stats.critMult, ORBIT_CRIT_MAX) : 1);
         damageEnemy(e, dmg, (dx / d) * ORBIT_KNOCK, (dy / d) * ORBIT_KNOCK, crit, 'orbit');
+        onBookHit(e, stats.damage * ORBIT_DAMAGE, 'orbit');
       }
     }
   }
@@ -2066,6 +2235,7 @@ function render() {
   for (const e of enemies) { const k = shadowK(e); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(e.x + 3, e.y + e.r * 0.8, e.r * 0.9 * k, e.r * 0.4 * k, 0, 0, TAU); ctx.fill(); }
   drawWorms(ctx, enemies);
   for (let i = enemies.length - 1; i >= 0; i--) drawEnemy(enemies[i]);
+  for (const e of enemies) if (e.inkT > 0 || e.chillT > 0 || e.frozenT > 0 || e.staticT > 0) drawStatus(e);
   for (const b of books) drawThrownBook(b);
   if (game.state !== 'title' && game.state !== 'gameover' && !(game.state === 'dying' && game.deathT < 1.5)) {
     orbiterPositions().forEach((o, k) => { if (orbitRest[k] > 0) ctx.globalAlpha = 0.4; drawBook(o.x, o.y, o.a * 2, PLAYER.orbit, 1.1); ctx.globalAlpha = 1; });
@@ -2074,6 +2244,7 @@ function render() {
   for (const c of cats) drawCat(c);
   drawHazards();
   for (const g of rings) drawRing(g);
+  drawZaps();
   drawParticles();
 
   if (settings.lights) renderLights();
@@ -2971,13 +3142,13 @@ requestAnimationFrame(frame);
 if (DEBUG) {
   window.__overdue = {
     game, get cats() { return cats; }, grid: () => `${COLS}x${ROWS}`, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, enemies, get content() { return content; },
-    makeEnemy, freeze: (on) => { debugFreeze = !!on; }, startRun: (m, w) => startRun(m, w, { noGuide: true }), startWave, get guide() { return game.guide; }, tipsSeen: () => tips.seen.slice(), setSurviveT: (t) => { game.surviveT = t; }, killAll: () => { for (const e of [...enemies]) killEnemy(e); spawnQueue.length = 0; telegraphs.length = 0; },
+    makeEnemy, freeze: (on) => { debugFreeze = !!on; }, startRun: (m, w) => startRun(m, w, { noGuide: true }), startWave, get guide() { return game.guide; }, tipsSeen: () => tips.seen.slice(), setSurviveT: (t) => { game.surviveT = t; }, killAll: () => { for (const e of [...enemies]) killEnemy(e, 'cleanup'); spawnQueue.length = 0; telegraphs.length = 0; },
     get progress() { return progress; }, setFines: (n) => { progress = { ...progress, fines: n }; saveProgress(); renderFineBadges(); },
     unlockAll: () => { progress = { ...progress, unlocked: WINGS.length }; saveProgress(); },
 
     god: () => { player.hp = 999; stats.maxHp = 999; },
     grant: (id) => { const u = UPGRADES.find((x) => x.id === id); game.owned[id] = (game.owned[id] || 0) + 1; game.picks.push(id); u.apply(stats, player); },
-    get runCounters() { return rl; }, get lastRun() { return game.lastRun; }, ui: () => ({ uiK, viewScale, dpr, W, H, UW, UH }),
+    get statusMetrics() { return sm; }, zaps, statusSprite, get runCounters() { return rl; }, get lastRun() { return game.lastRun; }, ui: () => ({ uiK, viewScale, dpr, W, H, UW, UH }),
     showCards: (ids) => renderCards(ids.map(byId)),
     showFreePerk: (id, label) => { queueFreePerk(byId(id), label); flushFreePerks(); }, showUpgrades, showDoors, nextRoom, texts, get cursedOffer() { return game.cursedOffer; }, takeCursed: (take) => { cardsArmedAt = 0; resolveCursedOffer(take); }, get rareId() { return game.rareId; }, get door() { return game.door; },
     // ---- balance bot (scripts/balance.mjs): drives the sim headless, faster than real time ----
