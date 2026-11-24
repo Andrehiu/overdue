@@ -1242,8 +1242,9 @@ function spawnBook(x, y, a, extra = {}) {
 }
 
 let currentLook = bookLook({});
+const MARGIN_DMG = 1.5;   // side and rear books hit 50% harder than a normal book: they never home, so most miss (bot-tuned)
 const MARGIN_SIDE = [Math.PI / 4], MARGIN_WIDE = [Math.PI / 6, Math.PI / 3];   // Margin Notes angles: ±45°, then ±30° and ±60°
-function marginBook(p, a) { spawnBook(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a, { bonus: true, nohome: true, margin: true }); }
+function marginBook(p, a) { spawnBook(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a, { bonus: true, nohome: true, margin: true, dmgMult: MARGIN_DMG }); }
 function fire() {
   const p = player, n = stats.projectiles;
   currentLook = bookLook(game.owned); // perks change how books look (cheap: a few flags per throw)

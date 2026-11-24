@@ -102,7 +102,7 @@ export function poolMetrics(runs) {
     const x = r.metrics; if (!x) continue;
     if (!m) m = { n: 0, dealt: {}, taken: {}, thrown: 0, ended: 0, thrownHit: 0, evict: 0, flight: [], life: [], pages: { hits: 0, crossed: 0, crossedHit: 0, blocked: 0, blockedHit: 0 }, bossKills: [], seconds: 0 };
     m.n += x.n || 1; m.dealt = addMaps(m.dealt, x.dealt); m.taken = addMaps(m.taken, x.taken);
-    for (const k of ['thrown', 'ended', 'thrownHit', 'evict', 'seconds']) m[k] += x[k] || 0;
+    for (const k of ['thrown', 'ended', 'thrownHit', 'evict', 'seconds', 'lcHits', 'lcSum', 'lcT', 'lcLow']) m[k] = (m[k] || 0) + (x[k] || 0);
     m.flight = addArrays(m.flight, x.flight); m.life = addArrays(m.life, x.life);
     m.pages = addMaps(m.pages, x.pages); m.bossKills.push(...(x.bossKills || []));
   }
