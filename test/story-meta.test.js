@@ -63,7 +63,7 @@ test('roomGoal: never room 1, the elite or the boss room; capped per wing; deter
       assert.ok(g === 'clear' || g === 'survive');
       if (g === 'survive') { n++; assert.ok(r !== 1 && r !== ELITE_ROOM && r !== BOSS_ROOM, `wing ${w} room ${r} must not be a goal room`); }
     }
-    assert.ok(n <= (w <= 2 ? 1 : 2), `wing ${w} has ${n} Survive rooms`);
+    assert.ok(n <= 1, `wing ${w} has ${n} Survive rooms`);
     if (n) wingsWith++;
   }
   assert.ok(wingsWith >= 6 && wingsWith <= 8, `${wingsWith} of 10 wings have a Survive room`);
@@ -89,7 +89,7 @@ test('a Survive room is never easier than the same room played plain, and its sp
       for (let t = 0; t < SURVIVE_SECONDS - 6; t += 6) assert.ok(sp.some((s) => s.t >= t && s.t < t + 8), `wing ${w} room ${r}: gap in spawns near ${t}s`);
     }
   }
-  assert.ok(found >= 8);
+  assert.ok(found >= 7);
 });
 
 test('Survive rooms build up: every spawn lands well before the buzzer and the budget arrives in a rising crescendo', async () => {
@@ -112,7 +112,7 @@ test('Survive rooms build up: every spawn lands well before the buzzer and the b
     const all = early + mid + late;
     assert.ok(late >= 0.45 * all && late > mid && mid > early * 1.2, `wing ${w} room ${r}: budget by phase ${[early, mid, late].map((x) => (100 * x / all).toFixed(0)).join('/')}%`);
   }
-  assert.ok(rooms >= 8);
+  assert.ok(rooms >= 7);
 });
 
 test('fines: a full 7-room wing pays within 10% of the old 10-room wing, elite and boss stay the biggest', async () => {

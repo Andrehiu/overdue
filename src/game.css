@@ -539,3 +539,29 @@ body.portrait .doors { flex-direction: column; align-items: center; }
 .free-perk .fp-gain { font-size: .8em; color: var(--muted); }
 .build-item.fresh { animation: chip-pulse 1s ease-in-out 3; border-color: var(--chip-glow); }
 @media (prefers-reduced-motion: reduce) { .free-perk { animation: none; } .build-item.fresh { animation: none; box-shadow: 0 0 .6em rgba(255, 213, 74, .7); } }
+
+/* =====================================================================
+   v1.13.0 new-player help: plain captions under fun terms, guided first room, big Survive timer
+   ===================================================================== */
+/* Caption: always shown, own line under the label, small and quiet (approved mock-up). */
+.cap { display: block; font-size: .62em; opacity: .62; font-weight: normal; line-height: 1.15; letter-spacing: 0; text-transform: none; }
+.cap.inl { display: inline; margin-left: .5em; }
+button .cap { margin-top: .1em; }
+.door-sub { margin: -.3em 0 0; text-align: center; }
+h3 .cap { display: inline; margin-left: .5em; }
+.menu-grid.three > :last-child:not([hidden]) { grid-column: 1 / -1; }
+.menu-grid > button { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.menu > button { display: block; }
+.card-wrap .banish, .banish-slot { min-height: 2.5em; }
+.renew { line-height: 1.15; }
+
+/* Guided first room: Skip button (top left, level with the pause button) and a pulse on the button being taught */
+#touchUI #btnGuideSkip { border-radius: 2em; width: auto; height: auto; padding: .35em .9em; font-size: .75em; left: calc(1em + env(safe-area-inset-left, 0px)); top: 4.6em; display: none; }
+body.guiding #touchUI #btnGuideSkip { display: block; }
+#touchUI button.guide-hl { animation: guide-pulse 1s ease-in-out infinite; border-color: #ffd54a; z-index: 3; }
+@keyframes guide-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 213, 74, .8), 0 0 1.2em rgba(255, 213, 74, .6); transform: scale(1); } 50% { box-shadow: 0 0 0 .7em rgba(255, 213, 74, 0), 0 0 1.6em rgba(255, 213, 74, .9); transform: scale(1.12); } }
+@media (prefers-reduced-motion: reduce) { #touchUI button.guide-hl { animation: none; box-shadow: 0 0 0 .3em #ffd54a; } }
+.menu button[hidden], .menu-grid > button[hidden] { display: none !important; }
+.cap.inl { white-space: nowrap; }
+#toast.low { top: auto; bottom: 4.2em; max-width: 60%; text-align: center; }
+#touchUI button.guide-hl { outline: .25em solid #ffd54a; outline-offset: .1em; }
