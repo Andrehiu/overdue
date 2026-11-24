@@ -36,6 +36,7 @@ running. Planner working branch: `claude/brave-galileo-jyg38o` (= main + docs). 
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-24 | New perks (1.15.0): bosses are immune to freeze and stun (they take +25% damage while chilled instead); elites and normal enemies get a 3 s cooldown after a freeze. Applies to Cold Storage/Deep Freeze, Superconductor, Static, Library Cat/Stray Colony, Orbit. Balance-review changes accepted (Margin Notes side books don't home, Last Chapter cap, Crossfire +50% radius capped, chains never start chains, Static L1 / Cat L2 buffs). Status colours: 3-option page before 1.15.0; static not gold (clashes with elite outline and crits) | Owner picked A |
 | 2026-11-24 | Bigger rooms (+20%) apply to story only; endless keeps today's grid (seeds and Hall of Fame stay comparable) | Owner picked A |
 | 2026-11-24 | Rooms 20% bigger (phone grid 34×16 → ~40×19): HUD/buttons keep their size, lamps and shelves scale with the room. First part of 1.14.0, before balance tuning. Bigger-map-with-camera stays parked | Owner (mock-ups of today / +20% / +40%) |
 | 2026-11-24 | New perks: owner wants the proposed mix (Leaky Pen, Cold Storage, Static Cling, Margin Notes, Last Chapter, Library Cat, Pop-up Book + Brittle Pages, Conductive Ink, Superconductor, Ink Bombs, Crossfire) for 1.15.0, adjusted by the independent balance review; Audiobook "blocks pages" questioned by owner (too strong) | Owner |
