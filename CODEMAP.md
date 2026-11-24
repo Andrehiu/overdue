@@ -44,7 +44,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/palette.js` | 60 | Projectile colours. Pure module (no DOM), unit-tested. |
 | `src/runlog.js` | 103 | Run log (v1.14.0): one compact record per finished run, kept on this phone, plus the "Share stats" code. |
 | `src/status.js` | 139 | Status effects (v1.15.0 part A): ink, chill, static + Pop-up Book maths. Pure module (no DOM), unit-tested. |
-| `src/story.js` | 162 | Story mode: ten handmade library wings (7 rooms each), unlocked in order. Pure module (no DOM) so it is unit-tested. |
+| `src/story.js` | 164 | Story mode: ten handmade library wings (7 rooms each), unlocked in order. Pure module (no DOM) so it is unit-tested. |
 | `src/upgrades.js` | 359 | Perks offered between waves. Pure data + a seeded roller (no DOM), so it is unit-tested. |
 | `src/util.js` | 132 | Small, dependency-free helpers shared by the game and its unit tests. |
 | `src/version.js` | 22 | Which build of the game is running. The build script injects the real values |
@@ -139,7 +139,7 @@ STATUS_SOURCES:25 · isStatusSource:26 · PROC_SOURCES:28 · canProc:29 · clamp
 
 ## src/story.js
 
-CURVE:18 · curveRoom:19 · SURVIVE_CHUNKS:27 · SURVIVE_ROOMS:28 · roomGoal:30 · WINGS:34 · roomKind:67 · wingBudget:77 · wingHp:78 · difficulty:81 · threat:110 · composeRoom:115 · layoutSeed:137 · forcedRoom:139 · roomShape:145 · roomReward:156 · firstClearBonus:161
+CURVE:18 · curveRoom:19 · SURVIVE_CHUNKS:27 · SURVIVE_ROOMS:28 · roomGoal:30 · WINGS:34 · roomKind:67 · wingBudget:77 · wingHp:78 · difficulty:83 · threat:112 · composeRoom:117 · layoutSeed:139 · forcedRoom:141 · roomShape:147 · roomReward:158 · firstClearBonus:163
 
 ## src/upgrades.js
 

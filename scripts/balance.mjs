@@ -12,6 +12,7 @@
 //   npm run balance -- --ban-perks=audiobook   (bot only: never pick these perks; for no-orbit baselines)
 //   npm run balance -- --rooms=old|new --viewport=844x390 --out=balance-report-x   (old = pre-1.14.0 room size, debug flag)
 //   npm run balance -- --policies=rare,rest --jobs=4
+//   npm run balance -- --renos=p65 --human=1   (p65 = 65% of every multi-level Renovation; human = reaction delay + sloppy dodging)
 //   npm run balance -- --policies=mystery --cursed=take|walk   (always Mystery Shelf; take or walk away from its cursed book)
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
@@ -37,12 +38,15 @@ const FORCE = parseForce(arg('force-perks', ''));
 const BAN = arg('ban-perks', '').split(',').filter((x) => /^[a-z_]+$/.test(x));   // bot only: never pick these (baseline runs, e.g. no orbit)
 const ROOMS_FLAG = arg('rooms', 'new') === 'old' ? '&legacyrooms=1' : '';
 const [VW, VH] = arg('viewport', '1280x720').split('x').map(Number);
+const HUMAN = arg('human', '0') === '1';   // human-like bot: reaction delay, sloppy dodging (v1.15.2)
 const JOBS = Math.max(1, Number(arg('jobs', Math.min(4, cpus().length))));
 
 // A mid-game save: about half of every multi-level Renovation (one-off expensive ones, like Second Wind, not yet bought).
 const saves = {
   none: normalizeProgress({ unlocked: 10 }),
   half: normalizeProgress({ unlocked: 10, reno: Object.fromEntries(RENOVATIONS.map((r) => [r.id, r.max <= 1 ? 0 : Math.round(r.max / 2)])) }),
+  // The owner's playtest level (v1.15.2): 65% of every multi-level Renovation, one-off ones (Catalogue, Second Wind) not bought.
+  p65: normalizeProgress({ unlocked: 10, reno: Object.fromEntries(RENOVATIONS.map((r) => [r.id, r.max <= 1 ? 0 : Math.round(r.max * 0.65)])) }),
   max: normalizeProgress({ unlocked: 10, reno: Object.fromEntries(RENOVATIONS.map((r) => [r.id, r.max])) }),   // every Renovation at its top tier
 };
 
@@ -94,13 +98,13 @@ async function worker(id) {
     const job = order[next++];
     let r;
     try {
-      r = await page.evaluate(async ({ wing, policy, progress, force, ban, seed, cursed }) => {
+      r = await page.evaluate(async ({ wing, policy, progress, force, ban, seed, cursed, human }) => {
         // Seeded randomness: run k of a cell gets the same seed in every batch, so old-vs-new room size compares like with like.
         let a = (seed * 2654435761) >>> 0;
         Math.random = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
         const m = await import('/__bot/balance-bot.mjs');
-        return m.playRun(window.__overdue, { wing, policy, progress, force, ban, cursed });
-      }, { wing: job.wing, policy: job.policy, progress: saves[job.renos], force: FORCE, ban: BAN, seed: job.seed, cursed: CURSED });
+        return m.playRun(window.__overdue, { wing, policy, progress, force, ban, cursed, human });
+      }, { wing: job.wing, policy: job.policy, progress: saves[job.renos], force: FORCE, ban: BAN, seed: job.seed, cursed: CURSED, human: HUMAN });
       if (page.pageErrors.length) { r.errors = [...(r.errors || []), ...page.pageErrors.splice(0)]; }
     } catch (e) {
       r = { wing: job.wing, policy: job.policy, outcome: 'error', room: 0, hearts: 0, fines: 0, time: 0, errors: [String(e.message || e).slice(0, 200)] };

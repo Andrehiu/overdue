@@ -3,10 +3,11 @@
 import { chooseDoor, pickPerk, chooseMove } from './balance-lib.mjs';
 
 const WEIGHT = { boss: 2.5, golem: 1.5, coin: 0.4 };
+const HUMAN_DECIDE_EVERY = 20;          // human-like: re-thinks every ~170 ms (reaction time), holds the last move in between
 const DECIDE_EVERY = 4;                 // steps (1/120 s each): the bot re-thinks at 30 Hz
 
 /** Play one run. progress = the save to start from. Never throws: failures come back as outcome 'error'. */
-export function playRun(o, { wing, policy, progress, force = [], ban = [], cursed = 'take', roomTimeout = 180, wallMs = 180000 }) {
+export function playRun(o, { wing, policy, progress, force = [], ban = [], cursed = 'take', human = false, roomTimeout = 180, wallMs = 180000 }) {
   const g = o.game, errors = [];
   try {
     o.drive(true);
@@ -37,9 +38,9 @@ export function playRun(o, { wing, policy, progress, force = [], ban = [], curse
       if (st === 'playing' && g.wave !== seen) { seen = g.wave; trace.push({ room: g.wave, hp: o.player.hp, door: lastDoor }); lastDoor = null; }
       if (st === 'playing') {
         if (g.waveT > roomTimeout || Date.now() - t0 > wallMs) { outcome = 'timeout'; break; }
-        prev = think(o, prev);
+        prev = think(o, prev, human);
       } else o.setBotInput({ x: 0, y: 0 });
-      o.stepN(DECIDE_EVERY);
+      o.stepN(human ? HUMAN_DECIDE_EVERY : DECIDE_EVERY);
     }
     o.setBotInput(null);
     const room = g.wave, won = g.state === 'gameover' && g.wingCleared;
@@ -58,7 +59,7 @@ export function playRun(o, { wing, policy, progress, force = [], ban = [], curse
 }
 
 /** One decision: steer, and maybe dash / SHHH. Returns the chosen direction (for the anti-jitter bias). */
-function think(o, prev) {
+function think(o, prev, human) {
   const p = o.player, threats = [];
   for (const e of o.enemies) if (!e.dead) threats.push({ x: e.x, y: e.y, vx: 0, vy: 0, r: e.r, w: WEIGHT[e.type] || 1 });
   for (const h of o.hazards) threats.push({ x: h.x, y: h.y, vx: h.vx, vy: h.vy, r: h.r, w: 1.6 });
@@ -73,8 +74,12 @@ function think(o, prev) {
     if (t.w === 1.6 ? d < 34 && towards : d < p.r + 14) danger = true;
   }
   if (!mv.x && !mv.y && nearest && nd < 90) { const d = Math.hypot(p.x - nearest.x, p.y - nearest.y) || 1; mv = { x: (p.x - nearest.x) / d, y: (p.y - nearest.y) / d }; }
+  if (human && (mv.x || mv.y)) {   // sloppy steering: up to ±0.45 rad off, and 25% of dash chances missed
+    const a = (Math.random() - 0.5) * 0.9, c = Math.cos(a), sn = Math.sin(a);
+    mv = { x: mv.x * c - mv.y * sn, y: mv.x * sn + mv.y * c };
+  }
   o.setBotInput(mv);
-  if (danger && p.dashStock > 0 && p.dashT <= 0 && p.inv <= 0 && (mv.x || mv.y)) o.actions.dash = true;
+  if (danger && !(human && Math.random() < 0.25) && p.dashStock > 0 && p.dashT <= 0 && p.inv <= 0 && (mv.x || mv.y)) o.actions.dash = true;
   if (close >= 4 && p.shhhT <= 0) o.actions.shhh = true;
   return mv;
 }
