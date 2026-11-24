@@ -15,11 +15,11 @@ export function checksum(s) {
   for (const b of enc.encode(s)) { h ^= b; h = Math.imul(h, 0x01000193) >>> 0; }
   return h.toString(16).padStart(8, '0');
 }
-function toB64(str) {
+export function toB64(str) {
   let bin = ''; for (const b of enc.encode(str)) bin += String.fromCharCode(b);
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
-function fromB64(b64) {
+export function fromB64(b64) {
   const bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
   return dec.decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
 }

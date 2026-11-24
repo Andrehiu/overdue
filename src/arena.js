@@ -30,7 +30,35 @@ export function setOrientation(portrait) { setGrid(portrait ? 18 : 32, portrait 
  * 16:9 desktop -> 32x18, iPad landscape -> 28x20. Narrower screens get the 4:3 shape (letterboxed); wider ones (phones) widen up to ~2.2:1.
  * Keeps roughly the same number of cells (same amount of room to play) and an even column count.
  */
-export function gridForAspect(aspect) {
+export function gridForAspect(aspect, story = false) {
+  const [lc, lr] = legacyGrid(aspect);
+  if (!story) return [lc, lr];
+  return storyGrid(aspect, lr);
+}
+
+/**
+ * v1.14.0: story rooms are ~20% longer on every side than the legacy grid (the same screen shape, so no bars).
+ * Rows = legacy rows x 1.2; columns follow the screen's aspect (even). Endless keeps the legacy grid.
+ */
+export const ROOM_SCALE = 1.2;
+function storyGrid(aspect, legacyRows) {
+  const a = clamp(aspect || 16 / 9, 4 / 3, WIDE_MAX);
+  const r0 = Math.round(legacyRows * ROOM_SCALE);
+  let best = null; // stay near r0 rows, but within 2.5% of the screen's shape (no black bars)
+  for (const rows of [r0 - 1, r0, r0 + 1]) {
+    const cols = clamp(Math.round((rows * a) / 2) * 2, 24, 48);
+    const miss = Math.abs(cols / rows / a - 1);
+    const cost = (miss > 0.025 ? 1000 : 0) + Math.abs(rows - r0) * 20 + miss * 100;
+    if (!best || cost < best.cost) best = { cols, rows, cost };
+  }
+  return [best.cols, best.rows];
+}
+
+/** How much bigger than the 576-cell legacy room this grid is (>= 1). Scales story shelf counts. */
+export const areaK = () => Math.max(1, (COLS * ROWS) / 576);
+
+/** The grid before v1.14.0: endless mode always uses it, and story HUD scale is measured against it. */
+function legacyGrid(aspect) {
   const a = clamp(aspect || 16 / 9, 4 / 3, WIDE_MAX); // landscape only since v1.4.0: never a portrait grid
   if (a > 32 / 18) { // phones (~2:1 to 2.2:1): follow the screen's shape so there are no side bars (v1.11.1)
     let best = null; // within 2.5% of the screen's shape, keep the cell count nearest today's 576
@@ -238,7 +266,7 @@ const SHAPE_GEN = {
       [{ x: xl, y: yb, w: half - 2 - xl, h: 1 }, { x: xl, y: gy + 4, w: 1, h: yb - gy - 4 }],   // bottom bar + lower side bar
     ];
     const out = [];
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0, n = Math.round(14 * areaK()); i < n; i++) {
       const horiz = rng.chance(0.4), w = horiz ? rng.int(3, 4) : 1, h = horiz ? 1 : rng.int(3, 5);
       out.push([{ x: rng.int(2, Math.max(2, xl - 2 - w)), y: rng.int(2, ROWS - 2 - h), w, h }]);
     }
@@ -255,7 +283,7 @@ const SHAPE_GEN = {
     let y = 0;
     for (const l of cuts) { wall.push({ x: wx, y, w: 1, h: l }); y += l + gw; }
     const extra = [];
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0, n = Math.round(12 * areaK()); i < n; i++) {
       const horiz = rng.chance(0.6), w = horiz ? rng.int(3, 5) : 1, h = horiz ? 1 : rng.int(2, 4);
       extra.push([{ x: rng.int(wx + 3, Math.max(wx + 3, half - 1 - w)), y: rng.int(2, ROWS - 2 - h), w, h }]);
     }

@@ -324,7 +324,7 @@ const shelfGap = (a, b) => Math.max(a.x - (b.x + b.w), b.x - (a.x + a.w), a.y - 
 test('aisles are at least 2 cells (60 px) wide in every room, on every screen shape, and never empty', async () => {
   const A = await load('arena');
   const { WINGS, ROOMS_PER_WING, difficulty, layoutSeed, roomShape } = await load('story');
-  const shapes = [[32, 18], [18, 32], [28, 20], [20, 28], ...[0.5, 1, 1.4, 2, 2.05, 2.17, 2.2].map((a) => A.gridForAspect(a))];
+  const shapes = [[32, 18], [18, 32], [28, 20], [20, 28], ...[0.5, 1, 1.4, 2, 2.05, 2.17, 2.2].map((a) => A.gridForAspect(a)), ...[1.33, 1.52, 2, 2.17, 2.2].map((a) => A.gridForAspect(a, true))];
   const check = (a, label) => {
     assert.ok(a.shelves.length > 0, `${label}: has shelves`);
     assert.ok(A.isConnected(a.solid), `${label}: connected`);

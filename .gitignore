@@ -3,6 +3,6 @@ dist/
 .DS_Store
 *.log
 qa-report/
-balance-report/
+balance-report*/
 .qa-private-terms
 art-shots/

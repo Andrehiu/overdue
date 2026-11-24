@@ -89,10 +89,12 @@
       <div class="progress-tools">
         <div class="menu row tool-row">
           <button id="btnBackup" type="button">Backup progress</button>
+          <button id="btnShareStats" type="button">Share stats</button>
           <button id="btnShowTips" type="button">Show tips again</button>
           <button id="btnResetProgress" type="button" class="danger">Reset progress</button>
         </div>
-        <p class="muted small">Fines, Renovations and story unlocks. Settings, Codex and Hall of Fame are kept.</p>
+        <p class="muted small">Fines, Renovations and story unlocks. Settings, Codex and Hall of Fame are kept. Share stats copies a code of your last runs (no personal data) so they can be analysed.</p>
+        <textarea id="statsOut" class="backup-text" rows="2" readonly hidden aria-label="Your stats code" spellcheck="false"></textarea>
         <div class="debug-only menu row">
           <button id="btnDebugFines" type="button">+500 fines</button>
           <button id="btnDebugUnlock" type="button">Unlock all wings</button>

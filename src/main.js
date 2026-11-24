@@ -1,6 +1,7 @@
 // OVERDUE! — Night Shift at the Meme Library
 // Engine: fixed-timestep loop, flow-field AI, dynamic lighting, procedural audio, roguelite perks.
-import { W, H, CELL, COLS, ROWS, SAFE, PORTRAIT, setGrid, gridForAspect, generateArena, isSolidPx, cellOf, edgeCells, idx } from './arena.js';
+import { W, H, CELL, COLS, ROWS, SAFE, PORTRAIT, setGrid, gridForAspect, areaK, generateArena, isSolidPx, cellOf, edgeCells, idx } from './arena.js';
+import { RUN_KEY, newCounters, addDealt, addTaken, bookEnded, sampleFlight, buildRecord, pushRun, normalizeRuns, encodeStats } from './runlog.js';
 import { createBackend } from './backend.js';
 import { BUILD, versionLabel, fetchLatestBuild } from './version.js';
 import { CATALOGUE } from './catalogue.js';
@@ -25,6 +26,7 @@ const ctx = canvas.getContext('2d');
 const stage = document.getElementById('stage');
 const $ = (s) => document.querySelector(s);
 const DEBUG = new URLSearchParams(location.search).has('debug');
+const LEGACY_ROOMS = DEBUG && new URLSearchParams(location.search).has('legacyrooms');   // balance bot: play story at the pre-1.14.0 room size
 
 const loadJSON = (k) => { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch { return {}; } };
 const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage blocked */ } };
@@ -58,10 +60,14 @@ const short = (s, n = 28) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 // Canvas sizing (logical 960x540 or 540x960 on portrait phones, letterboxed, HiDPI aware)
 // ======================================================================
 let dpr = 1, viewScale = 1;
+// v1.14.0: story rooms are bigger than the screen-fitting legacy grid, so the world draws smaller. uiK (>= 1) is how much
+// smaller; HUD, touch sticks and floating text are scaled up by it so they keep exactly their v1.13.1 on-screen size.
+// UW x UH is the screen-space "UI canvas" (equal to W x H whenever uiK is 1).
+let uiK = 1, UW = W, UH = H, layoutStory = false;
 const isPortraitScreen = () => innerHeight > innerWidth * 1.15;
 /** Pick the arena shape for the current screen. Only called between runs. */
 function applyLayout(force = false) {
-  const [cols, rows] = gridForAspect(innerWidth / innerHeight);
+  const [cols, rows] = gridForAspect(innerWidth / innerHeight, layoutStory);
   if (force || cols !== COLS || rows !== ROWS) {
     setGrid(cols, rows);
     LAMPS = lampPositions();
@@ -76,9 +82,12 @@ function applyLayout(force = false) {
 }
 function resize() {
   const scale = Math.min(innerWidth / W, innerHeight / H);
+  const [lc, lr] = gridForAspect(innerWidth / innerHeight);   // the legacy (v1.13.1) grid for this screen
+  uiK = Math.max(1, Math.min(innerWidth / (lc * CELL), innerHeight / (lr * CELL)) / scale);
+  UW = W / uiK; UH = H / uiK;
   const cw = Math.floor(W * scale), ch = Math.floor(H * scale);
   stage.style.width = cw + 'px'; stage.style.height = ch + 'px';
-  stage.style.setProperty('--ui-scale', String(Math.max(0.55, Math.min(1.25, scale))));
+  stage.style.setProperty('--ui-scale', String(Math.max(0.55, Math.min(1.25, scale * uiK))));
   dpr = Math.min(2, window.devicePixelRatio || 1);
   canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
   viewScale = cw / W;
@@ -250,9 +259,11 @@ const game = {
   seed: 1, freeze: 0, timeScale: 1, trauma: 0, flash: 0, banner: '', bannerSub: '', bannerT: 0,
   owned: {}, noHitWave: true, clearT: 0, boss: null, deathT: 0, waveT: 0, surviveT: 0, ammoT: 0, ammo: null,
   mode: 'endless', wingN: 1, diff: null, fines: 0, cards: 3, banked: null, wingCleared: false,
-  door: null, bonusPicks: 0, pickIsBonus: false,
+  door: null, bonusPicks: 0, pickIsBonus: false, picks: [], doorLog: [], banished: new Set(), lastHit: null, lastHitElite: false, lastRun: null,
 };
 let stats = baseStats();
+let rl = newCounters();          // run log counters (damage by source, book stats); reset every run
+let hazPat = 'page';             // which attack the next hazard comes from (for 'what killed you')
 let player = makePlayer();
 let arena = generateArena(1, 1);
 let flow = null, flowCell = -1, flowT = 0;
@@ -281,6 +292,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && ga
 function startRun(mode = 'endless', wing = 1, opts = {}) {
   sound.init();
   keepAwake();
+  layoutStory = mode === 'story' && !LEGACY_ROOMS;   // endless keeps the legacy grid (same waves for the same seed)
   applyLayout();
   touch.aimed = false;
   game.seed = (Math.random() * 1e9) | 0;
@@ -290,13 +302,14 @@ function startRun(mode = 'endless', wing = 1, opts = {}) {
     freeze: 0, timeScale: 1, trauma: 0, flash: 0, boss: null, mode, wingN: mode === 'story' ? clamp(wing, 1, WINGS.length) : 1, diff: null,
     guide: null, fines: 0, cards: bonus.cards, banked: null, wingCleared: false, door: null, bonusPicks: 0, pickIsBonus: false, afterBonus: false });
   stats = applyRenovations(baseStats(), progress);
+  rl = newCounters(); Object.assign(game, { picks: [], doorLog: [], lastHit: null, lastHitElite: false, lastRun: null });
   player = makePlayer();
   player.hp = stats.maxHp;
   player.revives = bonus.revives;
   // Head Start: free random perks (never specials) before room/wave 1.
   const head = bonus.startPerks ? rollUpgrades(rng, game.owned, bonus.startPerks, rollOpts({ noSpecial: true })) : [];
   freeQueue.length = 0; hideFreePerk();
-  for (const u of head) { queueFreePerk(u, 'Head Start'); game.owned[u.id] = (game.owned[u.id] || 0) + 1; u.apply(stats, player); }
+  for (const u of head) { queueFreePerk(u, 'Head Start'); game.owned[u.id] = (game.owned[u.id] || 0) + 1; game.picks.push(u.id); u.apply(stats, player); }
   // v1.13.0: the very first story run opens with a short guided room (skippable). Debug hooks pass noGuide.
   if (!opts.noGuide && shouldGuide(playerSaves(), mode, game.wingN)) game.guide = { beat: -1, t: 0, gap: 0.8, used: false, done: false };
   startWave(1);
@@ -314,7 +327,7 @@ function startWave(n) {
   clearWorld();
   game.diff = isStory() ? applyDoor(difficulty(game.wingN, n), game.door) : null;
   // Story rooms keep the same shelf layout every time you play them, like handmade levels.
-  arena = isStory() ? generateArena(layoutSeed(game.wingN, n), n, game.diff.shelvesPerHalf, roomShape(game.wingN, n)) : generateArena(game.seed, n);
+  arena = isStory() ? generateArena(layoutSeed(game.wingN, n), n, Math.round(game.diff.shelvesPerHalf * areaK()), roomShape(game.wingN, n)) : generateArena(game.seed, n);
   buildBackground();
   flowCell = -1;
   player.x = W / 2; player.y = H / 2; player.vx = player.vy = 0;
@@ -395,7 +408,7 @@ function resolveMystery() {
   if (prize.kind === 'cursed') {
     const u = byId(prize.id);
     queueFreePerk(u, 'Mystery Shelf');   // shown as a card once the next room starts
-    game.owned[u.id] = 1; u.apply(stats, player);
+    game.owned[u.id] = 1; game.picks.push(u.id); u.apply(stats, player);
     sound.play('upgrade');
   } else {
     game.bonusPicks++;   // the bonus pick screen is labelled "1 of 2" / "2 of 2"
@@ -476,7 +489,7 @@ function chooseDoor(id) {
 /** Walk through a door: apply it and start the next room. `auto` = no screen was shown, so announce it. */
 function enterDoor(id, auto) {
   const d = DOORS[id];
-  game.door = id;
+  game.door = id; game.doorLog.push(id);
   startWave(game.wave + 1);
   if (auto) toast(d.banner, 2600);
   // Break Room: a heart back on entering (never above max).
@@ -611,7 +624,7 @@ function buildCard(u, i) {
   if (info.mw) b.classList.add(info.mw === 'finale' ? 'finale' : 'near');
   b.addEventListener('click', () => {
     if (!cardsArmed() || game.state !== 'upgrade' || wrap.classList.contains('leaving')) return;
-    game.owned[u.id] = lvl;
+    game.owned[u.id] = lvl; game.picks.push(u.id);
     u.apply(stats, player);
     sound.play('upgrade');
     if (u.kind === 'combo' || u.kind === 'master') { codex.found.add(u.id); saveCodex(); }
@@ -928,7 +941,7 @@ function addLight(x, y, r, life, color = null, big = false) {
   flashes.push({ x, y, r, life, max: life, color });
 }
 function floatText(x, y, text, color = '#fff', size = 14, life = 0.8) {
-  texts.push({ x: clamp(x, 70, W - 70), y: Math.max(y, game.boss && PORTRAIT ? 120 : 78), text, color, size, life, max: life, vy: -40 });
+  texts.push({ x: clamp(x, 70, W - 70), y: Math.max(y, (game.boss && PORTRAIT ? 120 : 78) * uiK), text, color, size: size * uiK, life, max: life, vy: -40 });
 }
 function particle(p) { if (particles.length < 320) particles.push(p); }
 function burst(x, y, n, colors, speed = 160, life = 0.6, shape = 'sq') {
@@ -1031,7 +1044,7 @@ function moveInput() {
   if (keys.has('KeyW') || keys.has('ArrowUp')) y -= 1;
   if (keys.has('KeyS') || keys.has('ArrowDown')) y += 1;
   if (pad.connected && (pad.mx || pad.my)) { x = pad.mx; y = pad.my; }
-  if (touch.moveId !== null) { x = (touch.mx - touch.mx0) / 45; y = (touch.my - touch.my0) / 45; }
+  if (touch.moveId !== null) { x = (touch.mx - touch.mx0) / (45 * uiK); y = (touch.my - touch.my0) / (45 * uiK); }
   const l = Math.hypot(x, y);
   return l > 1 ? { x: x / l, y: y / l } : { x, y };
 }
@@ -1110,7 +1123,7 @@ function updatePlayer(dt) {
       for (const e of enemies) {
         if (e.dead || p.dashHits.has(e) || Math.hypot(e.x - p.x, e.y - p.y) > e.r + p.r + 6) continue;
         p.dashHits.add(e);
-        damageEnemy(e, stats.damage * stats.dashDamage, p.dx * 260, p.dy * 260, true);
+        damageEnemy(e, stats.damage * stats.dashDamage, p.dx * 260, p.dy * 260, true, 'dash');
       }
     }
   } else {
@@ -1153,11 +1166,12 @@ function spawnBook(x, y, a, extra = {}) {
   // replace the oldest book instead, so firing never feels like it stopped working.
   if (books.length >= MAX_BOOKS) {
     if (extra.child || extra.bonus) return;
-    books.shift();
+    books.shift(); rl.evict++;
   }
+  rl.thrown++;
   const book = game.ammo || pickBook();
   books.push({ x, y, vx: Math.cos(a) * stats.projSpeed, vy: Math.sin(a) * stats.projSpeed,
-    r: 6, life: stats.bookLife, rot: a, dmgMult: 1, scale: 1, spin: (Math.random() < 0.5 ? -1 : 1) * 14, bounces: stats.bounces, pierce: stats.pierce,
+    r: 6, life: stats.bookLife, age: 0, hitAny: false, rot: a, dmgMult: 1, scale: 1, spin: (Math.random() < 0.5 ? -1 : 1) * 14, bounces: stats.bounces, pierce: stats.pierce,
     wraps: stats.wraps, child: false, hit: new Set(), color: PLAYER.book, title: book.title,
     look: extra.color || extra.child ? null : currentLook, ...extra });
 }
@@ -1196,11 +1210,11 @@ function abilityReady(kind) {
 }
 
 /** Spine Breaker / Annotated Edition / Collapsing Stacks: damage everything in a radius. */
-function inkBurst(x, y, radius, dmg, color = '#e8d9b0') {
+function inkBurst(x, y, radius, dmg, color = '#e8d9b0', src = 'burst') {
   for (const e of enemies) {
     if (e.dead) continue;
     const d = Math.hypot(e.x - x, e.y - y);
-    if (d < radius + e.r) damageEnemy(e, dmg, ((e.x - x) / (d || 1)) * 120, ((e.y - y) / (d || 1)) * 120, false);
+    if (d < radius + e.r) damageEnemy(e, dmg, ((e.x - x) / (d || 1)) * 120, ((e.y - y) / (d || 1)) * 120, false, src);
   }
   burst(x, y, 7, [color, '#3a2a1a'], 140, 0.35);
   pages(x, y, 3);
@@ -1230,7 +1244,7 @@ function doShhh() {
       const kb = e.type === 'boss' ? 60 : 420;
       e.vx += (dx / d) * kb; e.vy += (dy / d) * kb;
       e.stun = e.type === 'boss' ? 0.4 : 1.5;
-      damageEnemy(e, 1, 0, 0, false);
+      damageEnemy(e, 1, 0, 0, false, 'shhh');
     }
   }
   if (stats.shhhGlobal) {
@@ -1334,6 +1348,7 @@ function updateEnemies(dt) {
         e.shootT = (game.diff ? game.diff.eliteShootEvery : 3) * (0.8 + Math.random() * 0.4);
         if (lineOfSight(arena.solid, COLS, ROWS, CELL, e.x, e.y, p.x, p.y)) {
           const a = Math.atan2(p.y - e.y, p.x - e.x);
+          hazPat = 'page:elite';
           if (game.diff && game.diff.bossTier >= 2) fan(e.x, e.y, a, 3, 0.2, 150); else { shootHazard(e.x, e.y, a, 150); sound.play('shoot'); }
         }
       }
@@ -1361,7 +1376,7 @@ function updateEnemies(dt) {
     // Contact damage
     if (game.state === 'playing' || game.state === 'waveclear') {
       const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy);
-      if (d < p.r + e.r - 3) hurtPlayer(e.x, e.y);
+      if (d < p.r + e.r - 3) hurtPlayer(e.x, e.y, e.type === 'boss' && e.mode === 'charge' ? 'boss:charge' : e.type, !!e.elite);
     }
   }
   for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].dead) enemies.splice(i, 1);
@@ -1390,7 +1405,7 @@ function bossAI(e, dt) {
     if (hitWall || e.modeT <= 0) {
       e.mode = 'idle'; e.modeT = 0;
       e.x = clamp(e.x, e.r, W - e.r); e.y = clamp(e.y, e.r, H - e.r);
-      if (hitWall) { shake(0.6); sound.play('explode'); radial(e.x, e.y, 14, 170, 0); }
+      if (hitWall) { shake(0.6); sound.play('explode'); hazPat = 'page:charge'; radial(e.x, e.y, 14, 170, 0); }
     }
     return;
   }
@@ -1401,11 +1416,11 @@ function bossAI(e, dt) {
   e.atkT -= dt;
   // Story bosses learn a pattern every 3 wings (tier 0..3): wider fans, more spiral arms, elite summons.
   const tier = e.tier || 0;
-  if (phase === 1 && e.atkT <= 0) { e.atkT = 1.25; fan(e.x, e.y, aim, tier >= 1 ? 7 : 5, 0.22, 210); }
+  if (phase === 1 && e.atkT <= 0) { e.atkT = 1.25; hazPat = 'page:fan'; fan(e.x, e.y, aim, tier >= 1 ? 7 : 5, 0.22, 210); }
   if (phase === 2) {
     e.spiral += dt * 2.3;
     const arms = tier >= 2 ? [0, TAU / 3, (2 * TAU) / 3] : [0, Math.PI];
-    if (e.atkT <= 0) { e.atkT = tier >= 2 ? 0.17 : 0.14; for (const o of arms) shootHazard(e.x, e.y, e.spiral + o, 165); }
+    if (e.atkT <= 0) { e.atkT = tier >= 2 ? 0.17 : 0.14; hazPat = 'page:spiral'; for (const o of arms) shootHazard(e.x, e.y, e.spiral + o, 165); }
     e.summonT -= dt;
     if (e.summonT <= 0) {
       e.summonT = 7;
@@ -1415,7 +1430,7 @@ function bossAI(e, dt) {
   if (phase === 3) {
     if (e.atkT <= 0) {
       if (Math.random() < 0.5) { e.mode = 'windup'; e.modeT = 0.6; e.cAim = aim; e.atkT = tier >= 1 ? 1.9 : 2.2; }
-      else { e.atkT = 1.4; radial(e.x, e.y, tier >= 1 ? 22 : 18, 190, e.t); fan(e.x, e.y, aim, tier >= 2 ? 5 : 3, 0.15, 260); }
+      else { e.atkT = 1.4; hazPat = 'page:radial'; radial(e.x, e.y, tier >= 1 ? 22 : 18, 190, e.t); fan(e.x, e.y, aim, tier >= 2 ? 5 : 3, 0.15, 260); }
     }
   }
 }
@@ -1423,13 +1438,14 @@ const MAX_HAZARDS = 260;
 function shootHazard(x, y, a, s) {
   if (hazards.length >= MAX_HAZARDS) return;
   s *= game.diff ? game.diff.hazardSpeed : 1; // story: pages fly faster in later rooms and wings
-  hazards.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: 5, life: 6, rot: a });
+  hazards.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: 5, life: 6, rot: a, pat: hazPat, orb: false });
 }
 function fan(x, y, a, n, spread, s) { for (let i = 0; i < n; i++) shootHazard(x, y, a + (i - (n - 1) / 2) * spread, s); sound.play('shoot'); }
 function radial(x, y, n, s, off) { for (let i = 0; i < n; i++) shootHazard(x, y, off + (i / n) * TAU, s); sound.play('shoot'); }
 
-function damageEnemy(e, dmg, kx, ky, crit) {
+function damageEnemy(e, dmg, kx, ky, crit, src = 'other') {
   if (e.dead) return;
+  addDealt(rl, src, dmg < e.hp ? dmg : e.hp);   // effective damage: overkill is not counted
   e.hp -= dmg;
   e.flash = 0.09;
   const kbScale = e.type === 'boss' ? 0.05 : e.type === 'golem' ? 0.3 : 1;
@@ -1442,7 +1458,7 @@ function damageEnemy(e, dmg, kx, ky, crit) {
     prev.sum += dmg; prev.crit = prev.crit || crit;
     const tot = Number.isInteger(prev.sum) ? prev.sum : prev.sum.toFixed(1);
     prev.text = `${tot}`; prev.life = prev.max; prev.x = clamp(e.x, 70, W - 70);
-    if (crit) { prev.color = '#ffd54a'; prev.size = 18; }
+    if (crit) { prev.color = '#ffd54a'; prev.size = 18 * uiK; }
   } else if (crit || e.type === 'boss' || texts.length < 8) {
     floatText(e.x + (Math.random() - 0.5) * 10, e.y - e.r, `${shown}`, crit ? '#ffd54a' : '#e8e0cc', crit ? 18 : 11, crit ? 0.7 : 0.5);
     e.dmgText = texts[texts.length - 1]; e.dmgText.sum = dmg; e.dmgText.crit = crit;
@@ -1459,6 +1475,7 @@ function damageEnemy(e, dmg, kx, ky, crit) {
 
 function killEnemy(e) {
   e.dead = true;
+  if (e.type === 'boss') rl.bossKills.push(Math.round(game.waveT * 10) / 10);   // run log: seconds from room start to boss kill
   game.kills++;
   game.combo++;
   game.comboT = 2.5;
@@ -1473,7 +1490,7 @@ function killEnemy(e) {
   if (game.combo > 0 && game.combo % 10 === 0) floatText(player.x, player.y - 34, `${game.combo} COMBO!`, '#ffd54a', 18, 1.1);
   if (e.type === 'coin') { game.fines += 1; floatText(e.x, e.y - 12, '+1 🪙', '#ffd54a', 12, 0.7); }
   // From wing 4, elites burst into a ring of pages as they go down: don't stand on them.
-  if (e.elite && game.diff && game.diff.deathBurst && game.state === 'playing') radial(e.x, e.y, game.diff.deathBurst, 120, Math.random() * TAU);
+  if (e.elite && game.diff && game.diff.deathBurst && game.state === 'playing') { hazPat = 'page:elite-burst'; radial(e.x, e.y, game.diff.deathBurst, 120, Math.random() * TAU); }
   if (e.type === 'golem') {
     for (let i = 0; i < 4; i++) { const a = (i / 4) * TAU; const c = makeEnemy('coin', e.x + Math.cos(a) * 14, e.y + Math.sin(a) * 14); c.vx = Math.cos(a) * 200; c.vy = Math.sin(a) * 200; }
     shake(0.3);
@@ -1502,7 +1519,7 @@ function buzz(pattern) {
   try { navigator.vibrate && navigator.vibrate(pattern); } catch { /* not allowed */ }
 }
 
-function hurtPlayer(sx, sy) {
+function hurtPlayer(sx, sy, src = 'other', elite = false) {
   const p = player;
   if (p.inv > 0 || p.dashT > 0 || game.state !== 'playing') return;
   if (game.guide && p.hp <= 1) {   // guided room: you can't lose here, you just get a breather
@@ -1517,7 +1534,7 @@ function hurtPlayer(sx, sy) {
     rings.push({ x: p.x, y: p.y, r: 10, max: 120, speed: 500, friendly: true, life: 1 });
     return;
   }
-  p.hp -= 1;
+  p.hp -= 1; addTaken(rl, src); game.lastHit = src; game.lastHitElite = elite;
   buzz(p.hp <= 0 ? [60, 40, 120] : 35);
   p.inv = stats.iframes;
   game.noHitWave = false;
@@ -1542,9 +1559,10 @@ function hurtPlayer(sx, sy) {
 
 
 function updateBooks(dt) {
+  if (game.state === 'playing') sampleFlight(rl, books.length);
   for (let i = books.length - 1; i >= 0; i--) {
     const b = books[i];
-    b.life -= dt;
+    b.life -= dt; b.age += dt;
     b.rot += b.spin * dt;
     const homing = b.homingBoost ? Math.max(stats.homing, 8) : stats.homing;
     if (homing > 0) {
@@ -1596,9 +1614,10 @@ function updateBooks(dt) {
           const base = stats.damage * b.dmgMult * (stats.nookDamage && player.nookOn ? 2 : 1);
           const dmg = crit ? base * stats.critMult : base;
           const s = Math.hypot(b.vx, b.vy) || 1;
-          damageEnemy(e, dmg, (b.vx / s) * 160, (b.vy / s) * 160, crit);
+          damageEnemy(e, dmg, (b.vx / s) * 160, (b.vy / s) * 160, crit, crit ? 'crit' : 'throw');
+          b.hitAny = true;
           burst(b.x, b.y, 5, [b.color, '#fff'], 120, 0.3);
-          if (crit && stats.critBurst) inkBurst(e.x, e.y, stats.critBurst, stats.damage, '#7a5cff');
+          if (crit && stats.critBurst) inkBurst(e.x, e.y, stats.critBurst, stats.damage, '#7a5cff', 'splash');
           if (b.pierce > 0) {
             b.pierce--;
             // Unreliable Narrator: the story forks.
@@ -1610,7 +1629,7 @@ function updateBooks(dt) {
         }
       }
     }
-    if (remove) books.splice(i, 1);
+    if (remove) { bookEnded(rl, b.age, b.hitAny); books.splice(i, 1); }
   }
 }
 
@@ -1631,20 +1650,23 @@ function updateOrbiters() {
       if ((e.x - o.x) ** 2 + (e.y - o.y) ** 2 < (e.r + 8) ** 2) {
         e.orbitHit = 0.35;
         const dx = e.x - player.x, dy = e.y - player.y, d = Math.hypot(dx, dy) || 1;
-        damageEnemy(e, stats.damage, (dx / d) * 220, (dy / d) * 220, false);
+        damageEnemy(e, stats.damage, (dx / d) * 220, (dy / d) * 220, false, 'orbit');
       }
     }
   }
 }
 
 function updateHazards(dt) {
+  const orbs = stats.orbiters && hazards.length ? orbiterPositions() : null;   // run log: which pages fly through an orbit book
   for (let i = hazards.length - 1; i >= 0; i--) {
     const h = hazards[i];
+    if (!h) continue;   // Second Wind (in hurtPlayer) empties this list mid-loop
     h.life -= dt; h.x += h.vx * dt; h.y += h.vy * dt; h.rot += dt * 6;
+    if (orbs && !h.orb) for (const o of orbs) if ((o.x - h.x) ** 2 + (o.y - h.y) ** 2 < (h.r + 9) ** 2) { h.orb = true; rl.pages.crossed++; break; }
     let remove = h.life <= 0 || h.x < -20 || h.x > W + 20 || h.y < -20 || h.y > H + 20;
     if (!remove && isSolidPx(arena.solid, h.x, h.y) && h.x > 0 && h.y > 0 && h.x < W && h.y < H) { remove = true; burst(h.x, h.y, 3, ['#ff6b6b'], 60, 0.25); }
     if (!remove && (h.x - player.x) ** 2 + (h.y - player.y) ** 2 < (h.r + player.r - 2) ** 2 && player.inv <= 0 && player.dashT <= 0) {
-      hurtPlayer(h.x, h.y); remove = true;
+      rl.pages.hits++; if (h.orb) rl.pages.crossedHit++; hurtPlayer(h.x, h.y, h.pat, h.pat.startsWith('page:elite')); remove = true;
     }
     if (remove) hazards.splice(i, 1);
   }
@@ -1653,11 +1675,12 @@ function updateHazards(dt) {
 function updateRings(dt) {
   for (let i = rings.length - 1; i >= 0; i--) {
     const g = rings[i];
+    if (!g) continue;   // Second Wind (in hurtPlayer) empties this list mid-loop
     g.r += g.speed * dt;
     g.life = 1 - g.r / g.max;
     if (!g.friendly) {
       const d = Math.hypot(player.x - g.x, player.y - g.y);
-      if (Math.abs(d - g.r) < g.width / 2 + player.r * 0.5) hurtPlayer(g.x, g.y);
+      if (Math.abs(d - g.r) < g.width / 2 + player.r * 0.5) hurtPlayer(g.x, g.y, 'ring');
     }
     if (g.r >= g.max) rings.splice(i, 1);
   }
@@ -1789,7 +1812,12 @@ function buildBackground() {
   // Walls
   g.strokeStyle = '#120b06'; g.lineWidth = 10; g.strokeRect(0, 0, W, H);
 }
-function lampPositions() { return [[26, H * 0.3], [W - 26, H * 0.3], [26, H * 0.66], [W - 26, H * 0.66]]; }
+// Four wall lamps; story rooms (bigger than the legacy grid) add one on the top and bottom wall so the extra floor is not darker.
+function lampPositions() {
+  const l = [[26, H * 0.3], [W - 26, H * 0.3], [26, H * 0.66], [W - 26, H * 0.66]];
+  if (areaK() > 1.2) l.push([W / 2, 26], [W / 2, H - 26]);
+  return l;
+}
 let LAMPS = lampPositions();
 
 // Light layer: darkness with "holes" punched by light sprites (destination-out), at half resolution.
@@ -1893,7 +1921,9 @@ function render() {
     ctx.fillStyle = `rgba(255,40,60,${(settings.motion ? 0.35 : 0.15) * game.flash})`;
     ctx.fillRect(0, 0, W, H);
   }
+  ctx.setTransform(s * uiK, 0, 0, s * uiK, 0, 0);   // HUD: drawn on the UW x UH canvas so it keeps its on-screen size
   if (game.state === 'playing' || game.state === 'waveclear' || game.state === 'dying') drawHUD();
+  ctx.setTransform(s, 0, 0, s, 0, 0);               // sticks and crosshair follow the finger in world coordinates (sizes scaled by uiK)
   if (touch.enabled && touch.moveId !== null) drawStick();
   if (touch.enabled && touch.aimId !== null) drawAimStick();
   if (!touch.enabled && mouse.seen && (game.state === 'playing' || game.state === 'waveclear')) drawCrosshair();
@@ -2131,22 +2161,22 @@ function drawHUD() {
   // Fines collected this run
   txt(`🪙 ${game.fines} fines`, 14, 48, 13, '#ffd54a');
   // Score + combo
-  if (!isStory()) txt(Math.floor(game.score).toLocaleString(), W - 16, 32, 24, '#fff', 'right');   // story runs aren't ranked: no score
+  if (!isStory()) txt(Math.floor(game.score).toLocaleString(), UW - 16, 32, 24, '#fff', 'right');   // story runs aren't ranked: no score
   const m = comboMult();
   if (game.combo > 1) {
-    txt(`${game.combo} combo  ×${m}`, W - 16, 52, 13, m >= 3 ? '#ffd54a' : '#9be7dc', 'right');
-    ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(W - 136, 58, 120, 4);
-    ctx.fillStyle = '#9be7dc'; ctx.fillRect(W - 136, 58, 120 * clamp(game.comboT / 2.5, 0, 1), 4);
+    txt(`${game.combo} combo  ×${m}`, UW - 16, 52, 13, m >= 3 ? '#ffd54a' : '#9be7dc', 'right');
+    ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(UW - 136, 58, 120, 4);
+    ctx.fillStyle = '#9be7dc'; ctx.fillRect(UW - 136, 58, 120 * clamp(game.comboT / 2.5, 0, 1), 4);
   }
   // Wave info
   const left = enemies.length + telegraphs.length + spawnQueue.length;
   if (isStory()) {
-    txt(`ROOM ${game.wave}/${ROOMS_PER_WING}`, W / 2, 26, 18, game.diff && game.diff.kind !== 'normal' ? '#ffd54a' : '#e8d9b0', 'center');
+    txt(`ROOM ${game.wave}/${ROOMS_PER_WING}`, UW / 2, 26, 18, game.diff && game.diff.kind !== 'normal' ? '#ffd54a' : '#e8d9b0', 'center');
     if (game.state === 'playing' && isSurvive()) drawSurviveTimer();
-    else if (game.state === 'playing' && !game.boss) txt(`${short(wingDef().name, 18)} · ${left} left`, W / 2, 44, 11, 'rgba(232,217,176,0.8)', 'center');
+    else if (game.state === 'playing' && !game.boss) txt(`${short(wingDef().name, 18)} · ${left} left`, UW / 2, 44, 11, 'rgba(232,217,176,0.8)', 'center');
   } else {
-    txt(`WAVE ${game.wave}`, W / 2, 26, 18, '#e8d9b0', 'center');
-    if (game.state === 'playing' && !game.boss) txt(`${left} disturbance${left === 1 ? '' : 's'} left`, W / 2, 44, 11, 'rgba(232,217,176,0.8)', 'center');
+    txt(`WAVE ${game.wave}`, UW / 2, 26, 18, '#e8d9b0', 'center');
+    if (game.state === 'playing' && !game.boss) txt(`${left} disturbance${left === 1 ? '' : 's'} left`, UW / 2, 44, 11, 'rgba(232,217,176,0.8)', 'center');
   }
   drawGuidePrompt();
   // Cooldowns
@@ -2157,16 +2187,16 @@ function drawHUD() {
     // On touch the on-screen buttons show their own cooldown rings + countdown.
     setTouchButton(btnDash, kDash, dashReady ? 0 : player.dashCd, dashLabel);
     setTouchButton(btnShhh, kShhh, player.shhhT, 'SHHH');
-    if (player.rapidT > 0) cooldown(30, H - 30, '☕x2', player.rapidT / 6, '#c69c6d');
+    if (player.rapidT > 0) cooldown(30, UH - 30, '☕x2', player.rapidT / 6, '#c69c6d');
   } else {
-    cooldown(30, H - 30, dashLabel, kDash, '#9be7dc', dashReady ? 0 : player.dashCd);
-    cooldown(80, H - 30, 'SHHH', kShhh, '#b48cff', player.shhhT);
-    if (player.rapidT > 0) cooldown(130, H - 30, '☕x2', player.rapidT / 6, '#c69c6d');
+    cooldown(30, UH - 30, dashLabel, kDash, '#9be7dc', dashReady ? 0 : player.dashCd);
+    cooldown(80, UH - 30, 'SHHH', kShhh, '#b48cff', player.shhhT);
+    if (player.rapidT > 0) cooldown(130, UH - 30, '☕x2', player.rapidT / 6, '#c69c6d');
   }
   // Boss bar
   if (game.boss) {
-    const b = game.boss, bw = Math.min(460, W - 120), bx = (W - bw) / 2, by = PORTRAIT ? 86 : H - 34;
-    txt(`${b.name}`, W / 2, by - 6, 13, '#d6c8ff', 'center');
+    const b = game.boss, bw = Math.min(460, UW - 120), bx = (UW - bw) / 2, by = PORTRAIT ? 86 : UH - 34;
+    txt(`${b.name}`, UW / 2, by - 6, 13, '#d6c8ff', 'center');
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(bx - 2, by - 2, bw + 4, 14);
     ctx.fillStyle = b.phase === 3 ? '#ff2d55' : b.bar || '#6c3cff'; ctx.fillRect(bx, by, bw * clamp(b.hp / b.maxHp, 0, 1), 10);
     ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(bx + bw * 0.33, by, 2, 10); ctx.fillRect(bx + bw * 0.66, by, 2, 10);
@@ -2175,20 +2205,20 @@ function drawHUD() {
   if (game.bannerT > 0) {
     const a = clamp(Math.min(game.bannerT, 2.4 - game.bannerT) * 3, 0, 1);
     const slide = (1 - a) * 30;
-    ctx.globalAlpha = a * 0.6; ctx.fillStyle = '#000'; ctx.fillRect(0, H / 2 - 92, W, game.bannerSub ? 84 : 60);
+    ctx.globalAlpha = a * 0.6; ctx.fillStyle = '#000'; ctx.fillRect(0, UH / 2 - 92, UW, game.bannerSub ? 84 : 60);
     ctx.globalAlpha = a;
-    txt(game.banner, W / 2 + slide, H / 2 - 50, 44, '#fff3c4', 'center');
-    if (game.bannerSub) txt(game.bannerSub, W / 2 - slide, H / 2 - 22, 16, '#d6c8ff', 'center');
+    txt(game.banner, UW / 2 + slide, UH / 2 - 50, 44, '#fff3c4', 'center');
+    if (game.bannerSub) txt(game.bannerSub, UW / 2 - slide, UH / 2 - 22, 16, '#d6c8ff', 'center');
     ctx.globalAlpha = 1;
   }
-  if (DEBUG) txt(`fps ${fps.toFixed(0)}  e${enemies.length} p${particles.length} seed ${game.seed}`, 10, H - 60, 11, '#0f0');
+  if (DEBUG) txt(`fps ${fps.toFixed(0)}  e${enemies.length} p${particles.length} seed ${game.seed}`, 10, UH - 60, 11, '#0f0');
 }
 
 /** Survive rooms: a big countdown at the top centre (digits + a shrinking bar); pulses red in the last 5 s. */
 function drawSurviveTimer() {
   const left = Math.max(0, game.surviveT), t = Math.ceil(left), last = left <= 5;
   const pulse = last ? 1 + 0.12 * Math.abs(Math.sin(left * Math.PI * 2)) : 1;
-  const cx = W / 2, cy = 74, col = last ? '#ff6b6b' : '#ffd54a';
+  const cx = UW / 2, cy = 74, col = last ? '#ff6b6b' : '#ffd54a';
   ctx.save();
   ctx.globalAlpha = 0.55; ctx.fillStyle = '#000';
   ctx.beginPath(); ctx.roundRect(cx - 74, 36, 148, 62, 14); ctx.fill();
@@ -2208,9 +2238,9 @@ function drawGuidePrompt() {
   const b = GUIDE_BEATS[g.beat], aimOff = touch.enabled && settings.autoaim === false;
   const text = guidePrompt(g.beat, { aimOff, used: g.used });
   ctx.font = FONT(18);
-  const w = Math.min(W - 40, ctx.measureText(text).width + 36), y = 118;
-  ctx.globalAlpha = 0.65; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.roundRect((W - w) / 2, y - 22, w, 34, 17); ctx.fill(); ctx.globalAlpha = 1;
-  txt(text, W / 2, y + 1, 18, '#fff3c4', 'center');
+  const w = Math.min(UW - 40, ctx.measureText(text).width + 36), y = 118;
+  ctx.globalAlpha = 0.65; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.roundRect((UW - w) / 2, y - 22, w, 34, 17); ctx.fill(); ctx.globalAlpha = 1;
+  txt(text, UW / 2, y + 1, 18, '#fff3c4', 'center');
   btnDash.classList.toggle('guide-hl', b.hl === 'dash' && !g.used);
   btnShhh.classList.toggle('guide-hl', b.hl === 'shhh' && !g.used);
 }
@@ -2254,23 +2284,23 @@ function drawCrosshair() {
 }
 
 function drawStick() {
-  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.arc(touch.mx0, touch.my0, 45, 0, TAU); ctx.stroke();
-  const dx = touch.mx - touch.mx0, dy = touch.my - touch.my0, d = Math.hypot(dx, dy), k = d > 45 ? 45 / d : 1;
-  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(touch.mx0 + dx * k, touch.my0 + dy * k, 18, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 3 * uiK;
+  ctx.beginPath(); ctx.arc(touch.mx0, touch.my0, 45 * uiK, 0, TAU); ctx.stroke();
+  const dx = touch.mx - touch.mx0, dy = touch.my - touch.my0, d = Math.hypot(dx, dy), k = d > 45 * uiK ? 45 * uiK / d : 1;
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(touch.mx0 + dx * k, touch.my0 + dy * k, 18 * uiK, 0, TAU); ctx.fill();
 }
 
 /** The aim stick: same ring + knob as the move stick, in library blue, with a tick on the ring showing the aim direction. */
 function drawAimStick() {
-  const { ax0: x0, ay0: y0 } = touch, dx = touch.ax - x0, dy = touch.ay - y0, d = Math.hypot(dx, dy), k = d > 45 ? 45 / d : 1;
+  const { ax0: x0, ay0: y0 } = touch, dx = touch.ax - x0, dy = touch.ay - y0, d = Math.hypot(dx, dy), k = d > 45 * uiK ? 45 * uiK / d : 1;
   const on = d > touch.dead;
-  ctx.strokeStyle = on ? 'rgba(125,190,255,0.75)' : 'rgba(125,190,255,0.4)'; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.arc(x0, y0, 45, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = on ? 'rgba(125,190,255,0.75)' : 'rgba(125,190,255,0.4)'; ctx.lineWidth = 3 * uiK;
+  ctx.beginPath(); ctx.arc(x0, y0, 45 * uiK, 0, TAU); ctx.stroke();
   ctx.fillStyle = on ? 'rgba(125,190,255,0.6)' : 'rgba(125,190,255,0.35)';
-  ctx.beginPath(); ctx.arc(x0 + dx * k, y0 + dy * k, 18, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(x0 + dx * k, y0 + dy * k, 18 * uiK, 0, TAU); ctx.fill();
   if (on) {
     const a = Math.atan2(dy, dx), c = Math.cos(a), s = Math.sin(a);
-    ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x0 + c * 66, y0 + s * 66); ctx.lineTo(x0 + c * 80, y0 + s * 80); ctx.stroke();
+    ctx.lineWidth = 4 * uiK; ctx.beginPath(); ctx.moveTo(x0 + c * 66 * uiK, y0 + s * 66 * uiK); ctx.lineTo(x0 + c * 80 * uiK, y0 + s * 80 * uiK); ctx.stroke();
   }
 }
 
@@ -2409,9 +2439,22 @@ function renderStory() {
   $('#btnEnterWing').textContent = `▶ Enter ${def.name}`;
 }
 
+/** Run log (v1.14.0): append this run to `overdue.runs.v1` (newest 50). Never throws: a full or blocked store just skips it. */
+function logRun(result) {
+  try {
+    const rec = buildRecord({ version: BUILD.version, mode: game.mode, wing: game.wingN, room: game.wave, result, killer: game.lastHit, elite: game.lastHitElite,
+      perks: game.picks, banished: [...game.banished], cursed: game.picks.filter((id) => byId(id)?.kind === 'cursed'), doors: game.doorLog,
+      reno: progress.reno, time: game.playTime, maxHp: stats.maxHp, counters: rl });
+    game.lastRun = rec;
+    let runs = []; try { runs = normalizeRuns(JSON.parse(localStorage.getItem(RUN_KEY))); } catch { /* none yet */ }
+    localStorage.setItem(RUN_KEY, JSON.stringify(pushRun(runs, rec)));
+  } catch { /* storage blocked or full */ }
+}
+
 /** Bank the run's fines once (game over, wing cleared, or quitting mid-run). */
-function bankRun() {
+function bankRun(result = 'q') {
   if (game.banked) return game.banked;
+  logRun(result);
   const res = recordRun(progress, { fines: game.fines, mode: game.mode, wing: game.wingN, room: game.wave, cleared: game.wingCleared });
   progress = res.progress; saveProgress();
   game.banked = res;
@@ -2423,6 +2466,16 @@ const inRun = () => ['playing', 'paused', 'upgrade', 'doors', 'waveclear', 'dyin
 $('#btnShowTips').addEventListener('click', () => { tips = normalizeTips(null); saveTips(); toast('Tips will show again'); });
 // ---- Backup code (v1.13.1): copy all player keys as one code; restore validates fully before writing anything ----
 const backupMsg = (t, bad = false) => { const m = $('#backupMsg'); m.textContent = t; m.style.color = bad ? '#ff8a9b' : ''; };
+// ---- Share stats (v1.14.0): the on-device run log (`overdue.runs.v1`) as one OVS1: code. Not part of the backup code. ----
+$('#btnShareStats').addEventListener('click', async () => {
+  let runs = []; try { runs = normalizeRuns(JSON.parse(localStorage.getItem(RUN_KEY))); } catch { /* none */ }
+  const out = $('#statsOut');
+  if (!runs.length) { out.hidden = true; toast('No runs logged yet: play a run first'); return; }
+  const code = encodeStats(runs);
+  out.value = code;
+  try { await navigator.clipboard.writeText(code); out.hidden = true; toast(`Copied stats for ${runs.length} run${runs.length === 1 ? '' : 's'}. Paste them into the chat.`, 3200); }
+  catch { out.hidden = false; out.focus(); out.select(); toast('Tap the code, select all and copy it', 3200); }
+});
 let pendingRestore = null;
 function readAllKeys() { const o = {}; for (const k of BACKUP_KEYS) { try { o[k] = localStorage.getItem(k); } catch { /* blocked */ } } return o; }
 $('#btnBackup').addEventListener('click', () => { pendingRestore = null; $('#restoreConfirm').hidden = true; $('#backupOut').hidden = true; $('#backupIn').value = ''; backupMsg(''); showScreen('backup'); });
@@ -2517,7 +2570,7 @@ document.addEventListener('click', (e) => {
   else if (act === 'resume') resume();
   else if (act === 'quit' || act === 'menu') {
     // Quitting mid-run still banks what you earned: every run counts.
-    if (act === 'quit' && inRun()) { const res = bankRun(); if (res.banked) setTimeout(() => toast(`🪙 +${res.banked} fines banked`), 50); }
+    if (act === 'quit' && inRun()) { const res = bankRun('q'); if (res.banked) setTimeout(() => toast(`🪙 +${res.banked} fines banked`), 50); }
     game.state = 'title'; sound.setIntensity(0); sound.setMuffled(false); clearWorld(); freeQueue.length = 0; hideFreePerk(); player = makePlayer(); showScreen('title');
   }
 });
@@ -2568,7 +2621,7 @@ $('#btnNudgeOff').addEventListener('click', () => { markTip('a2hs-off'); closeNu
 const BEST_KEY = 'overdue.best.v1';
 function showGameOver() {
   const story = isStory(), won = story && game.wingCleared;
-  const res = bankRun();
+  const res = bankRun(won ? 'c' : 'd');
   game.state = 'gameover';
   sound.setMuffled(true);
   if (won) sound.play('wave');
@@ -2719,7 +2772,8 @@ if (DEBUG) {
     unlockAll: () => { progress = { ...progress, unlocked: WINGS.length }; saveProgress(); },
 
     god: () => { player.hp = 999; stats.maxHp = 999; },
-    grant: (id) => { const u = UPGRADES.find((x) => x.id === id); game.owned[id] = (game.owned[id] || 0) + 1; u.apply(stats, player); },
+    grant: (id) => { const u = UPGRADES.find((x) => x.id === id); game.owned[id] = (game.owned[id] || 0) + 1; game.picks.push(id); u.apply(stats, player); },
+    get runCounters() { return rl; }, get lastRun() { return game.lastRun; }, ui: () => ({ uiK, viewScale, dpr, W, H, UW, UH }),
     showCards: (ids) => renderCards(ids.map(byId)),
     showFreePerk: (id, label) => { queueFreePerk(byId(id), label); flushFreePerks(); }, showUpgrades, showDoors, nextRoom, texts, get door() { return game.door; },
     // ---- balance bot (scripts/balance.mjs): drives the sim headless, faster than real time ----

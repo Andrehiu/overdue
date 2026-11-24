@@ -6,12 +6,13 @@ const WEIGHT = { boss: 2.5, golem: 1.5, coin: 0.4 };
 const DECIDE_EVERY = 4;                 // steps (1/120 s each): the bot re-thinks at 30 Hz
 
 /** Play one run. progress = the save to start from. Never throws: failures come back as outcome 'error'. */
-export function playRun(o, { wing, policy, progress, roomTimeout = 180, wallMs = 180000 }) {
+export function playRun(o, { wing, policy, progress, force = [], roomTimeout = 180, wallMs = 180000 }) {
   const g = o.game, errors = [];
   try {
     o.drive(true);
     o.setProgress(progress);
     o.startRun('story', wing);
+    for (const [id, lvl] of force) for (let i = 0; i < lvl; i++) o.grant(id);   // --force-perks: bot only, never in the game
     const t0 = Date.now();
     let prev = null, stuck = 0, outcome = null, lastDoor = null, seen = 0;
     const trace = [];                   // per room: hearts on entry and the door taken (for diagnosing spike rooms)
@@ -43,7 +44,9 @@ export function playRun(o, { wing, policy, progress, roomTimeout = 180, wallMs =
     const room = g.wave, won = g.state === 'gameover' && g.wingCleared;
     if (!outcome) outcome = g.state !== 'gameover' ? 'error' : won ? 'clear' : 'death';
     const banked = g.banked ? g.banked.banked - (g.banked.firstClear ? 30 + 10 * wing : 0) : null;
-    return { wing, policy, outcome, room, hearts: o.player.hp, fines: banked ?? Math.round(g.fines), time: Math.round(g.playTime), kills: g.kills, errors, trace };
+    const c = o.runCounters;   // the same counters the game's run log uses (src/runlog.js)
+    const metrics = { dealt: { ...c.dealt }, taken: { ...c.taken }, thrown: c.thrown, ended: c.ended, thrownHit: c.thrownHit, evict: c.evict, flight: Array.from(c.flight), life: Array.from(c.life), pages: { ...c.pages }, bossKills: c.bossKills.slice(), seconds: g.playTime };
+    return { wing, policy, outcome, room, hearts: o.player.hp, fines: banked ?? Math.round(g.fines), time: Math.round(g.playTime), kills: g.kills, errors, trace, metrics, record: g.lastRun };
   } catch (e) {
     return { wing, policy, outcome: 'error', room: g.wave, hearts: 0, fines: 0, time: Math.round(g.playTime || 0), errors: [String(e && e.message || e)] };
   } finally {

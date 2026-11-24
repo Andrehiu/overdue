@@ -17,6 +17,7 @@ look at the screenshots) notices.
 | New players (v1.13.0, all 7 sizes, `--only=newplayer`) | Fresh save title shows only Story / How to play / Settings; returning save shows every menu and still fits · guided room appears once on a fresh save (3 beats, DASH/SHHH highlights, can't die, same fines as room 1, perk pick follows, Skip works), never again · Survive timer big, on screen, clear of room label and pause button | as listed |
 | Performance | Wave-15 boss, ~25 perks + Masterworks, phone viewport; story wing 10 room 6 (elites shooting) | Game speed ≥ 0.85x, ≥ 50 fps (CI: ≥ 0.75x, fps not judged), books in flight ≤ 110 |
 | App basics (v1.13.1) | Served under `/overdue/` with a 10-min HTTP cache like Pages: worker registers and caches · offline reload shows the title and a run starts · N → N+1: update bar appears, new build waits, tap → title shows N+1, opens offline, only newest cache kept · kill switch removes worker + caches · `--fragment` build has no worker · backup code copy / restore (confirm first, bad / truncated / wrong-version / tampered codes change nothing) · Home Screen nudge (shown once after a 3+ min run or cleared wing, never in standalone, Got it / Don't show again) · Backup screen fits all 7 sizes | as listed |
+| Rooms +20% and run log (v1.14.0) | Story room uses the bigger grid (`gridForAspect(aspect, true)`), endless the old one · DASH/SHHH buttons the same size in both · a lost story run is written to `overdue.runs.v1` · Settings → Share stats makes a valid `OVS1:` code, and Settings still fits with the code box open (all 7 sizes) · perf: wing-10 story room at the new size | as listed |
 | Privacy | Secrets and email addresses in tracked files **and commit messages**; your private terms if `.qa-private-terms` exists | No hits |
 
 Output: `qa-report/report.md` plus screenshots per device (`iphone-landscape-1-title.png` … `-13-wing-cleared.png`, `perf-late-boss.png`, `perf-story-late.png`). Fit-only targets produce the layout screenshots only (title, perks, build strip, doors, game over, wing cleared, menus).
@@ -55,6 +56,12 @@ A check that exists only in the full flow does not run on the fit-only sizes: th
 ### Performance-sensitive (effects, particles, lights, more entities)
 - [ ] `npm run qa -- --only=perf` passes locally (not just in CI)
 - [ ] New per-entity effects have a budget or cap (see `MAX_BOOKS`, light budget, `particle()` cap)
+
+### Rooms, HUD size, run log (v1.14.0)
+- [ ] Compare a story room with the same room at the old size (`?debug=1&legacyrooms=1`): same look, bigger floor; HUD hearts, room label, DASH/SHHH and the sticks are the same size on screen
+- [ ] New world-space text or HUD element: draw HUD things on the `UW×UH` canvas (scaled by `uiK`) and world-space text with `size * uiK`, never raw pixel sizes
+- [ ] Any new damage source: pass a `src` to `damageEnemy` / `hurtPlayer` so the run log and the balance bot see it (`src/runlog.js` `DEALT_SOURCES`)
+- [ ] `overdue.runs.v1` is additive only: never rename or reshape it without a migration; the backup code intentionally skips it
 
 ### Saved data
 - [ ] No localStorage key renamed or reshaped (see CLAUDE.md), or a migration was added and tested

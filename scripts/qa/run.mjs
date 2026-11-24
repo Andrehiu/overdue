@@ -399,6 +399,17 @@ async function screensFlow(name, opts, full) {
     record(area, 'story: SHHH ready at the start of the next room', shhhStory === 0, `shhhT ${shhhStory}`);
     const shhhEndless = await page.evaluate(() => { const O = __overdue; O.startRun('endless'); O.player.shhhT = 9; O.startWave(2); const t = O.player.shhhT; O.startRun('story', 1); O.god(); return t; });
     record(area, 'endless: SHHH cooldown carries over', shhhEndless === 9, `shhhT ${shhhEndless}`);
+    // v1.14.0: story rooms are the bigger grid, endless keeps the old one, and the touch buttons keep their size in both
+    {
+      const A = await import(pathToFileURL(join(ROOT, 'src/arena.js')).href);
+      const vp = page.viewportSize(), asp = vp.width / vp.height;
+      const m = await page.evaluate(() => { const O = __overdue, sz = () => { const r = document.getElementById('btnDash').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; };
+        O.startRun('story', 1); O.god(); const story = { grid: O.grid(), btn: sz(), touch: document.body.classList.contains('touch') };
+        O.startRun('endless'); const endless = { grid: O.grid(), btn: sz() }; O.startRun('story', 1); O.god(); return { story, endless }; });
+      const [sc, sr] = A.gridForAspect(asp, true), [ec, er] = A.gridForAspect(asp);
+      record(area, 'v1.14.0: story room uses the +20% grid, endless the old one', m.story.grid === `${sc}x${sr}` && m.endless.grid === `${ec}x${er}` && sc > ec && sr > er, `story ${m.story.grid} · endless ${m.endless.grid}`);
+      record(area, 'v1.14.0: DASH/SHHH buttons keep their size in the bigger story room', !m.story.touch || (Math.abs(m.story.btn[0] - m.endless.btn[0]) <= 1 && Math.abs(m.story.btn[1] - m.endless.btn[1]) <= 1), `story ${m.story.btn} · endless ${m.endless.btn}`);
+    }
     // v1.7.1: Mystery Shelf's bonus pick says why you get a second perk
     const bonusTitle = await page.evaluate(() => { const O = __overdue; O.game.bonusPicks = 1; O.showUpgrades(); return document.querySelector('#upgradeTitle').textContent; });
     record(area, 'Mystery bonus pick is labelled 1 of 2', /^🎲 Mystery prize: bonus pick \(1 of 2\)/.test(bonusTitle), bonusTitle);
@@ -587,6 +598,24 @@ async function menusFlow(name, opts) {
         record(area, 'howto: Perks box present and fits the width', /Masterwork/.test(pb.text) && /Collected Work/.test(pb.text) && /once per run/.test(pb.text) && pb.right <= pb.vw + 1, `${Math.round(pb.w)} of ${pb.vw}`);
       }
       await page.click(`#${id} [data-act=${back}]`); await page.waitForTimeout(250);
+    }
+    // v1.14.0: a finished run is logged to overdue.runs.v1; Settings -> Share stats makes an OVS1: code (box shown when the clipboard is refused) and still fits
+    {
+      const rlog = await page.evaluate(() => { const O = __overdue; localStorage.removeItem('overdue.runs.v1'); O.startRun('story', 1); O.drive(true); O.player.hp = 1; O.player.inv = 0; O.die(); O.stepN(1500); O.drive(false);
+        const state = O.game.state; document.querySelector('#gameover [data-act=menu]').click(); return { state, runs: JSON.parse(localStorage.getItem('overdue.runs.v1') || 'null') }; });
+      const rec = rlog.runs && rlog.runs[0];
+      record(area, 'v1.14.0: a lost story run is logged (overdue.runs.v1)', rlog.state === 'gameover' && rlog.runs?.length === 1 && rec.v === 1 && rec.res === 'd' && rec.mode === 's' && rec.wing === 1 && rec.room === 1 && typeof rec.killer === 'string' && rec.hp > 0, JSON.stringify(rec).slice(0, 160));
+      await page.click('#title [data-act=settings]'); await page.waitForTimeout(250);
+      await page.evaluate(() => { navigator.clipboard.writeText = () => Promise.reject(new Error('refused')); });   // worst case for the layout: the fallback text box shows
+      await page.click('#btnShareStats'); await page.waitForTimeout(250);
+      const st = await page.evaluate(() => { const o = document.getElementById('statsOut'); return { shown: !o.hidden, code: o.value }; });
+      const { decodeStats } = await import(pathToFileURL(join(ROOT, 'src/runlog.js')).href);
+      const dec = decodeStats(st.code);
+      record(area, 'v1.14.0: Share stats makes a valid OVS1: code (fallback box shown when the clipboard is refused)', st.shown && dec.ok && dec.runs.length === 1, st.code.slice(0, 40));
+      await shot(page, `${name}-menu-settings-stats`);
+      const sBad = await page.evaluate(`(${PINNED_CHECK})('settings')`);
+      record(area, 'v1.14.0: settings with the stats box open: pinned row covers nothing and fits', !sBad.length, sBad.join('; '));
+      await page.click('#settings [data-act=back]'); await page.waitForTimeout(200);
     }
     // v1.13.1: Backup screen (opened from Settings) fits every size, with its code box and confirm step showing
     await page.click('#title [data-act=settings]'); await page.waitForTimeout(250);

@@ -3,6 +3,8 @@
 
 export const POLICIES = ['rare', 'rest', 'mixed'];
 export const WINGS_TESTED = [1, 4, 7, 10];
+export const DEALT_SOURCES = ['throw', 'crit', 'dash', 'orbit', 'burst', 'splash', 'shhh', 'other'];   // = src/runlog.js (this file runs in the game page too, so it imports nothing)
+export const RENO_PRESETS = ['none', 'half', 'max'];
 export const ROOMS = 7;   // = ROOMS_PER_WING in src/story.js (a unit test keeps them equal; this file also runs inside the game page, so it imports nothing)
 
 /** Door preference per policy, best first. Mystery Shelf is always last: only taken when nothing else is offered. */
@@ -71,6 +73,59 @@ export function chooseMove(s) {
   return best;
 }
 
+// ---------------------------------------------------------------- run-log metrics (v1.14.0 part A)
+
+/** Parse "--force-perks=dewey:3,interlibrary:3" -> [['dewey', 3], ['interlibrary', 3]]. Junk entries are dropped; levels clamp to 1..3. */
+export function parseForce(text) {
+  if (!text || text === 'none') return [];
+  return String(text).split(',').map((p) => p.trim()).filter(Boolean).map((p) => { const [id, n] = p.split(':'); return [id, Math.max(1, Math.min(3, Math.floor(Number(n)) || 1))]; }).filter(([id]) => /^[a-z_]+$/.test(id));
+}
+
+/** p-th percentile of a histogram: the lower edge of the bin where the running total reaches p, times unit. */
+export function histP(hist, p, unit = 1) {
+  let total = 0; for (const v of hist) total += v;
+  if (!total) return null;
+  let acc = 0;
+  for (let i = 0; i < hist.length; i++) { acc += hist[i]; if (acc >= total * p) return i * unit; }
+  return (hist.length - 1) * unit;
+}
+
+const addMaps = (a, b) => { const o = { ...a }; for (const k of Object.keys(b || {})) o[k] = (o[k] || 0) + b[k]; return o; };
+const addArrays = (a, b) => (b ? (a || []).length >= b.length ? a.map((v, i) => v + (b[i] || 0)) : b.map((v, i) => v + ((a || [])[i] || 0)) : a);
+
+/** Pool the per-run `metrics` of several runs (each from the page: dealt, taken, thrown, ended, thrownHit, evict, flight[], life[], pages, bossKills[], seconds). */
+export function poolMetrics(runs) {
+  let m = null;
+  for (const r of runs) {
+    const x = r.metrics; if (!x) continue;
+    if (!m) m = { n: 0, dealt: {}, taken: {}, thrown: 0, ended: 0, thrownHit: 0, evict: 0, flight: [], life: [], pages: { hits: 0, crossed: 0, crossedHit: 0 }, bossKills: [], seconds: 0 };
+    m.n += x.n || 1; m.dealt = addMaps(m.dealt, x.dealt); m.taken = addMaps(m.taken, x.taken);
+    for (const k of ['thrown', 'ended', 'thrownHit', 'evict', 'seconds']) m[k] += x[k] || 0;
+    m.flight = addArrays(m.flight, x.flight); m.life = addArrays(m.life, x.life);
+    m.pages = addMaps(m.pages, x.pages); m.bossKills.push(...(x.bossKills || []));
+  }
+  return m;
+}
+
+/** Derived numbers for the report, from pooled metrics. */
+export function summariseMetrics(m) {
+  if (!m) return null;
+  const total = DEALT_SOURCES.reduce((a, k) => a + (m.dealt[k] || 0), 0);
+  const share = Object.fromEntries(DEALT_SOURCES.map((k) => [k, total ? (m.dealt[k] || 0) / total : null]));
+  const taken = Object.values(m.taken).reduce((a, b) => a + b, 0);
+  return {
+    n: m.n, dealtShare: share, dealtPerRun: total / m.n,
+    takenList: Object.entries(m.taken).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ src: k, hearts: v, share: taken ? v / taken : null })),
+    hitRate: m.ended ? m.thrownHit / m.ended : null,
+    lifeP95: histP(m.life, 0.95, 0.1), flightP95: histP(m.flight, 0.95, 1),
+    evictPerSec: m.seconds ? m.evict / m.seconds : null,
+    orbitShareOfDamage: share.orbit,
+    pagesBlockedShare: m.pages.hits ? m.pages.crossedHit / m.pages.hits : null,   // of the pages that hit you, how many first flew through an orbit book
+    pagesCrossed: m.pages.crossed, pagesHit: m.pages.hits,
+    bossKillTime: m.bossKills.length ? avg(m.bossKills) : null, bossKills: m.bossKills.length,
+  };
+}
+
 // ---------------------------------------------------------------- aggregation + report
 
 const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
@@ -105,6 +160,7 @@ export function aggregate(results) {
       heartsLeft: round(avg(clears.map((r) => r.hearts))),
       fines: round(avg(ok.map((r) => r.fines))),
       time: round(avg(ok.map((r) => r.time)), 0),
+      metrics: poolMetrics(ok),
     });
   }
   return out.sort((a, b) => a.renos.localeCompare(b.renos) || a.wing - b.wing || POLICIES.indexOf(a.policy) - POLICIES.indexOf(b.policy));
@@ -195,10 +251,33 @@ export function findings(rows) {
   return out;
 }
 
+const f1 = (v, d = 1) => (v === null || v === undefined ? '–' : v.toFixed(d));
+
+/** Damage by source, damage taken by source, book and orbit metrics per renos × wing (all door policies pooled). */
+export function metricsSection(rows) {
+  const L = [];
+  for (const renos of [...new Set(rows.map((r) => r.renos))]) {
+    const wings = [...new Set(rows.filter((x) => x.renos === renos).map((x) => x.wing))].sort((a, b) => a - b);
+    const sums = wings.map((w) => ({ w, s: summariseMetrics(poolMetrics(rows.filter((x) => x.renos === renos && x.wing === w).flatMap((x) => (x.metrics ? [{ metrics: x.metrics }] : [])))) }));
+    if (!sums.some((x) => x.s)) continue;
+    const name = renos === 'none' ? 'fresh save' : renos === 'half' ? 'half Renovations' : 'max Renovations';
+    L.push(`## Damage and books (${name})`, '');
+    L.push('Damage dealt by source (share of all damage, door policies pooled). burst = Spine Breaker shelf bursts, splash = Annotated crit splash.', '');
+    L.push(`| Wing | Runs | Damage/run | ${DEALT_SOURCES.join(' | ')} |`, `|---|---|---|${DEALT_SOURCES.map(() => '---').join('|')}|`);
+    for (const { w, s } of sums) if (s) L.push(`| ${w} | ${s.n} | ${Math.round(s.dealtPerRun)} | ${DEALT_SOURCES.map((k) => pct(s.dealtShare[k])).join(' | ')} |`);
+    L.push('', 'Hearts lost by source (share of all hearts lost):', '', '| Wing | Top sources |', '|---|---|');
+    for (const { w, s } of sums) if (s) L.push(`| ${w} | ${s.takenList.slice(0, 6).map((t) => `${t.src} ${pct(t.share)}`).join(' · ') || '–'} |`);
+    L.push('', 'Throw and orbit metrics:', '', '| Wing | Thrown-book hit rate | Book life p95 (s) | Books in flight p95 | Evictions/s | Orbit share of damage | Pages through an orbit book that still hit you (share of hits) | Boss kill time (s, n) |', '|---|---|---|---|---|---|---|---|');
+    for (const { w, s } of sums) if (s) L.push(`| ${w} | ${pct(s.hitRate)} | ${f1(s.lifeP95)} | ${f1(s.flightP95, 0)} | ${f1(s.evictPerSec, 2)} | ${pct(s.orbitShareOfDamage)} | ${pct(s.pagesBlockedShare)} (${s.pagesHit} hits) | ${f1(s.bossKillTime)} (${s.bossKills}) |`);
+    L.push('');
+  }
+  return L;
+}
+
 export function renderReport(rows, meta = {}) {
   const L = [];
   L.push('# Balance report', '');
-  L.push(`Generated ${meta.date || ''} · ${meta.runsPerCell ?? '?'} runs per cell · version ${meta.version || '?'}`, '');
+  L.push(`Generated ${meta.date || ''} · ${meta.runsPerCell ?? '?'} runs per cell · version ${meta.version || '?'}${meta.rooms ? ` · rooms ${meta.rooms}` : ''}${meta.viewport ? ` · viewport ${meta.viewport}` : ''}${meta.force && meta.force !== 'none' ? ` · forced perks ${meta.force}` : ''}`, '');
   L.push('> The bot plays worse than people. Compare wings and door policies with each other; never read absolute difficulty from these numbers.', '');
   L.push('## What stands out', '');
   const f = findings(rows);
@@ -232,6 +311,7 @@ export function renderReport(rows, meta = {}) {
       if (chk.length) L.push('');
     }
   }
+  L.push(...metricsSection(rows));
   L.push('Policies: `rare` = always 💰 Rare Books; `rest` = ☕ Break Room / 🚪 Stacks; `mixed` = Break Room at ≤ 2 hearts, else Rare Books. 🎲 Mystery Shelf only when nothing else is offered.');
   L.push('Run time is game time (what a player would spend). Hearts left and fines are averaged over the runs that apply (hearts: clears only).', '');
   return L.join('\n');
