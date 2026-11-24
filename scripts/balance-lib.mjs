@@ -2,6 +2,7 @@
 // Loaded both by Node (report) and by the game page (bot), so keep it dependency-free.
 
 export const POLICIES = ['rare', 'rest', 'mixed'];
+export const EXTRA_POLICIES = ['mystery'];   // only on request (--policies=mystery): always the Mystery Shelf when offered, to measure cursed books
 export const WINGS_TESTED = [1, 4, 7, 10];
 export const DEALT_SOURCES = ['throw', 'crit', 'dash', 'orbit', 'burst', 'splash', 'shhh', 'other'];   // = src/runlog.js (this file runs in the game page too, so it imports nothing)
 export const RENO_PRESETS = ['none', 'half', 'max'];
@@ -11,6 +12,7 @@ export const ROOMS = 7;   // = ROOMS_PER_WING in src/story.js (a unit test keeps
 const ORDER = {
   rare: ['rare', 'stacks', 'rest', 'mystery'],
   rest: ['rest', 'stacks', 'rare', 'mystery'],
+  mystery: ['mystery', 'stacks', 'rest', 'rare'],
 };
 
 /** Which door the bot walks through. `offer` = door ids on screen, `hearts` = current hearts. */

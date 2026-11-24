@@ -23,7 +23,7 @@ export function baseStats() {
     critBurst: 0,         // Annotated Edition: crits splash in this radius
     bounceBurst: false,   // Collapsing Stacks: every ricochet also bursts
     // curses
-    scoreMult: 1, lanternScale: 1, enemySpeedMult: 1,
+    scoreMult: 1, lanternScale: 1, enemySpeedMult: 1, fineMult: 1, shhhStun: 1,   // fineMult: story fines per room (Lights Out); shhhStun: SHHH! stun length multiplier (Loud Reader)
     // masterworks
     tomeEvery: 0, zone: false, sagaEvery: 0, bounceAccel: 0, bookLife: 1.3, dashCharges: 1,
     regenPerWave: 0, shhhGlobal: false, critMult: 2.5, orbitPulse: false, amnesty: false,
@@ -57,9 +57,9 @@ export const UPGRADES = [
   perk({ id: 'interlibrary', icon: '🔁', short: 'Loan', name: 'Interlibrary Loan', desc: 'Books leaving the library come back through the opposite wall', max: 3, weight: 5, apply: (s) => { s.wraps += 1; } }),
 
   // ---- cursed books: big upside, real cost ----
-  cursed({ id: 'bannedbook', icon: '💀', short: 'Banned Book', name: 'Banned Book', desc: '+100% book damage. −1 max heart.', apply: (s, p) => { s.damage += 1; s.maxHp = Math.max(1, s.maxHp - 1); if (p) p.hp = Math.min(p.hp, s.maxHp); } }),
-  cursed({ id: 'loudreader', icon: '📢', short: 'Loud Reader', name: 'Loud Reader', desc: 'SHHH! recharges 3× faster. Enemies move 15% faster.', apply: (s) => { s.shhhCd /= 3; s.enemySpeedMult *= 1.15; } }),
-  cursed({ id: 'lightsout', icon: '🕯️', short: 'Lights Out', name: 'Lights Out', desc: '+50% score. Your lantern shrinks to half.', needsLights: true, apply: (s) => { s.scoreMult *= 1.5; s.lanternScale *= 0.5; } }),
+  cursed({ id: 'bannedbook', icon: '💀', short: 'Banned Book', name: 'Banned Book', desc: '+100% book damage, books pierce 1 enemy. −1 max heart.', apply: (s, p) => { s.damage += 1; s.pierce += 1; s.maxHp = Math.max(1, s.maxHp - 1); if (p) p.hp = Math.min(p.hp, s.maxHp); } }),
+  cursed({ id: 'loudreader', icon: '📢', short: 'Loud Reader', name: 'Loud Reader', desc: 'SHHH! recharges 3× faster, is 50% bigger and stuns longer. Enemies move 15% faster.', apply: (s) => { s.shhhCd /= 3; s.shhhRadius *= 1.5; s.shhhStun *= 1.5; s.enemySpeedMult *= 1.15; } }),
+  cursed({ id: 'lightsout', icon: '🕯️', short: 'Lights Out', name: 'Lights Out', desc: '+50% fines and score. Your lantern shrinks to half.', needsLights: true, apply: (s) => { s.scoreMult *= 1.5; s.fineMult *= 1.5; s.lanternScale *= 0.5; } }),
 
   // ---- Collected Works: own both perks to unlock ----
   combo({ id: 'cyoa', icon: '🗺️', short: 'Adventure', name: 'Choose Your Own Adventure', requires: ['bookmark', 'dewey'], desc: 'Every ricochet turns toward the nearest enemy. +1 bounce.', apply: (s) => { s.retarget = true; s.bounces += 1; } }),
@@ -152,6 +152,8 @@ const GAIN = [
   ['nook', (a, b) => `+${pct(b - a)} throw speed next to shelves`],
   ['wraps', (a, b) => (a === 0 ? 'Books come back through the walls' : `+${b - a} trip through the walls`)],
   ['scoreMult', (a, b) => `+${pct(b / a - 1)} score`],
+  ['fineMult', (a, b) => `+${pct(b / a - 1)} fines`],
+  ['shhhStun', (a, b) => `+${pct(b / a - 1)} SHHH! stun time`],
   ['enemySpeedMult', (a, b) => `Enemies ${pct(b / a - 1)} faster`],
   ['lanternScale', (a, b) => 'Your lantern shrinks to half'],
 ];

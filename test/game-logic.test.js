@@ -178,7 +178,9 @@ test('rebalance: no single core perk more than doubles output at level 1', async
   byId('hardcover').apply(s); assert.equal(s.damage, 1.5);
   byId('trilogy').apply(s); assert.equal(s.projectiles, 2);
   const c = baseStats();
-  byId('bannedbook').apply(c, { hp: 5 }); assert.equal(c.damage, 2); assert.equal(c.maxHp, 4);
+  byId('bannedbook').apply(c, { hp: 5 }); assert.equal(c.damage, 2); assert.equal(c.maxHp, 4); assert.equal(c.pierce, 1, 'v1.14.1: Banned Book also pierces 1');
+  const l = baseStats(); byId('lightsout').apply(l); assert.equal(l.fineMult, 1.5); assert.equal(l.scoreMult, 1.5); assert.equal(l.lanternScale, 0.5);
+  const r = baseStats(); byId('loudreader').apply(r); assert.equal(r.shhhRadius, 210); assert.equal(r.shhhStun, 1.5);
 });
 
 test('every stackable perk tops out at 3/3 and leads to exactly one Masterwork', async () => {
@@ -225,7 +227,7 @@ test('cards say just the gain, hint at combos, and Banish keeps perks out of the
   assert.deepEqual(gainText(byId('extendedloan'), s, { hp: 3 }), ['+1 max heart', 'heals 2']);
   assert.deepEqual(gainText(byId('extendedloan'), s, { hp: 5 }), ['+1 max heart']);
   assert.deepEqual(gainText(byId('hardcover'), s, { hp: 5 }), ['+50% damage']);
-  assert.deepEqual(gainText(byId('loudreader'), s, { hp: 5 }), ['SHHH! recharges 3× faster', 'Enemies 15% faster']);
+  assert.deepEqual(gainText(byId('loudreader'), s, { hp: 5 }), ['SHHH! recharges 3× faster', '+50% SHHH! size', '+50% SHHH! stun time', 'Enemies 15% faster']);
   // Hints only when you already hold the partner perk
   assert.deepEqual(comboHints(byId('bookmark'), {}), []);
   assert.deepEqual(comboHints(byId('bookmark'), { dewey: 1 }).map((h) => h.combo.id), ['cyoa']);

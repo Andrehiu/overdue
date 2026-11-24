@@ -12,6 +12,7 @@
 //   npm run balance -- --ban-perks=audiobook   (bot only: never pick these perks; for no-orbit baselines)
 //   npm run balance -- --rooms=old|new --viewport=844x390 --out=balance-report-x   (old = pre-1.14.0 room size, debug flag)
 //   npm run balance -- --policies=rare,rest --jobs=4
+//   npm run balance -- --policies=mystery --cursed=take|walk   (always Mystery Shelf; take or walk away from its cursed book)
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
 import { execSync } from 'node:child_process';
@@ -19,7 +20,7 @@ import { readFile, mkdir, rm, cp, writeFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { cpus } from 'node:os';
 import { extname, join, resolve } from 'node:path';
-import { aggregate, findings, renderReport, parseForce, POLICIES, WINGS_TESTED, RENO_PRESETS } from './balance-lib.mjs';
+import { EXTRA_POLICIES, aggregate, findings, renderReport, parseForce, POLICIES, WINGS_TESTED, RENO_PRESETS } from './balance-lib.mjs';
 import { RENOVATIONS, normalizeProgress } from '../src/meta.js';
 import { roomGoal, roomKind } from '../src/story.js';
 
@@ -29,8 +30,9 @@ const OUT = join(ROOT, arg('out', 'balance-report'));
 const SITE = join(OUT, 'site');
 const RUNS = Math.max(1, Number(arg('runs', 20)));
 const WINGS = arg('wings', WINGS_TESTED.join(',')).split(',').map(Number).filter((n) => n >= 1 && n <= 10);
-const PICKED = arg('policies', POLICIES.join(',')).split(',').filter((p) => POLICIES.includes(p));
+const PICKED = arg('policies', POLICIES.join(',')).split(',').filter((p) => POLICIES.includes(p) || EXTRA_POLICIES.includes(p));
 const RENOS = arg('renos', 'both') === 'both' ? ['none', 'half'] : arg('renos', 'both').split(',').filter((r) => RENO_PRESETS.includes(r));
+const CURSED = arg('cursed', 'take');   // Mystery Shelf cursed book: take | walk
 const FORCE = parseForce(arg('force-perks', ''));
 const BAN = arg('ban-perks', '').split(',').filter((x) => /^[a-z_]+$/.test(x));   // bot only: never pick these (baseline runs, e.g. no orbit)
 const ROOMS_FLAG = arg('rooms', 'new') === 'old' ? '&legacyrooms=1' : '';
@@ -92,13 +94,13 @@ async function worker(id) {
     const job = order[next++];
     let r;
     try {
-      r = await page.evaluate(async ({ wing, policy, progress, force, ban, seed }) => {
+      r = await page.evaluate(async ({ wing, policy, progress, force, ban, seed, cursed }) => {
         // Seeded randomness: run k of a cell gets the same seed in every batch, so old-vs-new room size compares like with like.
         let a = (seed * 2654435761) >>> 0;
         Math.random = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
         const m = await import('/__bot/balance-bot.mjs');
-        return m.playRun(window.__overdue, { wing, policy, progress, force, ban });
-      }, { wing: job.wing, policy: job.policy, progress: saves[job.renos], force: FORCE, ban: BAN, seed: job.seed });
+        return m.playRun(window.__overdue, { wing, policy, progress, force, ban, cursed });
+      }, { wing: job.wing, policy: job.policy, progress: saves[job.renos], force: FORCE, ban: BAN, seed: job.seed, cursed: CURSED });
       if (page.pageErrors.length) { r.errors = [...(r.errors || []), ...page.pageErrors.splice(0)]; }
     } catch (e) {
       r = { wing: job.wing, policy: job.policy, outcome: 'error', room: 0, hearts: 0, fines: 0, time: 0, errors: [String(e.message || e).slice(0, 200)] };
