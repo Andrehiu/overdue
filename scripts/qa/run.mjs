@@ -135,6 +135,8 @@ const PINNED_CHECK = (id) => {
 async function screensFlow(name, opts, full) {
   const record = recorder();
   const ctx = await browser.newContext(opts);
+  // v1.13.1: the Home Screen nudge has its own checks (basics); here it would cover the end-screen buttons
+  await ctx.addInitScript(() => { try { if (localStorage.getItem('overdue.tips.v1') === null) localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off"]}'); } catch {} });
   const page = await ctx.newPage();
   const errors = [], failed = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -519,6 +521,8 @@ async function screensFlow(name, opts, full) {
 async function menusFlow(name, opts) {
   const record = recorder();
   const ctx = await browser.newContext(opts);
+  // v1.13.1: the Home Screen nudge has its own checks (basics); here it would cover the end-screen buttons
+  await ctx.addInitScript(() => { try { if (localStorage.getItem('overdue.tips.v1') === null) localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off"]}'); } catch {} });
   const page = await ctx.newPage();
   const area = `menus/${name}`;
   try {
@@ -751,8 +755,9 @@ async function basicsFlow() {
     await page.waitForSelector('#updateBar:not([hidden])', { timeout: 10000 }).catch(() => {});
     const barOn = await page.evaluate(() => !document.getElementById('updateBar').hidden);
     record(area, 'update: serving N+1 shows the update bar while N is open', barOn && (await page.textContent('#updateBar')).includes(newCommit), (await page.textContent('#updateBar')).slice(0, 60));
-    await page.waitForFunction(async () => { const r = await navigator.serviceWorker.getRegistration(); return !!r.waiting; }, null, { timeout: 10000 }).catch(() => {});
-    record(area, 'update: the new build is fetched in the background (worker waiting)', await page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()).waiting));
+    let waiting = false;
+    for (let i = 0; i < 40 && !waiting; i++) { waiting = await page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()).waiting); if (!waiting) await page.waitForTimeout(250); }
+    record(area, 'update: the new build is fetched in the background (worker waiting)', waiting);
     const stayed = await page.evaluate(() => document.querySelector('.version-label').textContent);
     record(area, 'update: the open page keeps running N until the player taps', stayed.includes(oldCommit), stayed);
     await shot(page, 'basics-update-bar');
