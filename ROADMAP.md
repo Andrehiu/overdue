@@ -38,6 +38,7 @@ only when the owner says "ship".
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-24 | Order: 1.14.0 late game + perk balance → 1.14.1 Rare Books + cursed → 1.15.0 new perks → 1.16.0 Book Bag (Renovations A, kits permanent) → 1.17.0 player look. Dewey + Interlibrary is dominant (never miss); Audiobook Orbit useless; new perks take inspiration from genre classics (mechanics only, original names) | Owner |
 | 2026-11-24 | Loud Patron shout ring reach −20% (196 → 157 px), story and endless; added to the 1.13.0 coder | Owner: still too big for the small rooms |
 | 2026-11-24 | Late-game reachability: NO free starting perks. Measure with a maxed-Renovations bot save (wings 6–10, ≥ 60 runs), then flatten the steepest per-wing dials (enemy HP +22%/wing compounding with budget) toward: maxed Renovations wing 8 ~40%, wing 10 ~20% clears (bot). Top item of 1.14.0 | Tester: wing 8 extremely hard even with all Renovations; planner math: wing 8 ≈ 6× the damage-per-second of wing 1 with the same starting power |
 | 2026-11-24 | More Renovation tiers: yes, but owner finds pure stat tiers one-dimensional; planner to propose Renovations that change how you play (sidegrades/unlocks), not just +numbers | Owner |
@@ -98,8 +99,11 @@ only when the owner says "ship".
 | 1.12.2 | **Polish:** skip single-door screen, free perks as a card, banish animates one card, redundant UI removed (+ no "!" on crits), Mystery wording + "1 of 2", hide story score | Shipped 2026-11-23 with 1.12.1 (planner review: 73/73 tests, QA all green; screenshots: 5 cards one row, door badges gone, no story score). Handoff: `docs/handoffs/1.12.2-polish.md` |
 | 1.13.0 | **New players:** plain captions + earned menus, guided first room, wing 1 rooms 1–3 check, Survive clarity (timer, goal, max 1/wing) | Coder started 2026-11-24. Handoff: `docs/handoffs/1.13.0-new-players.md` |
 | 1.13.1 | **App basics:** Home Screen nudge, save backup code, offline play | Coder started 2026-11-24 (parallel). Handoff: `docs/handoffs/1.13.1-app-basics.md` |
-| 1.14.0 | **Late game reachable + builds + difficulty curve:** maxed-Renovations bot, flatten wing scaling (no free starting perks), Rare Books better pick (A), cursed books rebalance + take or walk away, gentle curve smoothing (cliffs at wing 4 and 7; bot measures all 10 wings) | Planned. Owner playtests wings 4 and 7 after |
-| 1.15.0 | **Player look:** art agent → 3 looks → owner pick → final, layered for cosmetics | Planned (2 sessions) |
+| 1.14.0 | **Late game reachable + perk balance:** maxed-Renovations bot (wings 6–10), flatten wing scaling (no free starting perks), per-perk measurement (forced-perk runs, damage share by source), fix Audiobook Orbit, break Dewey × Interlibrary "never miss", tune outliers; gentle curve smoothing (cliffs wing 4 and 7) | Planned next after 1.13. Owner playtests wings 7–8 and an orbit run after |
+| 1.14.1 | **Builds:** Rare Books better pick (A), cursed books rebalance + take or walk away | Planned |
+| 1.15.0 | **New perks:** 6–8 new perks + effect combos (genre-inspired: angles, status effects, on-kill, risk/reward, helpers), from a 3-option proposal | Design agent drafting the proposal (2026-11-24) |
+| 1.16.0 | **Book Bag (Renovations 2.0 A):** kits bought once, pack before a run, gain + cost; drop Forbidden Satchel and Fire Drill | Planned |
+| 1.17.0 | **Player look:** art agent → 3 looks → owner pick → final, layered for cosmetics | Planned (2 sessions) |
 | — | **QA trim** (tooling): full flow on 3 devices, fit-only on 4, parallel contexts; target ~5 min | Merged: QA 11 min → 3 min (full flow on 3 devices, fit-only on 4, parallel); `--full` ~3.5 min |
 | — | **Bigger map (parked):** ~40×24 cells (1.7× floor), camera follows the player with a dead zone; light layer screen-sized (same look; owner OK needed since CLAUDE.md says keep lighting); auto-aim only on screen; spawns just off-screen; edge arrows for off-screen enemies; perf budget must hold. Build behind `?bigmap=1` first | Parked: 1.3.1 fixed the cramped feeling. Revisit only if it comes back |
 
@@ -135,7 +139,7 @@ Morning brief: `docs/plans/morning-brief.md`. Room Atlas (private): https://clau
 Ranked proposals for 1.8+ with draft handoffs: `docs/plans/next-ideas.md` (story beats → room goals → balance pass → Daily Shift → weapons).
 
 ## Parked ideas
-- **Renovations 2.0 (proposal, 2026-11-24):** A Book Bag kits (gain + cost, packed before a run) · B New Acquisitions (buy new perks/doors/cursed books into the story pool) · C Signature Editions (weapon types). Planner pick: A then B, C later; drop Forbidden Satchel (≈ free starting perk) and Fire Drill (clashes with max 1 Survive/wing). Waiting on owner. Page (private): https://claude.ai/artifact/2ZFt6ufDiCVLJ3ma128vrT · spec: `docs/plans/renovations-2.md`. Build after 1.14.0.
+- **Renovations 2.0 (proposal, 2026-11-24):** A Book Bag kits (gain + cost, packed before a run) · B New Acquisitions (buy new perks/doors/cursed books into the story pool) · C Signature Editions (weapon types). Planner pick: A then B, C later; drop Forbidden Satchel (≈ free starting perk) and Fire Drill (clashes with max 1 Survive/wing). Owner picked A (2026-11-24), kits permanent, built as 1.16.0. Page (private): https://claude.ai/artifact/2ZFt6ufDiCVLJ3ma128vrT · spec: `docs/plans/renovations-2.md`. Build after 1.14.0.
 - **More ways to spend fines (owner, 2026-11-23, later):** cosmetics (librarian outfits/hats, book skins, lantern colours, rug/floor themes), maybe a few more Renovations. Rules to respect: cosmetics never change gameplay or hitboxes; books stay library blue and enemies stay in enemy hues (palette rule); new saved data in its own additive key (no reshape of `overdue.progress.v1`). Pairs well with Daily Shift (streak rewards).
 - **Room goals (story):** survive 30s, rescue stolen books, defend the returns desk, catch a thief. Fixes "every room plays the same".
 - **Weapon types:** Paperback (4 × 1 = 4 dmg/s), Encyclopedia (1.3 × 3.5 = 4.6, slow, knockback), Index Cards (10 × 0.4 = 4, flurry),
