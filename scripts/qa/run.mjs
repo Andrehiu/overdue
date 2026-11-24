@@ -912,7 +912,7 @@ async function newPerksFlow(name, opts) {
       record(area, "What's new card never shows twice", await page.evaluate(() => document.getElementById('whatsNew').hidden && __overdue.tipsSeen().includes('whatsnew-1.15.0')));
       // NEW badges on the first offer; this player has not been stamped as fresh, so the badges are still pending
       await page.evaluate(() => { localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.15.0","perk-stack"]}'); }); await page.reload(); await page.waitForTimeout(700);
-      await page.evaluate(() => { __overdue.startRun('endless'); __overdue.showUpgrades(); __overdue.showCards(['margin', 'hardcover', 'librarycat']); }); await page.waitForTimeout(900);
+      await page.evaluate(() => { __overdue.startRun('endless'); __overdue.game.banished.add('margin'); __overdue.game.banished.add('librarycat'); __overdue.showUpgrades(); __overdue.showCards(['margin', 'hardcover', 'librarycat']); }); await page.waitForTimeout(900);
       const cls = () => page.evaluate(() => [...document.querySelectorAll('#cards .card')].map((c) => c.classList.contains('new')));
       const first = await cls(); await shot(page, `${name}-perk-new-badge`);
       record(area, 'NEW badge shows on new perk cards the first time they are offered', first[0] && !first[1] && first[2], JSON.stringify(first));
@@ -1172,6 +1172,30 @@ if (want('perf')) {
   record('perf', `late boss game speed ≥ ${PERF.sim}x`, avg('sim') >= PERF.sim, `${avg('sim').toFixed(2)}x (samples ${samples.map((s) => s.sim.toFixed(2)).join(', ')})`);
   if (PERF.fps) record('perf', `late boss fps ≥ ${PERF.fps}`, avg('fps') >= PERF.fps, `${avg('fps').toFixed(0)} fps`);
   record('perf', 'books in flight capped', Math.max(...samples.map((s) => s.books)) <= 110, `max ${Math.max(...samples.map((s) => s.books))}`);
+  // v1.15.0: stress build (Trilogy 3, Margin 3, Speed Reader 3, In the Zone, Saga, Crossfire, Demolition) on the wave-15 boss.
+  await page.evaluate(() => {
+    const O = __overdue; O.startRun('endless');
+    for (const id of ['trilogy', 'trilogy', 'trilogy', 'margin', 'margin', 'margin', 'speedreader', 'speedreader', 'speedreader', 'spinebreaker', 'spinebreaker', 'spinebreaker',
+      'm_zone', 'm_saga', 'crossfire', 'm_demolition']) O.grant(id);
+    O.startWave(15); O.god();
+  });
+  await page.waitForTimeout(3000);
+  const stress = await page.evaluate(async () => {
+    const O = __overdue, out = [];
+    for (let s = 0; s < 4; s++) {
+      const b = O.enemies.find((e) => e.type === 'boss');
+      if (b) { b.hp = b.maxHp; O.player.x = b.x; O.player.y = Math.min(b.y + 160, 900); }
+      const t0 = performance.now(), sim0 = O.game.playTime; let frames = 0;
+      await new Promise((res) => { const tick = (now) => { frames++; if (now - t0 < 1000) requestAnimationFrame(tick); else res(); }; requestAnimationFrame(tick); });
+      out.push({ sim: (O.game.playTime - sim0) / ((performance.now() - t0) / 1000), fps: frames, books: O.counts().books });
+    }
+    return out;
+  });
+  await shot(page, 'perf-stress-margin');
+  const savg = (k) => stress.reduce((a, s) => a + s[k], 0) / stress.length;
+  record('perf', `v1.15.0 stress build (Margin 3 + Crossfire + Demolition...) late boss game speed ≥ ${PERF.sim}x`, savg('sim') >= PERF.sim, `${savg('sim').toFixed(2)}x (samples ${stress.map((s) => s.sim.toFixed(2)).join(', ')})`);
+  if (PERF.fps) record('perf', `v1.15.0 stress build late boss fps ≥ ${PERF.fps}`, savg('fps') >= PERF.fps, `${savg('fps').toFixed(0)} fps`);
+  record('perf', 'v1.15.0 stress build: books in flight capped', Math.max(...stress.map((s) => s.books)) <= 110, `max ${Math.max(...stress.map((s) => s.books))}`);
   // Story late game: wing 10 room 6, a crowd of elites firing fans of pages.
   await page.evaluate(() => { const O = __overdue; O.unlockAll(); O.startRun('story', 10); O.startWave(6); O.god(); });
   await page.waitForTimeout(5000);
