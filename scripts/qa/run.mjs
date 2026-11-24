@@ -1187,7 +1187,7 @@ const PERF_SAMPLE_JS = `(async (N, MS) => {
   const O = __overdue, out = [];
   const reset = () => { const b = O.enemies.find((e) => e.type === 'boss'); if (b) { b.hp = b.maxHp; O.player.x = b.x; O.player.y = Math.min(b.y + 160, 900); } };
   const run = (ms) => new Promise((res) => { reset(); const t0 = performance.now(), sim0 = O.game.playTime; let frames = 0;
-    const tick = (now) => { frames++; if (now - t0 < ms) requestAnimationFrame(tick); else res({ sim: (O.game.playTime - sim0) / ((performance.now() - t0) / 1000), fps: frames / ((now - t0) / 1000), books: O.counts().books, hazards: O.counts().hazards }); };
+    const tick = (now) => { frames++; const b = O.enemies.find((e) => e.type === 'boss'); if (b && b.hp < b.maxHp * 0.5) b.hp = b.maxHp; if (now - t0 < ms) requestAnimationFrame(tick); else res({ sim: (O.game.playTime - sim0) / ((performance.now() - t0) / 1000), fps: frames / ((now - t0) / 1000), books: O.counts().books, hazards: O.counts().hazards }); };
     requestAnimationFrame(tick); });
   await run(4000); // warm-up, discarded (fps climbs for the first few seconds as caches and JIT settle)
   for (let s = 0; s < N; s++) out.push(await run(MS));
