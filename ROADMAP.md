@@ -3,37 +3,35 @@
 The plan and the owner's decisions, kept current by the planner session. **Planners: read this after CLAUDE.md.**
 Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <topic>`; their prompts are saved in `docs/handoffs/`.
 
-## Handover note (2026-11-22, from "Overdue · planning" to "Overdue · planning 2")
-**State (updated 2026-11-23):** v1.12.2 live (bd030ec, Pages green; 1.12.1 bugs + 1.12.2 polish). Original note: v1.11.2 was live (`0e037ea`, shipped with the QA trim). Nothing is merged-but-unshipped and no coder is running.
-The planner's working branch is `claude/brave-galileo-jyg38o` (equal to `main` plus docs). Work for a new release goes on a new
-coder branch from `origin/main`, then the planner merges into its own working branch, runs QA and ships with `git push origin HEAD:main`
-only when the owner says "ship".
+## Handover note (2026-11-24, from "Overdue · planning 2" to the next planner)
+**State:** v1.13.1 shipped to `main` (04cdae9; confirm the Pages run is green before saying live). Nothing merged-but-unshipped, no coder
+running. Planner working branch: `claude/brave-galileo-jyg38o` (= main + docs). The owner wrapped up this planner after 1.13.1.
 
-**How this owner works (learned over 13 releases):**
-- Prefers short replies with tables, a clear recommendation, then "say X to ship". Asks "what's next" often; offer 3–5 options + a pick.
-- Usually says "ship when ready / if all good" → you may ship after your own review + green QA, then confirm the Pages deploy.
-- Plays on an **iPhone in landscape** (also an iPad). Their screenshots are the best bug reports; measure before guessing.
-- Usage credits are OFF; plan limits apply. Keep sessions lean; batch small things.
+**How this owner works (still true, plus this week):**
+- Short replies: tables, a clear pick, then the one word they need to say ("ship", a letter). Ships only on "ship" / "ship if all good".
+- Playtest mode: when they say they're playtesting, only log a numbered list; split into releases on "done testing".
+- Likes 3-option proposal pages (enemy art, Renovations 2.0, perks) with a pick; screenshots at phone size for anything visual.
+- Plays on iPhone (also an iPad and a "Duo" device; Duo-only layout oddities are not targets). Near the weekly usage limit: max 2 coders.
+- Going to sleep → schedule an 08:00 SGT morning update (what's live, where to look on the phone, what only a device can confirm).
 
-**Gotchas:**
-- Pages deploys often fail with GitHub-side "Deployment failed, try again later" / "Fetching artifact metadata failed": re-run
-  (`mcp__github__actions_run_trigger` rerun_workflow_run); it has always gone green by the 3rd attempt. Never say "live" before green.
-- The auto-mode classifier once blocked `git push origin HEAD:main`; an explicit owner "push X to main" unblocked it.
-- Coders' containers sometimes have a stale local `main` or no `node_modules`: handoffs say "start from origin/main"; QA needs `npm ci`.
-- Merges: expect `package.json` version and `CODEMAP.md` conflicts every time (take the newer version, `npm run codemap`); when two
-  coders both add tests in the same spot, keep both. Re-run QA after every merge.
-- Watch coders weakening rule tests (e.g. 1.9.0 relaxed a budget sub-check: acceptable only because `threat` stayed strict).
-- QA: `npm run qa` ≈ 3 min (full flow on iPhone 13 / iPad / iPad mini, fit-only on 4 more sizes, parallel); `--full` ≈ 3.5 min.
-  Flaky checks get fixed (deterministic `stepN` + counters), never ignored.
+**Next for the new planner (approved order, see Plan):**
+1. Confirm the 1.13.1 Pages deploy is green. Ask the owner for the iPhone-only checks: Add to Home Screen, open in airplane mode,
+   copy backup code in Safari (service worker shipped for the first time in 1.13.1).
+2. Write the **1.14.0** handoffs as two sequential coder sessions: (a) rooms +20% (phone grid ~40×19; HUD/buttons keep size, lamps and
+   shelves scale) + run analytics A (on-device run log + "Share stats" code, schema reusable by the bot) + bot tooling (maxed-Renovations
+   save, damage by source, forced-perk runs); then (b) balance on top: flatten wing scaling (no free starting perks), perk fixes from
+   `docs/plans/perks-balance-review.md` (orbit: no page blocking before Surround Sound, no stun on elites/bosses; Dewey×Interlibrary;
+   Speed Reader/Footnotes), gentle smoothing at wings 4 and 7. Targets in the Decisions table.
+3. Then 1.14.1 (Rare Books better pick, cursed books + take-or-walk-away), 1.15.0 new perks (mix + review fixes), 1.16.0 Book Bag,
+   1.17.0 player look. Specs: `docs/plans/` (perks-new-and-fixes, perks-balance-review, renovations-2, art-*).
 
-**Next for the new planner:**
-1. ✅ Done 2026-11-22 (v1.11.2: 70 rooms, 34×16 grid, survive rooms tagged). Regenerate the **Room Atlas** (private artifact https://claude.ai/artifact/5kXSXFYFDShVAGw81fPhzS) for 7-room wings and the
-   wider phone grids (it still shows v1.6.0's 10-room layouts). Method: ad-hoc Playwright script in the scratchpad screenshotting
-   every story room at iPhone 13 Home Screen size (844x390) with `?debug=1` hooks (`unlockAll`, `startRun('story', w)`, `startWave(r)`,
-   `killAll`, `game.bannerT = 0`), images embedded as data URIs, republished to the same URL.
-2. Wait for the owner's playtest notes (see "Waiting on owner playtest" under Next ideas), then a **balance pass** (bot:
-   `npm run balance -- --runs=20`).
-3. Then the owner's pick among: Daily Shift, Rescue rooms, weapon types (all in Next ideas / parked).
+**Gotchas (new this week):**
+- Pages runs sometimes sit in "waiting" for a minute; check again before re-running.
+- Parallel coders always conflict in `CODEMAP.md`, `package.json`, `src/main.js`, `src/game.css`, `scripts/qa/run.mjs`; conflicts are
+  usually additive (keep both). After a merge, `node --check scripts/qa/run.mjs` and make sure every QA flow still `return record.list`.
+- QA seeds a "returning player" save since 1.13.0 (fresh saves hide menus) and `a2hs-off` (nudge) in old flows.
+- Coders sometimes report the planner branch name by mistake; verify with `git log origin/<branch>` before worrying.
+- "Show tips again" in Settings also clears the 1.13.0 unlock flags (menus may re-toast once): small follow-up if the owner notices.
 
 ## Decisions (newest first)
 | Date | Decision | Why |
