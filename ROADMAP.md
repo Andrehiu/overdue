@@ -18,10 +18,10 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
   Coders sometimes report the planner branch name by mistake: verify with `git log origin/<branch>`. Pages runs can sit in
   "waiting" a minute. "Show tips again" also clears the 1.13.0 unlock flags (small follow-up if the owner notices).
 - **1.15.0 new perks:** status colours picked (A: ink violet `#9a6bff`, chill cyan `#74e6ff`, static lime `#c8ff4d`; page
-  https://claude.ai/artifact/9mMLXf7yUJ9Je2TgHw9Vhs). Handoffs drafted, waiting for the owner's go: `docs/handoffs/1.15.0a-status-perks.md`
+  https://claude.ai/artifact/9mMLXf7yUJ9Je2TgHw9Vhs). Owner said go (2026-11-24); 2 coders running (sessions session_014kswNma1ffcy55DKfyTXLx = A, session_014kswNm1QrbdV3FpTgcFFxh = B), check-in 11:43 UTC: `docs/handoffs/1.15.0a-status-perks.md`
   (status engine + Leaky Pen, Cold Storage, Static Cling, Pop-up Book + 4 combos, `claude/status-perks-1150`) and
   `docs/handoffs/1.15.0b-new-perks.md` (Margin Notes, Last Chapter, Library Cat, Crossfire, What's new card, NEW badges,
-  `claude/new-perks-1150`), both from main, in parallel. Open: new perks in endless too (default yes; waves unchanged, perk rolls shift).
+  `claude/new-perks-1150`), both from main, in parallel. New perks in endless too (owner OK by go).
 - **Owner to do when convenient:** playtest wings 7–8 + an Orbit run on v1.14.1; phone checks: Take it / Walk away tap comfort,
   5-card Rare hand readability, Surround dimmed-book cue, Settings captions fit. Optional: add the CI docs `paths-ignore` to
   `.github/workflows/ci.yml` (auto-mode blocked coders from it; the owner can edit it on GitHub).
