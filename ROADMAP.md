@@ -4,12 +4,7 @@ The plan and the owner's decisions, kept current by the planner session. **Plann
 Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <topic>`; their prompts are saved in `docs/handoffs/`.
 
 ## Current state (planning 3, 2026-11-24)
-- **Live:** v1.13.1 (04cdae9). iPhone checks (Home Screen, airplane mode, backup copy) confirmed by owner.
-- **1.14.0 part A:** reviewed by planner (f96a1d3: 100/100 tests, QA 776 checks green, perf boss 0.92x/61 fps, wing 10 0.97x/61 fps,
-  basics flake fixed 5/5). Branch `claude/rooms-analytics-1140`.
-- **Running:** 1.14.0 part B coder "Overdue · v1.14.0 balance" (`claude/balance-1140`, from part A), incl. CI docs `paths-ignore`.
-- **Running in parallel:** 1.14.1 coder "Overdue · v1.14.1 rare + cursed" (`claude/rare-cursed-1141`, from part A; avoids part B's files).
-  Merge order: 1.14.0 (A+B) first, then 1.14.1 on top.
+- **Live:** v1.14.1 (1.14.0 + 1.14.1), shipped 2026-11-24; see Plan. Owner wants 1.15.0 (new perks) next; wing 8+ tuning (1.14.2) only if the owner's playtest still finds issues.
 - **Planner branch:** `claude/brave-galileo-jyg38o` (= main + docs).
 - **Owner habits:** short replies (tables, a pick, the one word needed); ships only on "ship"; playtest mode = numbered log only;
   3-option pages only for visual choices; 08:00 SGT morning update when going to sleep; max 2 coders (usage).
@@ -68,8 +63,8 @@ Older decisions (2026-11-21 to 23, all shipped): `docs/roadmap-archive.md`. Prod
 ## Plan
 | Version | What | Status |
 |---|---|---|
-| 1.14.0 | **Rooms +20% + late game reachable + perk balance + run analytics (on-device log + Share stats code):** rooms 20% bigger first; maxed-Renovations bot (wings 6–10), flatten wing scaling (no free starting perks), per-perk measurement (forced-perk runs, damage share by source), fix Audiobook Orbit, break Dewey × Interlibrary "never miss", tune outliers; gentle curve smoothing (cliffs wing 4 and 7) | Handoffs drafted (planning 3, 2026-11-24): `docs/handoffs/1.14.0a-rooms-analytics-bot.md` → `docs/handoffs/1.14.0b-balance.md` (sequential). Part A coder started 2026-11-24 (branch `claude/rooms-analytics-1140`); part B after review. Owner playtests wings 7–8 and an orbit run after |
-| 1.14.1 | **Builds:** Rare Books better pick (A), cursed books rebalance + take or walk away | Planned |
+| 1.14.0 | **Rooms +20% (story) + late game reachable + perk fixes + run analytics:** story grid ~+20% per side (HUD same size), run log `overdue.runs.v1` + Share stats, bot tooling (max Renovations, damage by source, forced/banned perks); wing scaling flattened (HP/budget/boss HP/speed etc.), Orbit fair version, Dewey×Interlibrary first-trip homing, Speed Reader +1.2/lvl, Footnotes +15% | Shipped 2026-11-24 as v1.14.1 with 1.14.1 (planner review: 101/101 tests, QA 800 green, perf boss 0.94x/61 fps). Bot after: half wings 4–10 63/45/32/53/12/45/7%, max 8 53%, max 10 15%. Open (1.14.2, after owner playtest): wing 8 room 5 maze, wings 7/9 easier than neighbours, 3→4 cliff 27 pts, Orbit L3 6% of damage (target 15–30%), Spine Breaker 100% clears. CI docs paths-ignore not applied (auto-mode blocked; owner can edit ci.yml). Reports: `docs/balance/1.14.0-*.md` |
+| 1.14.1 | **Rare Books better pick + cursed books:** Rare pick +1 card with one guaranteed combo/Masterwork card, Rare door softened (owner A); cursed upsides (Lights Out +50% fines, Loud Reader bigger SHHH + stun, Banned Book +1 pierce); Mystery cursed prize = Take it / Walk away | Shipped 2026-11-24 (with 1.14.0). Post-merge bot (half, n=30): Rare vs safe wings 4–7 93/83, 67/80, 40/43, 50/70%. Nit: "Walk away" wraps to 2 lines |
 | 1.15.0 | **New perks:** 6–8 new perks + effect combos (genre-inspired: angles, status effects, on-kill, risk/reward, helpers), from a 3-option proposal | Proposal ready (2026-11-24), owner picked the mix (2026-11-24); independent balance review done: `docs/plans/perks-balance-review.md` (orbit no page-blocking before Surround Sound, bosses immune to stun/freeze, Margin Notes side books don't home, no chains from chain damage, Last Chapter capped). Page (private): https://claude.ai/artifact/BKrDdNKrMjbVQyxuBcDKRX · spec incl. 1.14.0 perk fixes: `docs/plans/perks-new-and-fixes.md`. Planner pick: mix (Leaky Pen, Cold Storage, Static Cling, Margin Notes, Last Chapter, Library Cat, Pop-up Book + 5 combos); effect colours must not read as book blue. Also: "What's new" card + NEW badges on new perk cards (see Decisions) |
 | 1.16.0 | **Book Bag (Renovations 2.0 A):** kits bought once, pack before a run, gain + cost; drop Forbidden Satchel and Fire Drill | Planned |
 | 1.17.0 | **Player look:** art agent → 3 looks → owner pick → final, layered for cosmetics | Planned (2 sessions) |
