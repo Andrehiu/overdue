@@ -22,7 +22,7 @@ Then tell the owner briefly (one table, a clear recommendation) where things sta
 - One docs commit per conversation, not one per edit.
 
 **CI and notifications**
-- Docs-only commits skip CI (`paths-ignore` added in 1.14.0).
+- Docs-only commits should skip CI: `paths-ignore` is NOT in ci.yml yet (auto-mode blocked coders); the owner may add it on GitHub.
 - Only failures on `main` (CI or "Deploy to GitHub Pages") need the owner; handle everything else yourself and never forward
   branch noise.
 - Fix flaky tests when seen (make them deterministic); never skip, disable or loosen a test or CI check without asking.
