@@ -52,7 +52,8 @@ npm run build   # dist/overdue.html (single file) + dist/version.json; this is e
 4. Release: bump `"version"` in package.json for anything players will notice (patch = fix, minor = feature).
 5. Ship: fast-forward `main` to your branch (`git push origin HEAD:main`) only when the owner asked to ship.
 6. **Never say "live" until the "Deploy to GitHub Pages" run for that commit is green.** If it fails with
-   "Fetching artifact metadata failed", that's a GitHub hiccup: re-run the workflow and check again.
+   "Fetching artifact metadata failed", that's a GitHub hiccup: start a fresh run (Actions → Deploy to GitHub Pages → Run workflow, i.e. workflow_dispatch) and check again. Don't use
+   "re-run failed jobs": it re-uploads into the same run and fails with "Multiple artifacts named github-pages".
 7. Players see the new version on next open; the title screen shows `v<version> · <commit>`.
 
 ## Product rules (owner decisions, don't change without asking)
