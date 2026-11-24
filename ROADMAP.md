@@ -15,8 +15,7 @@ running. Planner working branch: `claude/brave-galileo-jyg38o` (= main + docs). 
 - Going to sleep → schedule an 08:00 SGT morning update (what's live, where to look on the phone, what only a device can confirm).
 
 **Next for the new planner (approved order, see Plan):**
-1. Ask the owner for the iPhone-only checks: Add to Home Screen, open in airplane mode,
-   copy backup code in Safari (service worker shipped for the first time in 1.13.1).
+1. ~~iPhone-only checks~~ Done 2026-11-24: owner confirmed Add to Home Screen, airplane-mode open and backup-code copy all work on iPhone.
 2. Write the **1.14.0** handoffs as two sequential coder sessions: (a) rooms +20% (phone grid ~40×19; HUD/buttons keep size, lamps and
    shelves scale) + run analytics A (on-device run log + "Share stats" code, schema reusable by the bot) + bot tooling (maxed-Renovations
    save, damage by source, forced-perk runs); then (b) balance on top: flatten wing scaling (no free starting perks), perk fixes from
