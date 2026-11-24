@@ -17,10 +17,11 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
   (usually additive; after a merge run `node --check scripts/qa/run.mjs`). QA seeds a "returning player" save since 1.13.0.
   Coders sometimes report the planner branch name by mistake: verify with `git log origin/<branch>`. Pages runs can sit in
   "waiting" a minute. "Show tips again" also clears the 1.13.0 unlock flags (small follow-up if the owner notices).
-- **Owner's priority: 1.15.0 new perks** ("all the new major items"). Status-colour page published (planning 4, private):
-  https://claude.ai/artifact/9mMLXf7yUJ9Je2TgHw9Vhs (A violet ink / cyan chill / lime static = pick; B black ink; C cyan static),
-  waiting for the owner's letter. Pop-up Book ring becomes teal + white (not gold). Then the 1.15.0 handoffs (likely 2 coders: shared status system, then perks + combos + What's new
-  card / NEW badges). Spec: `docs/plans/perks-new-and-fixes.md` + `docs/plans/perks-balance-review.md` + Decisions 2026-11-24.
+- **1.15.0 new perks:** status colours picked (A: ink violet `#9a6bff`, chill cyan `#74e6ff`, static lime `#c8ff4d`; page
+  https://claude.ai/artifact/9mMLXf7yUJ9Je2TgHw9Vhs). Handoffs drafted, waiting for the owner's go: `docs/handoffs/1.15.0a-status-perks.md`
+  (status engine + Leaky Pen, Cold Storage, Static Cling, Pop-up Book + 4 combos, `claude/status-perks-1150`) and
+  `docs/handoffs/1.15.0b-new-perks.md` (Margin Notes, Last Chapter, Library Cat, Crossfire, What's new card, NEW badges,
+  `claude/new-perks-1150`), both from main, in parallel. Open: new perks in endless too (default yes; waves unchanged, perk rolls shift).
 - **Owner to do when convenient:** playtest wings 7–8 + an Orbit run on v1.14.1; phone checks: Take it / Walk away tap comfort,
   5-card Rare hand readability, Surround dimmed-book cue, Settings captions fit. Optional: add the CI docs `paths-ignore` to
   `.github/workflows/ci.yml` (auto-mode blocked coders from it; the owner can edit it on GitHub).
@@ -30,6 +31,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-24 | Status colours A: ink violet `#9a6bff`, chill cyan `#74e6ff`, static lime `#c8ff4d`; Pop-up Book ring teal + white (not gold); Annotated Edition card text drops "ink" | Owner picked A (planning 4) |
 | 2026-11-24 | Rare Books door softened (A): elite share +0.5 → +0.35, budget ×1.3 → ×1.15, from wing 4 elite HP +50% → +30% and fire 30% → 15% faster; ×2 fines and the new Rare pick stay. Rare ≈ safe door in wings 4–7 (bot); re-check after the 1.14.0 merge | Owner picked A (1.14.1) |
 | 2026-11-24 | "What's new" for players: a one-time card only for big releases (first use 1.15.0 new perks), plus NEW badges on new perk cards the first time each is offered (cleared once seen/tapped), reusing the 1.13.0 earned-menus pattern. No popup on small releases. Flags additive in `overdue.tips.v1` (last seen release + seen perk ids). Goes into the 1.15.0 handoff | Owner (from a side chat) |
 | 2026-11-24 | Old playtest list dropped; replaced by one focused playtest after 1.14.0 (wings 7–8 + an Orbit run) | Owner: 'drop it' (bot covers it) |
