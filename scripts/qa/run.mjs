@@ -1189,10 +1189,10 @@ const PERF_SAMPLE_JS = `(async (N, MS) => {
   const run = (ms) => new Promise((res) => { reset(); const t0 = performance.now(), sim0 = O.game.playTime; let frames = 0;
     const tick = (now) => { frames++; if (now - t0 < ms) requestAnimationFrame(tick); else res({ sim: (O.game.playTime - sim0) / ((performance.now() - t0) / 1000), fps: frames / ((now - t0) / 1000), books: O.counts().books, hazards: O.counts().hazards }); };
     requestAnimationFrame(tick); });
-  await run(1000); // warm-up, discarded
+  await run(4000); // warm-up, discarded (fps climbs for the first few seconds as caches and JIT settle)
   for (let s = 0; s < N; s++) out.push(await run(MS));
   O.drive(true);
-  try { reset(); const t0 = performance.now(); O.stepN(120); var upd = (performance.now() - t0) / 120; } finally { O.drive(false); }
+  try { reset(); O.game.freeze = 0; O.stepN(30); const t0 = performance.now(); for (let i = 0; i < 120; i++) { O.game.freeze = 0; O.stepN(1); } var upd = (performance.now() - t0) / 120; } finally { O.drive(false); }
   return { out, upd };
 })`;
 const perfSample = async (page) => {
