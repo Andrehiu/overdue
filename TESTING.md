@@ -15,6 +15,7 @@ look at the screenshots) notices.
 | Rotation (cheap, all phones) | iPhone portrait: rotate overlay covers the title, rotating mid-run pauses, rotating back shows pause and the arena fills ≥ 95% · iPhone 13 / SE / 15 Pro Max: portrait→landscape and landscape→portrait→landscape keep fill ≥ 95% and the title fits | as listed |
 | Story + late fees (**full-flow targets only**; fit-only targets run the layout rows) | Renovations shop readable · buying spends fines and saves · wing select (10 wings, only wing 1 open) · story room starts · 4-card hand fits the screen · elite room is all elites · Survive room counts down, keeps spawning and clears itself · room-7 boss · clearing wing 1 unlocks wing 2 | as listed |
 | Performance | Wave-15 boss, ~25 perks + Masterworks, phone viewport; story wing 10 room 6 (elites shooting) | Game speed ≥ 0.85x, ≥ 50 fps (CI: ≥ 0.75x, fps not judged), books in flight ≤ 110 |
+| App basics (v1.13.1) | Served under `/overdue/` with a 10-min HTTP cache like Pages: worker registers and caches · offline reload shows the title and a run starts · N → N+1: update bar appears, new build waits, tap → title shows N+1, opens offline, only newest cache kept · kill switch removes worker + caches · `--fragment` build has no worker · backup code copy / restore (confirm first, bad / truncated / wrong-version / tampered codes change nothing) · Home Screen nudge (shown once after a 3+ min run or cleared wing, never in standalone, Got it / Don't show again) · Backup screen fits all 7 sizes | as listed |
 | Privacy | Secrets and email addresses in tracked files **and commit messages**; your private terms if `.qa-private-terms` exists | No hits |
 
 Output: `qa-report/report.md` plus screenshots per device (`iphone-landscape-1-title.png` … `-13-wing-cleared.png`, `perf-late-boss.png`, `perf-story-late.png`). Fit-only targets produce the layout screenshots only (title, perks, build strip, doors, game over, wing cleared, menus).
@@ -64,7 +65,14 @@ A check that exists only in the full flow does not run on the fit-only sizes: th
 - [ ] Open the live site: title shows the new `v<version> · <commit>`
 - [ ] If the icon, name or manifest changed: tell players to re-add to Home Screen
 
+### Offline / backup / nudge
+- [ ] `npm run qa` basics rows green (offline, update N→N+1, kill switch, backup, nudge)
+- [ ] Never add a file to the game without adding it to `PRECACHE` in `sw.js` if it must work offline
+
 ### Things only a real device can tell you (do before telling friends)
+- [ ] iPhone Safari: Share → Add to Home Screen works, the installed app opens offline (airplane mode), and the nudge never shows inside it
+- [ ] iPhone Safari: "Copy backup code" really copies (clipboard API); long-press paste into Notes and back works
+- [ ] After a new release: open the installed app online once, tap the update bar, title shows the new version
 - [ ] Sound plays after the first tap; music isn't too loud
 - [ ] Touch: drag to move, DASH/SHHH reachable with thumbs, no accidental perk picks
 - [ ] Feels smooth in a late boss fight on an actual phone

@@ -88,6 +88,7 @@
       </div>
       <div class="progress-tools">
         <div class="menu row tool-row">
+          <button id="btnBackup" type="button">Backup progress</button>
           <button id="btnShowTips" type="button">Show tips again</button>
           <button id="btnResetProgress" type="button" class="danger">Reset progress</button>
         </div>
@@ -99,6 +100,23 @@
       </div>
       <p class="version-label muted"></p>
       <div class="menu row"><button data-act="back">Back</button></div>
+    </section>
+
+    <section id="backup" class="screen" hidden>
+      <h2>Backup progress</h2>
+      <p class="muted small">Safari can erase a website’s saved data after about a week unused. Copy your code somewhere safe (Notes, Messages) to restore on this or another phone.</p>
+      <div class="backup-box">
+        <button id="btnCopyBackup" type="button" class="primary">Copy backup code</button>
+        <textarea id="backupOut" class="backup-text" rows="2" readonly hidden aria-label="Your backup code" spellcheck="false"></textarea>
+        <textarea id="backupIn" class="backup-text" rows="2" placeholder="Paste a backup code here to restore" aria-label="Paste backup code" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+        <button id="btnRestoreBackup" type="button">Restore from code</button>
+        <div id="restoreConfirm" class="restore-confirm" hidden>
+          <p id="restoreWarn">This replaces your progress on this phone.</p>
+          <div class="menu row"><button id="btnRestoreYes" type="button" class="danger">Replace my progress</button><button id="btnRestoreNo" type="button">Cancel</button></div>
+        </div>
+        <p id="backupMsg" class="muted small" role="status" aria-live="polite"></p>
+      </div>
+      <div class="menu row"><button data-act="backupback">Back</button></div>
     </section>
 
     <section id="leaderboard" class="screen" hidden>
@@ -203,6 +221,14 @@
       <button id="btnDash"><span class="lbl">DASH</span><span class="cd"></span></button>
     </div>
     <button id="updateBar" type="button" hidden>🔄 New version available — tap to update</button>
+    <div id="nudge" class="nudge" role="dialog" aria-label="Add to Home Screen" hidden>
+      <div class="nudge-card">
+        <h3>📲 Keep your progress safe</h3>
+        <p>Add <b>Overdue!</b> to your Home Screen. Safari can wipe a website’s saved data after about a week, but an installed app keeps it.</p>
+        <ol><li>Tap the <b>Share</b> button <span aria-hidden="true">⎙</span> in Safari</li><li>Choose <b>Add to Home Screen</b></li></ol>
+        <div class="menu row"><button id="btnNudgeOk" type="button" class="primary">Got it</button><button id="btnNudgeOff" type="button">Don’t show again</button></div>
+      </div>
+    </div>
     <div id="toast" role="status" hidden></div>
     <div id="freePerks" aria-live="polite"></div>
     <noscript><p class="screen">This game needs JavaScript.</p></noscript>
