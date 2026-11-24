@@ -2468,13 +2468,14 @@ $('#btnShowTips').addEventListener('click', () => { tips = normalizeTips(null); 
 const backupMsg = (t, bad = false) => { const m = $('#backupMsg'); m.textContent = t; m.style.color = bad ? '#ff8a9b' : ''; };
 // ---- Share stats (v1.14.0): the on-device run log (`overdue.runs.v1`) as one OVS1: code. Not part of the backup code. ----
 $('#btnShareStats').addEventListener('click', async () => {
+  const btn = $('#btnShareStats'), say = (t) => { btn.textContent = t; setTimeout(() => { btn.textContent = 'Share stats'; }, 2400); };   // the label is the message: a toast would cover the settings
   let runs = []; try { runs = normalizeRuns(JSON.parse(localStorage.getItem(RUN_KEY))); } catch { /* none */ }
   const out = $('#statsOut');
-  if (!runs.length) { out.hidden = true; toast('No runs logged yet: play a run first'); return; }
+  if (!runs.length) { out.hidden = true; say('No runs yet'); return; }
   const code = encodeStats(runs);
   out.value = code;
-  try { await navigator.clipboard.writeText(code); out.hidden = true; toast(`Copied stats for ${runs.length} run${runs.length === 1 ? '' : 's'}. Paste them into the chat.`, 3200); }
-  catch { out.hidden = false; out.focus(); out.select(); toast('Tap the code, select all and copy it', 3200); }
+  try { await navigator.clipboard.writeText(code); out.hidden = true; say(`Copied ${runs.length} run${runs.length === 1 ? '' : 's'} ✓`); }
+  catch { out.hidden = false; out.focus(); out.select(); say('Copy the code below'); }
 });
 let pendingRestore = null;
 function readAllKeys() { const o = {}; for (const k of BACKUP_KEYS) { try { o[k] = localStorage.getItem(k); } catch { /* blocked */ } } return o; }

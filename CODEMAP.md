@@ -38,7 +38,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/doors.js` | 68 | Story doors: after most rooms you pick the next room from 2 doors. Pure module (no DOM) so it is unit-tested. |
 | `src/enemy-art.js` | 396 | Enemy art (v1.12.0): every enemy except the boss is drawn here. Look "Blend": library characters (own face per type) |
 | `src/flowfield.js` | 102 | Dijkstra flow field: one search from the player gives every enemy a path around the shelves. |
-| `src/main.js` | 2790 | OVERDUE! — Night Shift at the Meme Library |
+| `src/main.js` | 2791 | OVERDUE! — Night Shift at the Meme Library |
 | `src/meta.js` | 99 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
 | `src/newplayer.js` | 59 | New-player help (v1.13.0): which menus a player has earned, and the scripted first room. Pure module (no DOM), unit-tested. |
 | `src/palette.js` | 52 | Projectile colours. Pure module (no DOM), unit-tested. |
@@ -109,8 +109,8 @@ NEIGH:4 · canStep:44 · computeFlowField:54 · lineOfSight:91
 - **Effects helpers** (933–961): shake:936 · addLight:939 · floatText:943 · particle:946 · burst:947 · pages:955
 - **Update** (962–1721): step:965 · playerSaves:1000 · startGuideBeat:1004 · updateGuide:1011 · endGuide:1029 · moveInput:1039 · nearestEnemy:1052 · updatePlayer:1062 · collideWorld:1151 · spawnBook:1164 · fire:1180 · abilityReady:1202 · inkBurst:1213 · nextToShelf:1227 · doShhh:1235 · updateFlow:1272 · seek:1283 · updateEnemies:1295 · bossAI:1385 · shootHazard:1438 · fan:1443 · radial:1444 · damageEnemy:1446 · killEnemy:1476 · buzz:1517 · hurtPlayer:1522 · updateBooks:1561 · orbiterPositions:1636 · updateOrbiters:1645 · updateHazards:1659 · updateRings:1675 · updatePickups:1689 · updateParticles:1706
 - **Rendering** (1722–2306): BOOK_PALETTE:1725 · buildBackground:1727 · lampPositions:1816 · lightSprite:1828 · glowCache:1834 · glowSprite:1835 · renderLights:1844 · render:1883 · drawThrownBook:1933 · drawBook:1966 · drawPlayer:1974 · rim:2017 · drawEnemy:2022 · drawBoss:2032 · drawTelegraph:2066 · drawPickup:2074 · hazardSprite:2087 · drawHazards:2095 · drawRing:2112 · drawParticles:2119 · heartPath:2132 · FONT:2142 · txt:2143 · drawHUD:2149 · drawSurviveTimer:2218 · drawGuidePrompt:2235 · cooldown:2248 · btnCache:2264 · setTouchButton:2265 · drawCrosshair:2277 · drawStick:2286 · drawAimStick:2294
-- **DOM screens, settings, leaderboard** (2307–2688): SCREENS:2310 · showScreen:2312 · pinnedObservers:2322 · fitPinnedRow:2323 · renderMenus:2348 · renderFineBadges:2361 · renderShop:2366 · defaultWing:2400 · wingStatus:2404 · renderStory:2410 · logRun:2443 · bankRun:2455 · inRun:2463 · backupMsg:2468 · readAllKeys:2480 · setSetting:2528 · toast:2542 · toggleFullscreen:2578 · loadLeaderboard:2588 · isStandalone:2611 · maybeNudge:2612 · closeNudge:2618 · showGameOver:2622
-- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2689–2790): frame:2694 · checkForUpdate:2717 · applyUpdate:2737
+- **DOM screens, settings, leaderboard** (2307–2689): SCREENS:2310 · showScreen:2312 · pinnedObservers:2322 · fitPinnedRow:2323 · renderMenus:2348 · renderFineBadges:2361 · renderShop:2366 · defaultWing:2400 · wingStatus:2404 · renderStory:2410 · logRun:2443 · bankRun:2455 · inRun:2463 · backupMsg:2468 · readAllKeys:2481 · setSetting:2529 · toast:2543 · toggleFullscreen:2579 · loadLeaderboard:2589 · isStandalone:2612 · maybeNudge:2613 · closeNudge:2619 · showGameOver:2623
+- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2690–2791): frame:2695 · checkForUpdate:2718 · applyUpdate:2738
 
 ## src/meta.js
 
