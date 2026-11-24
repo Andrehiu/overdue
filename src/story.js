@@ -19,13 +19,13 @@ export const CURVE = [1, 2, 4, 5, 7, 8, 10];
 export const curveRoom = (room) => CURVE[Math.min(CURVE.length, Math.max(1, room)) - 1];
 
 // Survive rooms: 30 s on the clock while enemies keep coming. Handmade per wing, never room 1, the elite
-// room or the boss room; wings 1-2 have at most one, wings 3+ at most two. Fines are the plain room's.
+// room or the boss room; at most one per wing (v1.13.0, plain early rooms for new players). Fines are the plain room's.
 export const SURVIVE_SECONDS = 30;
 export const SURVIVE_BUDGET_MULT = 1.2;    // total spawn budget vs the plain room: never easier
 export const SURVIVE_END = SURVIVE_SECONDS - 10;     // no spawn after this, so the last enemies still have time to be fought
 // Budget shares and the time slice of the 30 s each chunk fills (thin start, heavy finish).
 export const SURVIVE_CHUNKS = [{ share: 0.2, from: 0.8, to: 6 }, { share: 0.3, from: 6.5, to: 12 }, { share: 0.5, from: 12.5, to: SURVIVE_END }];
-const SURVIVE_ROOMS = { 1: [3], 2: [], 3: [2, 5], 4: [6], 5: [3, 6], 6: [], 7: [2, 5], 8: [3], 9: [], 10: [2, 6] };
+const SURVIVE_ROOMS = { 1: [3], 2: [], 3: [5], 4: [6], 5: [6], 6: [], 7: [5], 8: [3], 9: [], 10: [6] };
 /** 'clear' (kill everything) or 'survive' (stay alive SURVIVE_SECONDS). Deterministic per wing + room. */
 export const roomGoal = (wing, room) => ((SURVIVE_ROOMS[wing] || []).includes(room) ? 'survive' : 'clear');
 

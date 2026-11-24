@@ -25,13 +25,13 @@
       <p class="tag">Night Shift at the Meme Library</p>
       <p class="blurb">The library is closed. The books are not. Keep the peace by any (quiet) means necessary.</p>
       <div class="menu">
-        <button data-act="story" class="primary">▶ Story: the library wings</button>
-        <button data-act="play">∞ Endless shift</button>
-        <button data-act="shop" class="shop-btn">🪙 Renovations <span class="fine-count"></span></button>
+        <button data-act="story" class="primary">▶ Story: the library wings<small class="cap">7-room levels with a boss</small></button>
+        <button data-act="play" data-menu="endless" hidden>∞ Endless shift<small class="cap">survive as long as you can</small></button>
+        <button data-act="shop" data-menu="shop" class="shop-btn" hidden>🪙 Renovations <span class="fine-count"></span><small class="cap">permanent upgrades</small></button>
         <div class="menu-grid">
           <button data-act="howto">How to play</button>
-          <button data-act="leaderboard">Hall of Fame</button>
-          <button data-act="codex">Library Codex</button>
+          <button data-act="leaderboard" data-menu="leaderboard" hidden>Hall of Fame<small class="cap">high scores</small></button>
+          <button data-act="codex" data-menu="codex" hidden>Library Codex<small class="cap">your collection</small></button>
           <button data-act="settings">Settings</button>
         </div>
         <button data-act="fullscreen" class="fs-only">⛶ Fullscreen</button>
@@ -111,13 +111,14 @@
       <h2 id="upgradeTitle">Choose a perk</h2>
       <p id="perkTip" class="perk-tip" role="note" hidden></p>
       <div id="cards" class="cards"></div>
-      <button id="btnRenew" class="renew" hidden>↻ Renew</button>
+      <button id="btnRenew" class="renew" hidden>↻ Renew<small class="cap">reroll</small></button>
       <div id="buildStrip" class="build" aria-label="Your build" hidden></div>
       <p class="muted small"><span class="no-touch">Press a number key — or click a card.</span></p>
     </section>
 
     <section id="doors" class="screen" hidden>
       <h2 id="doorsTitle">Pick your next door</h2>
+      <p class="door-sub cap">choose your next room</p>
       <div id="doorCards" class="doors"></div>
       <p class="muted small"><span class="no-touch">Press 1 or 2 — or click a door.</span></p>
     </section>
@@ -137,8 +138,8 @@
       <h2>Library Codex</h2>
       <p id="codexProgress" class="muted"></p>
       <div class="cols codex-cols">
-        <div><h3>Collected Works</h3><ul id="codexCombos" class="codex-list"></ul></div>
-        <div><h3>Masterworks</h3><ul id="codexMasters" class="codex-list"></ul></div>
+        <div><h3>Collected Works<small class="cap">perk combos</small></h3><ul id="codexCombos" class="codex-list"></ul></div>
+        <div><h3>Masterworks<small class="cap">max-level bonuses</small></h3><ul id="codexMasters" class="codex-list"></ul></div>
       </div>
       <div class="menu row"><button data-act="back">Back</button></div>
     </section>
@@ -199,6 +200,7 @@
 
     <div id="touchUI" aria-hidden="true">
       <button id="btnPause" title="Pause">❚❚</button>
+      <button id="btnGuideSkip" data-act="guideskip" hidden>Skip ▸</button>
       <button id="btnShhh"><span class="lbl">SHHH</span><span class="cd"></span></button>
       <button id="btnDash"><span class="lbl">DASH</span><span class="cd"></span></button>
     </div>

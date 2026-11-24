@@ -13,6 +13,7 @@ import { BURST, shadowK, drawEnemy as drawArtEnemy, drawWorms } from './enemy-ar
 import { SoundEngine } from './audio.js';
 import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
 import { DOORS, soleDoor, doorOffer, applyDoor, doorReward, mysteryPrize } from './doors.js';
+import { GUIDE_FLAG, UNLOCK_FLAG, MENUS, unlockToast, hasPlayed, unlockedMenus, newUnlocks, shouldGuide, GUIDE_BEATS, guidePrompt } from './newplayer.js';
 import { PROGRESS_KEY, RENOVATIONS, normalizeProgress, applyRenovations, runBonuses, recordRun, level, nextCost, canBuy, buy } from './meta.js';
 
 // ======================================================================
@@ -276,7 +277,7 @@ async function keepAwake() {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && game.state === 'playing') keepAwake(); });
 
 /** mode 'endless' (classic waves) or 'story' (one wing of ROOMS_PER_WING rooms). */
-function startRun(mode = 'endless', wing = 1) {
+function startRun(mode = 'endless', wing = 1, opts = {}) {
   sound.init();
   keepAwake();
   applyLayout();
@@ -286,7 +287,7 @@ function startRun(mode = 'endless', wing = 1) {
   const bonus = runBonuses(progress);
   Object.assign(game, { wave: 0, score: 0, kills: 0, combo: 0, comboT: 0, bestCombo: 0, playTime: 0, owned: {}, renews: bonus.renews, banishes: bonus.banishes, banished: new Set(),
     freeze: 0, timeScale: 1, trauma: 0, flash: 0, boss: null, mode, wingN: mode === 'story' ? clamp(wing, 1, WINGS.length) : 1, diff: null,
-    fines: 0, cards: bonus.cards, banked: null, wingCleared: false, door: null, bonusPicks: 0, pickIsBonus: false, afterBonus: false });
+    guide: null, fines: 0, cards: bonus.cards, banked: null, wingCleared: false, door: null, bonusPicks: 0, pickIsBonus: false, afterBonus: false });
   stats = applyRenovations(baseStats(), progress);
   player = makePlayer();
   player.hp = stats.maxHp;
@@ -295,8 +296,10 @@ function startRun(mode = 'endless', wing = 1) {
   const head = bonus.startPerks ? rollUpgrades(rng, game.owned, bonus.startPerks, rollOpts({ noSpecial: true })) : [];
   freeQueue.length = 0; hideFreePerk();
   for (const u of head) { queueFreePerk(u, 'Head Start'); game.owned[u.id] = (game.owned[u.id] || 0) + 1; u.apply(stats, player); }
+  // v1.13.0: the very first story run opens with a short guided room (skippable). Debug hooks pass noGuide.
+  if (!opts.noGuide && shouldGuide(playerSaves(), mode, game.wingN)) game.guide = { beat: -1, t: 0, gap: 0.8, used: false, done: false };
   startWave(1);
-  if (touch.enabled && settings.autoaim === false) setTimeout(() => toast('Auto-aim off: drag a second finger to aim and throw'), 0);
+  if (touch.enabled && settings.autoaim === false && !game.guide) setTimeout(() => toast('Auto-aim off: drag a second finger to aim and throw'), 0);
 }
 
 function clearWorld() {
@@ -314,7 +317,8 @@ function startWave(n) {
   buildBackground();
   flowCell = -1;
   player.x = W / 2; player.y = H / 2; player.vx = player.vy = 0;
-  spawnQueue = (isStory() ? composeRoom(game.wingN, n, rng, game.diff) : composeWave(n, rng)).spawns;
+  if (n !== 1) game.guide = null;
+  spawnQueue = game.guide ? [] : (isStory() ? composeRoom(game.wingN, n, rng, game.diff) : composeWave(n, rng)).spawns;   // guided room: beats add their own spawns
   game.waveT = 0; game.noHitWave = true; game.boss = null;
   game.surviveT = isSurvive() ? SURVIVE_SECONDS : 0;
   game.ammo = pickBook(); game.ammoT = 0;
@@ -323,12 +327,14 @@ function startWave(n) {
   if (isStory()) {
     const kind = game.diff.kind;
     const door = DOORS[game.door]?.banner;
-    const sub = kind === 'boss' ? 'A rogue author approaches…' : kind === 'elite' ? '★ Elite room: they fight back' : n === 1 ? wingDef().intro : door || wingDef().name;
-    banner(`ROOM ${n}/${ROOMS_PER_WING}`, isSurvive() ? `⏱️ Survive ${SURVIVE_SECONDS} seconds${door && kind === 'normal' && n > 1 ? ' · ' + door.replace(/:.*/, '') : ''}` : sub);
+    const sub = game.guide ? 'Quick training: you can skip it' : kind === 'boss' ? 'A rogue author approaches…' : kind === 'elite' ? '★ Elite room: they fight back' : n === 1 ? wingDef().intro : door || wingDef().name;
+    banner(`ROOM ${n}/${ROOMS_PER_WING}`, isSurvive() ? `SURVIVE ${SURVIVE_SECONDS} s: stay alive, no need to clear the room${door && kind === 'normal' && n > 1 ? ' · ' + door.replace(/:.*/, '') : ''}` : sub);
+    if (isSurvive() && !tipSeen('survive-room')) { markTip('survive-room'); setTimeout(() => { if (game.state === 'playing' && isSurvive()) toast('⏱️ Survive rooms: the timer ends the room. Dodge, throw, stay alive.', 3600, true); }, 1800); }
   } else banner(`WAVE ${n}`, n % 5 === 0 ? 'A rogue author approaches…' : '');
   sound.setIntensity(1); sound.setMuffled(false);
   game.state = 'playing';
   showScreen(null);
+  document.body.classList.toggle('guiding', !!game.guide);
   flushFreePerks();
 }
 
@@ -361,7 +367,7 @@ function waveCleared() {
   const fine = isStory() ? doorReward(game.wingN, game.wave, game.door) : 1 + Math.floor(game.wave / 5) + (game.wave % 5 === 0 ? 15 : 0);
   game.fines += fine;
   const wingDone = isStory() && game.wave >= BOSS_ROOM;
-  banner(wingDone ? 'WING CLEARED!' : 'SHELF CLEARED!', `${isStory() ? '' : `+${bonus.toLocaleString()} · `}+${fine} 🪙${game.noHitWave ? ' · flawless!' : ''}`);
+  banner(wingDone ? 'WING CLEARED!' : 'SHELF CLEARED!', `${isStory() ? '' : `+${bonus.toLocaleString()} · `}+${fine} 🪙 fines${game.noHitWave ? ' · flawless!' : ''}`);
   if (stats.regenPerWave && player.hp < stats.maxHp) {
     player.hp = Math.min(stats.maxHp, player.hp + stats.regenPerWave);
     floatText(player.x, player.y - 24, '+1 ♥ Lifetime Membership', '#ff6b81', 13, 1.4);
@@ -533,7 +539,8 @@ function renderCards(choices) {
   showPerkTip(choices);
   const renew = $('#btnRenew');
   renew.hidden = !(game.renews > 0);
-  renew.textContent = `↻ Renew (${game.renews || 0})`;
+  renew.innerHTML = '';
+  renew.append(`↻ Renew (${game.renews || 0})`, cap('reroll'));
   renderBuild($('#buildStrip'), choices);
 }
 
@@ -569,6 +576,9 @@ function banishCard(wrap, u) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) done(); else setTimeout(done, 320);
 }
 
+/** A small plain-words caption under (or beside) a fun term. */
+function cap(text, inline = false) { const c = document.createElement('small'); c.className = inline ? 'cap inl' : 'cap'; c.textContent = text; return c; }
+
 function buildCard(u, i) {
   const wrap = document.createElement('div');
   wrap.className = 'card-wrap';
@@ -594,6 +604,9 @@ function buildCard(u, i) {
   const info = levelInfo(u, game.owned);
   b.querySelector('.lvl').textContent = info.pips;
   b.querySelector('.mw').textContent = info.mwText;
+  if (u.kind === 'master') b.querySelector('.lvl').append(cap('max-level bonus', true));
+  else if (u.kind === 'combo') b.querySelector('.lvl').append(cap('perk combo', true));
+  else if (/Masterwork/.test(info.mwText)) b.querySelector('.mw').append(cap('max-level bonus', true));
   if (info.mw) b.classList.add(info.mw === 'finale' ? 'finale' : 'near');
   b.addEventListener('click', () => {
     if (!cardsArmed() || game.state !== 'upgrade' || wrap.classList.contains('leaving')) return;
@@ -613,7 +626,7 @@ function buildCard(u, i) {
     const x = document.createElement('button');
     x.className = 'banish';
     x.type = 'button';
-    x.textContent = '✕ Banish';
+    x.append('✕ Banish', cap('never offer again'));
     x.title = `Never offer ${u.name} again this run`;
     x.addEventListener('click', () => banishCard(wrap, u));
     wrap.appendChild(x);
@@ -961,11 +974,50 @@ function step(dt) {
   game.ammoT += sdt;
   if (game.ammoT > 7) { game.ammoT = 0; game.ammo = pickBook(); }
 
+  if (game.state === 'playing') updateGuide(sdt);
   if (game.state === 'playing' && isSurvive()) { game.surviveT -= sdt; if (game.surviveT <= 0) endSurvive(); }
-  else if (game.state === 'playing' && !spawnQueue.length && !telegraphs.length && !enemies.length) waveCleared();
+  else if (game.state === 'playing' && !game.guide && !spawnQueue.length && !telegraphs.length && !enemies.length) waveCleared();
   if (game.state === 'waveclear') { game.clearT -= dt; if (game.clearT <= 0) (game.wingCleared ? showGameOver() : showUpgrades()); }
   if (game.state === 'dying') { game.deathT -= dt; if (game.deathT <= 0) showGameOver(); }
   actions.dash = actions.shhh = false;
+}
+
+// ---- Guided first room (v1.13.0): three beats (move, DASH, SHHH), skippable, only on a brand-new player's first story run ----
+function playerSaves() {
+  const hof = (() => { try { const v = JSON.parse(localStorage.getItem('overdue.halloffame.v1')); return Array.isArray(v) ? v.length : 0; } catch { return 0; } })();
+  return { progress, bestScore: loadJSON(BEST_KEY).score || 0, hallCount: hof, seen: tips.seen, codexCount: codex.seen.size + codex.found.size };
+}
+function startGuideBeat(i) {
+  const g = game.guide, b = GUIDE_BEATS[i];
+  g.beat = i; g.t = 0; g.used = false; g.waiting = false;
+  for (const sp of b.spawns) spawnQueue.push({ type: sp.type, t: game.waveT + sp.dt });
+  spawnQueue.sort((a, c) => a.t - c.t);
+}
+/** Runs every frame in a guided room: starts the next beat when the last was cleared, tunes the beat's enemies, ends the guide. */
+function updateGuide(dt) {
+  const g = game.guide;
+  if (!g || g.done) return;
+  g.t += dt;
+  if (g.beat >= 0) {
+    const b = GUIDE_BEATS[g.beat];
+    for (const e of enemies) if (!e.guided) { e.guided = true; e.speed *= b.speed; e.hp = e.maxHp = b.hp; }
+    if (g.beat === 1 && player.dashT > 0) g.used = true;
+    if (g.beat === 2 && player.shhhT > 0) g.used = true;
+  }
+  const empty = !spawnQueue.length && !telegraphs.length && !enemies.length;
+  if (g.beat < 0) { g.gap -= dt; if (g.gap <= 0) startGuideBeat(0); return; }
+  if (!empty) { g.waiting = false; return; }
+  if (!g.waiting) { g.waiting = true; g.gap = 1; if (g.beat < GUIDE_BEATS.length - 1) floatText(player.x, player.y - 30, 'Nice!', '#9be7dc', 18, 1); }
+  g.gap -= dt;
+  if (g.gap > 0) return;
+  if (g.beat < GUIDE_BEATS.length - 1) startGuideBeat(g.beat + 1); else endGuide(false);
+}
+function endGuide(skipped) {
+  markTip(GUIDE_FLAG);
+  game.guide = null;
+  document.body.classList.remove('guiding');
+  btnDash.classList.remove('guide-hl'); btnShhh.classList.remove('guide-hl');
+  if (skipped) startWave(1);   // Skip: straight into the regular room 1 (the guided one was never "the room")
 }
 
 // Balance bot (debug only): when set, the bot's move vector replaces the keyboard/touch stick and the player auto-aims like on touch.
@@ -1452,6 +1504,11 @@ function buzz(pattern) {
 function hurtPlayer(sx, sy) {
   const p = player;
   if (p.inv > 0 || p.dashT > 0 || game.state !== 'playing') return;
+  if (game.guide && p.hp <= 1) {   // guided room: you can't lose here, you just get a breather
+    p.inv = 1.6; shake(0.3); sound.play('hurt'); floatText(p.x, p.y - 28, 'Careful!', '#ffd54a', 16, 1);
+    const dx = p.x - sx, dy = p.y - sy, d = Math.hypot(dx, dy) || 1; p.vx += (dx / d) * 380; p.vy += (dy / d) * 380;
+    return;
+  }
   if (p.hp <= 1 && p.amnesty) {
     p.amnesty = false; p.inv = 1.6;
     floatText(p.x, p.y - 28, 'AMNESTY!', '#9be7dc', 20, 1.4);
@@ -2071,7 +2128,7 @@ function drawHUD() {
     txt(`× ${player.hp}`, 38, 28, 16, '#fff');
   }
   // Fines collected this run
-  txt(`🪙 ${game.fines}`, 14, 48, 13, '#ffd54a');
+  txt(`🪙 ${game.fines} fines`, 14, 48, 13, '#ffd54a');
   // Score + combo
   if (!isStory()) txt(Math.floor(game.score).toLocaleString(), W - 16, 32, 24, '#fff', 'right');   // story runs aren't ranked: no score
   const m = comboMult();
@@ -2084,12 +2141,13 @@ function drawHUD() {
   const left = enemies.length + telegraphs.length + spawnQueue.length;
   if (isStory()) {
     txt(`ROOM ${game.wave}/${ROOMS_PER_WING}`, W / 2, 26, 18, game.diff && game.diff.kind !== 'normal' ? '#ffd54a' : '#e8d9b0', 'center');
-    if (game.state === 'playing' && isSurvive()) { const t = Math.max(0, Math.ceil(game.surviveT)); txt(`⏱️ Survive ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, W / 2, 44, 13, '#ffd54a', 'center'); }
+    if (game.state === 'playing' && isSurvive()) drawSurviveTimer();
     else if (game.state === 'playing' && !game.boss) txt(`${short(wingDef().name, 18)} · ${left} left`, W / 2, 44, 11, 'rgba(232,217,176,0.8)', 'center');
   } else {
     txt(`WAVE ${game.wave}`, W / 2, 26, 18, '#e8d9b0', 'center');
     if (game.state === 'playing' && !game.boss) txt(`${left} disturbance${left === 1 ? '' : 's'} left`, W / 2, 44, 11, 'rgba(232,217,176,0.8)', 'center');
   }
+  drawGuidePrompt();
   // Cooldowns
   const dashReady = player.dashStock > 0;
   const kDash = dashReady ? 1 : clamp(1 - player.dashCd / stats.dashCd, 0, 1), kShhh = clamp(1 - player.shhhT / stats.shhhCd, 0, 1);
@@ -2123,6 +2181,37 @@ function drawHUD() {
     ctx.globalAlpha = 1;
   }
   if (DEBUG) txt(`fps ${fps.toFixed(0)}  e${enemies.length} p${particles.length} seed ${game.seed}`, 10, H - 60, 11, '#0f0');
+}
+
+/** Survive rooms: a big countdown at the top centre (digits + a shrinking bar); pulses red in the last 5 s. */
+function drawSurviveTimer() {
+  const left = Math.max(0, game.surviveT), t = Math.ceil(left), last = left <= 5;
+  const pulse = last ? 1 + 0.12 * Math.abs(Math.sin(left * Math.PI * 2)) : 1;
+  const cx = W / 2, cy = 74, col = last ? '#ff6b6b' : '#ffd54a';
+  ctx.save();
+  ctx.globalAlpha = 0.55; ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.roundRect(cx - 74, 36, 148, 62, 14); ctx.fill();
+  ctx.globalAlpha = 1;
+  txt('SURVIVE', cx, 50, 11, 'rgba(232,217,176,0.85)', 'center');
+  ctx.translate(cx, cy); ctx.scale(pulse, pulse);
+  txt(`${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, 0, 12, 36, col, 'center');
+  ctx.restore();
+  ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(cx - 62, 90, 124, 4);
+  ctx.fillStyle = col; ctx.fillRect(cx - 62, 90, 124 * clamp(left / SURVIVE_SECONDS, 0, 1), 4);
+}
+
+/** Guided room: the one-line prompt near the top, and a glow on the button it points at. */
+function drawGuidePrompt() {
+  const g = game.guide;
+  if (!g || g.beat < 0) { if (btnDash.classList.contains('guide-hl') || btnShhh.classList.contains('guide-hl')) { btnDash.classList.remove('guide-hl'); btnShhh.classList.remove('guide-hl'); } return; }
+  const b = GUIDE_BEATS[g.beat], aimOff = touch.enabled && settings.autoaim === false;
+  const text = guidePrompt(g.beat, { aimOff, used: g.used });
+  ctx.font = FONT(18);
+  const w = Math.min(W - 40, ctx.measureText(text).width + 36), y = 118;
+  ctx.globalAlpha = 0.65; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.roundRect((W - w) / 2, y - 22, w, 34, 17); ctx.fill(); ctx.globalAlpha = 1;
+  txt(text, W / 2, y + 1, 18, '#fff3c4', 'center');
+  btnDash.classList.toggle('guide-hl', b.hl === 'dash' && !g.used);
+  btnShhh.classList.toggle('guide-hl', b.hl === 'shhh' && !g.used);
 }
 
 function cooldown(x, y, label, k, color, secs = 0) {
@@ -2194,7 +2283,7 @@ function showScreen(id) {
   currentScreen = id;
   closeBuildPop();
   document.body.classList.toggle('in-game', id === null);
-  if (id === 'title') renderFineBadges();
+  if (id === 'title') { renderFineBadges(); renderMenus(); }
   if (id) fitPinnedRow(document.getElementById(id));
 }
 
@@ -2223,10 +2312,24 @@ function fitPinnedRow(scr) {
   pinnedObservers.set(scr, ro);
 }
 
+// ---- Menus appear as they're earned (v1.13.0): derived from saves, flags only in the tips store ----
+let menusAnnounce = false;   // false at boot: a returning player is never greeted with "unlocked" toasts for old progress
+function renderMenus() {
+  const unlocked = unlockedMenus(playerSaves());
+  for (const m of MENUS) { const el = document.querySelector(`#title [data-menu="${m.id}"]`); if (el) el.hidden = !unlocked[m.id]; }
+  const fresh = newUnlocks(unlocked, tips.seen);
+  for (const id of fresh) markTip(UNLOCK_FLAG[id]);
+  if (menusAnnounce) fresh.forEach((id, i) => setTimeout(() => { if (game.state === 'title') toast(unlockToast(id), 3000); }, 350 + i * 3200));
+  menusAnnounce = true;
+  updateFirstHint();
+  const grid = document.querySelector('#title .menu-grid');
+  if (grid) grid.classList.toggle('three', [...grid.children].filter((b) => !b.hidden).length % 2 === 1);
+}
+
 // ---- Late fees UI: fines balance, Renovations shop, story wing select ----
 function renderFineBadges() {
   for (const el of document.querySelectorAll('.fine-balance')) el.textContent = `🪙 ${progress.fines.toLocaleString()} fines`;
-  for (const el of document.querySelectorAll('.fine-count')) el.textContent = progress.fines ? `· ${progress.fines.toLocaleString()}` : '';
+  for (const el of document.querySelectorAll('.fine-count')) el.textContent = progress.fines ? `· ${progress.fines.toLocaleString()} fines` : '';
 }
 
 function renderShop() {
@@ -2352,10 +2455,10 @@ document.querySelectorAll('#settings input[data-k]').forEach((box) => {
 });
 
 let toastTimer = 0;
-function toast(msg, ms = 1600) {
+function toast(msg, ms = 1600, low = false) {
   const el = $('#toast');
   if (game.state === 'gameover') return; // v1.12.1: toasts never sit on the end-screen headings
-  el.textContent = msg; el.hidden = false;
+  el.textContent = msg; el.hidden = false; el.classList.toggle('low', low);
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (el.hidden = true), ms);
 }
@@ -2367,6 +2470,7 @@ document.addEventListener('click', (e) => {
   const act = b.dataset.act;
   if (act === 'play') startRun('endless');
   else if (act === 'again') startRun(game.mode, game.wingN);
+  else if (act === 'guideskip') { if (game.guide && game.state === 'playing') endGuide(true); }
   else if (act === 'story') { selectedWing = defaultWing(); renderStory(); showScreen('story'); }
   else if (act === 'enterwing') startRun('story', selectedWing);
   else if (act === 'nextwing') startRun('story', Math.min(WINGS.length, game.wingN + 1));
@@ -2425,7 +2529,7 @@ function showGameOver() {
   game.state = 'gameover';
   sound.setMuffled(true);
   if (won) sound.play('wave');
-  markTip('firstrun'); updateFirstHint(); freeQueue.length = 0; hideFreePerk();
+  markTip('firstrun'); if (!story) markTip('endless-run'); updateFirstHint(); freeQueue.length = 0; hideFreePerk();
   const score = Math.floor(game.score);
   // Personal best + Hall of Fame stay endless-only, so the numbers keep meaning the same thing.
   const best = loadJSON(BEST_KEY);
@@ -2542,7 +2646,7 @@ requestAnimationFrame(frame);
 if (DEBUG) {
   window.__overdue = {
     game, grid: () => `${COLS}x${ROWS}`, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, enemies, get content() { return content; },
-    makeEnemy, freeze: (on) => { debugFreeze = !!on; }, startRun, startWave, setSurviveT: (t) => { game.surviveT = t; }, killAll: () => { for (const e of [...enemies]) killEnemy(e); spawnQueue.length = 0; telegraphs.length = 0; },
+    makeEnemy, freeze: (on) => { debugFreeze = !!on; }, startRun: (m, w) => startRun(m, w, { noGuide: true }), startWave, get guide() { return game.guide; }, tipsSeen: () => tips.seen.slice(), setSurviveT: (t) => { game.surviveT = t; }, killAll: () => { for (const e of [...enemies]) killEnemy(e); spawnQueue.length = 0; telegraphs.length = 0; },
     get progress() { return progress; }, setFines: (n) => { progress = { ...progress, fines: n }; saveProgress(); renderFineBadges(); },
     unlockAll: () => { progress = { ...progress, unlocked: WINGS.length }; saveProgress(); },
 

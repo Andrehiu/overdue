@@ -129,6 +129,16 @@ const PINNED_CHECK = (id) => {
   return bad;
 };
 
+// v1.13.0: menus appear as they're earned, so flows that tap Endless / Renovations / Hall of Fame / Codex start as a RETURNING player.
+// (A fresh save shows only Story / How to play / Settings: the new-player flow checks that separately.)
+const RETURNING_SAVE = () => {
+  localStorage.setItem('overdue.progress.v1', JSON.stringify({ v: 1, fines: 0, lifetime: 50, unlocked: 1, best: { 1: 2 }, cleared: [], reno: {} }));
+  localStorage.setItem('overdue.codex.v1', JSON.stringify({ seen: ['dewey'], found: [] }));
+  localStorage.setItem('overdue.halloffame.v1', JSON.stringify([{ name: 'QA', score: 1000, wave: 3, kills: 5, at: 1 }]));
+};
+const RETURNING_SAVE_JS = `(${RETURNING_SAVE})()`;
+const TITLE_MENUS_JS = () => [...document.querySelectorAll('#title .menu button[data-act]')].filter((b) => b.offsetParent && !b.hidden).map((b) => b.dataset.act);
+
 // ---------------------------------------------------------------- 3. screens on every device
 // `full` = whole gameplay flow; otherwise the fit-only pass (skips rules/logic checks that don't depend on screen size).
 async function screensFlow(name, opts, full) {
@@ -159,6 +169,20 @@ async function screensFlow(name, opts, full) {
     const ver = await page.textContent('#title .version-label');
     record(area, 'version label shown', ver.includes(BUILD.version) && ver.includes(BUILD.commit), ver);
 
+    // v1.13.0: a brand-new player sees only Story / How to play / Settings (plus the plain caption under Story)
+    const freshMenus = await page.evaluate(`(${TITLE_MENUS_JS})()`);
+    record(area, 'fresh save: title shows only Story, How to play, Settings', ['story', 'howto', 'settings'].every((a) => freshMenus.includes(a)) && freshMenus.filter((a) => !['story', 'howto', 'settings', 'fullscreen'].includes(a)).length === 0, freshMenus.join(','));
+    record(area, 'Story button has its plain caption', (await page.textContent('[data-act=story] .cap')) === '7-room levels with a boss');
+    // A returning save shows everything at once (every menu, captions, fines count): the title must still fit
+    await page.evaluate(RETURNING_SAVE_JS); await page.reload(); await page.waitForTimeout(700);
+    await page.evaluate(() => __overdue.setFines(1234));
+    await shot(page, `${name}-1b-title-returning`);
+    const retMenus = await page.evaluate(`(${TITLE_MENUS_JS})()`);
+    record(area, 'returning save: every menu is shown at once', ['story', 'play', 'shop', 'howto', 'leaderboard', 'codex', 'settings'].every((a) => retMenus.includes(a)), retMenus.join(','));
+    const fit2 = await page.evaluate(`(${TITLE_FIT_JS})()`);
+    record(area, 'returning title (all menus + captions) fits without scrolling', fit2.length === 0, fit2.join(' | '));
+    const caps = await page.$$eval('#title .cap', (cs) => cs.filter((c) => c.offsetParent).map((c) => `${c.parentElement.dataset.act}:${c.textContent}:${getComputedStyle(c).fontSize}`));
+    record(area, 'title captions: Story, Endless, Renovations, Hall of Fame, Codex', caps.length === 5, caps.join(' | '));
     await tap('[data-act=play]');
     await page.evaluate(() => __overdue.god()); await page.waitForTimeout(2500);
     await shot(page, `${name}-2-play`);
@@ -172,6 +196,7 @@ async function screensFlow(name, opts, full) {
     record(area, 'perk cards render', cards.length >= 1 && cards.every((c) => c.gain.trim().length > 0), `${cards.length} cards`);
     record(area, 'no technical units on cards', !cards.some((c) => /\d\s?(px|rad)\b|rad\/s/.test(c.text)));
     record(area, 'Masterwork offered at 3/3', cards[0]?.kind.includes('master'));
+    record(area, 'perk captions: Masterwork "max-level bonus", Renew "reroll"', /max-level bonus/.test(cards[0]?.text || '') && /reroll/.test(await page.textContent('#btnRenew')), `${(cards[0]?.text || '').slice(-40)} | ${(await page.textContent('#btnRenew')).trim()}`);
     // v1.11.0: learn perks as you go. Fresh tips store -> first perk screen shows the stacking tip.
     {
       const tipInfo = await page.evaluate(() => {
@@ -396,7 +421,7 @@ async function screensFlow(name, opts, full) {
     await page.evaluate(() => { const O = __overdue; O.startRun('story', 1); O.startWave(3); O.god(); }); await page.waitForTimeout(1500);
     const sv = await page.evaluate(() => { const O = __overdue; return { goal: O.game.diff.goal, t: O.game.surviveT, sub: O.game.bannerSub, state: O.game.state }; });
     await shot(page, `${name}-survive-room`);
-    record(area, 'Survive room starts with a 30 s timer and a banner naming the goal', sv.goal === 'survive' && sv.t > 26 && sv.t <= 30 && /Survive 30 seconds/.test(sv.sub) && sv.state === 'playing', JSON.stringify(sv));
+    record(area, 'Survive room starts with a 30 s timer and a banner naming the goal', sv.goal === 'survive' && sv.t > 26 && sv.t <= 30 && /SURVIVE 30 s: stay alive, no need to clear the room/.test(sv.sub) && sv.state === 'playing', JSON.stringify(sv));
     const svSpawn = await page.evaluate(async () => {
       const O = __overdue; let seenLate = 0;
       for (let i = 0; i < 60; i++) { await new Promise((r) => setTimeout(r, 100)); if (O.game.waveT > 5) seenLate = Math.max(seenLate, O.counts().enemies); }
@@ -521,7 +546,7 @@ async function menusFlow(name, opts) {
   const page = await ctx.newPage();
   const area = `menus/${name}`;
   try {
-    await page.goto(URL0); await page.waitForTimeout(600);
+    await page.goto(URL0); await page.evaluate(RETURNING_SAVE_JS); await page.reload(); await page.waitForTimeout(600);
     const check = (id) => page.evaluate((id) => {
       const s = document.getElementById(id);
       const sel = id === 'title' ? '.menu button' : '.menu.row:last-child button';
@@ -610,7 +635,7 @@ async function rotateOverlayFlow() {
     // Start a run in landscape, then rotate to portrait
     await page.setViewportSize({ width: 844, height: 390 }); await page.waitForTimeout(500);
     record(area, 'overlay hidden in landscape', await page.evaluate(() => document.getElementById('rotate').hidden));
-    await page.tap('[data-act=play]'); await page.evaluate(() => __overdue.god()); await page.waitForTimeout(1500);
+    await page.evaluate(() => __overdue.startRun('endless')); await page.evaluate(() => __overdue.god()); await page.waitForTimeout(1500);
     record(area, 'run started in landscape', await page.evaluate(() => __overdue.game.state === 'playing'));
     await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(500);
     const portrait = await page.evaluate(() => ({ shown: !document.getElementById('rotate').hidden, state: __overdue.game.state }));
@@ -693,6 +718,97 @@ async function shapesFlow() {
 }
 
 
+// ---------------------------------------------------------------- v1.13.0: new-player flows (guided first room, Survive timer)
+async function newPlayerFlow(name, opts) {
+  const record = recorder();
+  const ctx = await browser.newContext(opts);
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  const tap = (sel) => (opts.hasTouch ? page.tap(sel) : page.click(sel));
+  const area = `newplayer/${name}`;
+  const rect = (sel) => page.evaluate((sel) => { const r = document.querySelector(sel).getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; }, sel);
+  const hit = (a, b) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
+  // Wait until the beat's enemies are out (up to 6 s), then clear the beat and wait for the next one to start (or the guide to end).
+  const beatReady = (n) => page.waitForFunction((n) => __overdue.guide?.beat >= 0 && __overdue.enemies.length >= n, n, { timeout: 8000 }).catch(() => {});
+  const clearBeat = async () => {
+    const from = await page.evaluate(() => __overdue.guide?.beat ?? -2);
+    await page.evaluate(() => __overdue.killAll());
+    await page.waitForFunction((from) => !__overdue.guide || __overdue.guide.beat > from, from, { timeout: 6000 }).catch(() => {});
+  };
+  try {
+    await page.goto(URL0); await page.waitForTimeout(600);
+    // ---- fresh save: Story -> wing 1 -> the guided room appears
+    await tap('#title [data-act=story]'); await page.waitForTimeout(300);
+    await tap('#btnEnterWing'); await page.waitForTimeout(400);
+    await page.evaluate(() => __overdue.god());
+    record(area, 'guided room starts on a fresh save', await page.evaluate(() => !!__overdue.guide && __overdue.game.state === 'playing' && __overdue.game.wave === 1));
+    record(area, 'Skip button is on screen and clear of the pause button', await (async () => {
+      const sk = await rect('#btnGuideSkip'), pa = await rect('#btnPause');
+      return sk.w > 0 && sk.l >= 0 && sk.r <= (await page.evaluate(() => innerWidth)) && !hit(sk, pa);
+    })());
+    await beatReady(1);
+    const b1 = await page.evaluate(() => ({ beat: __overdue.guide.beat, n: __overdue.enemies.length, slow: __overdue.enemies.every((e) => e.speed < 70) }));
+    await shot(page, `${name}-guide-1-move`);
+    record(area, 'beat 1: a few slow bunnies, move prompt', b1.beat === 0 && b1.n >= 1 && b1.slow, JSON.stringify(b1));
+    await clearBeat(); await beatReady(1); await page.waitForTimeout(400);
+    const b2 = await page.evaluate(() => ({ beat: __overdue.guide?.beat, hl: document.querySelector('#btnDash').classList.contains('guide-hl'), n: __overdue.enemies.length }));
+    await shot(page, `${name}-guide-2-dash`);
+    record(area, 'beat 2: one charger, DASH button highlighted', b2.beat === 1 && b2.hl, JSON.stringify(b2));
+    await clearBeat(); await beatReady(3); await page.waitForTimeout(400);
+    const b3 = await page.evaluate(() => ({ beat: __overdue.guide?.beat, hl: document.querySelector('#btnShhh').classList.contains('guide-hl'), dashHl: document.querySelector('#btnDash').classList.contains('guide-hl'), n: __overdue.enemies.length }));
+    await shot(page, `${name}-guide-3-shhh`);
+    record(area, 'beat 3: a small crowd, SHHH highlighted (not DASH)', b3.beat === 2 && b3.hl && !b3.dashHl && b3.n >= 3, JSON.stringify(b3));
+    // cannot die: the player has 1 heart and takes hits
+    const safe = await page.evaluate(async () => { const O = __overdue; O.player.hp = 1; O.player.inv = 0; O.die(); await new Promise((r) => setTimeout(r, 400)); return { hp: O.player.hp, state: O.game.state }; });
+    record(area, 'cannot die in the guided room', safe.hp === 1 && safe.state === 'playing', JSON.stringify(safe));
+    await page.evaluate(() => __overdue.killAll());
+    await page.waitForFunction(() => !__overdue.guide && __overdue.game.state === 'upgrade', null, { timeout: 8000 }).catch(() => {}); await page.waitForTimeout(300);
+    const done = await page.evaluate(() => ({ guide: !!__overdue.guide, state: __overdue.game.state, seen: __overdue.tipsSeen(), fines: __overdue.game.fines }));
+    await shot(page, `${name}-guide-4-perks`);
+    record(area, 'cleared: normal perk pick follows, flag saved', !done.guide && done.state === 'upgrade' && done.seen.includes('guided-room'), JSON.stringify(done));
+    const guidedFines = done.fines;
+    await page.evaluate(() => __overdue.pickCard(0)); await page.waitForTimeout(500);
+    await page.evaluate(() => { if (__overdue.game.state === 'doors') __overdue.pickDoor(__overdue.doors[0]); }); await page.waitForTimeout(600);
+    record(area, 'the run continues to room 2', await page.evaluate(() => __overdue.game.wave === 2 && __overdue.game.state === 'playing' && !__overdue.guide), await page.evaluate(() => `wave ${__overdue.game.wave} ${__overdue.game.state}`));
+    // ---- never again: a second story run on the same save has no guide
+    await page.evaluate(() => { document.querySelector('[data-act=quit]') && 0; });
+    await page.reload(); await page.waitForTimeout(600);
+    await tap('#title [data-act=story]'); await page.waitForTimeout(300);
+    await tap('#btnEnterWing'); await page.waitForTimeout(400);
+    record(area, 'the guided room never appears again', await page.evaluate(() => !__overdue.guide && __overdue.game.wave === 1 && __overdue.game.state === 'playing'));
+    // ---- Skip: a brand-new save, tap Skip -> straight into the regular room 1
+    await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForTimeout(600);
+    await tap('#title [data-act=story]'); await page.waitForTimeout(300);
+    await tap('#btnEnterWing'); await page.waitForTimeout(500);
+    await page.evaluate(() => __overdue.god());
+    await tap('#btnGuideSkip'); await page.waitForTimeout(500);
+    const sk = await page.evaluate(() => ({ guide: !!__overdue.guide, wave: __overdue.game.wave, state: __overdue.game.state, seen: __overdue.tipsSeen().includes('guided-room'), skipShown: getComputedStyle(document.querySelector('#btnGuideSkip')).display }));
+    record(area, 'Skip: regular room 1, flag saved, button gone', !sk.guide && sk.wave === 1 && sk.state === 'playing' && sk.seen && sk.skipShown === 'none', JSON.stringify(sk));
+    await page.evaluate(async () => { const O = __overdue; for (let i = 0; i < 40 && O.game.state === 'playing'; i++) { O.killAll(); await new Promise((r) => setTimeout(r, 80)); } });
+    const normalFines = await page.evaluate(() => __overdue.game.fines);
+    record(area, 'fines for the guided room = the regular room 1 fines', guidedFines > 0 && guidedFines === normalFines, `${guidedFines} vs ${normalFines}`);
+    // ---- auto-aim off: the first prompt mentions the second finger (text lives in src/newplayer.js; unit-tested), the game just runs
+    // ---- Survive room: big timer at the top centre, clear of the room label and the pause button
+    await page.evaluate(() => { const O = __overdue; O.startRun('story', 1); O.god(); O.startWave(3); });
+    await page.waitForTimeout(1200);
+    await page.evaluate(() => __overdue.setSurviveT(4));
+    await page.waitForTimeout(600);
+    await shot(page, `${name}-survive-timer`);
+    const geo = await page.evaluate(() => {
+      const O = __overdue, c = document.getElementById('game').getBoundingClientRect(), k = c.width / O.W;
+      return { goal: O.game.diff.goal, canvas: { l: c.left, t: c.top, r: c.right, b: c.bottom }, box: { l: c.left + (O.W / 2 - 74) * k, r: c.left + (O.W / 2 + 74) * k, t: c.top + 36 * k, b: c.top + 98 * k }, label: { b: c.top + 32 * k }, k, vw: innerWidth };
+    });
+    const pause = await rect('#btnPause');
+    const inside = geo.box.l >= geo.canvas.l && geo.box.r <= geo.canvas.r && geo.box.t >= geo.canvas.t && geo.box.b <= geo.canvas.b;
+    record(area, 'Survive timer is big, on screen and clear of the room label and pause button', geo.goal === 'survive' && inside && geo.box.t > geo.label.b && !hit({ l: geo.box.l, r: geo.box.r, t: geo.box.t, b: geo.box.b }, pause) && 36 * geo.k >= 8, JSON.stringify({ ...geo.box, pause }));
+    record(area, 'no script errors', errors.length === 0, errors.join('; ').slice(0, 200));
+  } catch (e) { record(area, 'new-player flow ran to the end', false, e.message.split('\n')[0]); }
+  await ctx.close();
+  return record.list;
+}
+
 // ---------------------------------------------------------------- run everything except perf, N contexts at a time
 // Slowest flows first so the pool stays busy. Perf is NOT in the pool: it runs alone afterwards so fps stays comparable.
 {
@@ -703,6 +819,7 @@ async function shapesFlow() {
   if (want('menus')) for (const [name, opts] of TARGETS) tasks.push(() => menusFlow(name, opts));
   if (want('screens')) { tasks.push(() => rotateOverlayFlow()); for (const r of ROTATIONS) tasks.push(() => rotationFlow(...r)); }
   if (want('shapes')) tasks.push(() => shapesFlow());
+  if (want('newplayer')) for (const [name, opts] of TARGETS) tasks.push(() => newPlayerFlow(name, opts));
   const t0 = Date.now();
   // Report order stays stable: screens (full, then fit), menus, rotation, shapes, regardless of finish order.
   for (const list of await pool(tasks, JOBS)) results.push(...list);
@@ -714,7 +831,7 @@ async function shapesFlow() {
 if (want('perf')) {
   const ctx = await browser.newContext(devices['iPhone 13 landscape']);
   const page = await ctx.newPage();
-  await page.goto(URL0); await page.waitForTimeout(500);
+  await page.goto(URL0); await page.evaluate(RETURNING_SAVE_JS); await page.reload(); await page.waitForTimeout(500);
   await page.tap('[data-act=play]'); await page.waitForTimeout(300);
   await page.evaluate(() => {
     const O = __overdue;

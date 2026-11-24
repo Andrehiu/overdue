@@ -273,9 +273,9 @@ export function levelInfo(u, owned = {}) {
 }
 
 export const TIPS = {
-  'perk-stack': 'Perks stack to ●●●. Max one to unlock its Masterwork.',
+  'perk-stack': 'Perks stack to ●●●. Max one to unlock its Masterwork (a max-level bonus).',
   'special-unlocked': 'Unlocked cards always take the first slot until you pick them.',
-  'combo-pair': 'Two perks that pair unlock a Collected Work.',
+  'combo-pair': 'Two perks that pair unlock a Collected Work (a perk combo).',
   'masterwork-near': "One more level and this perk's Masterwork joins the deck.",
   codex: '📚 Added to your Library Codex (title screen)',
 };
