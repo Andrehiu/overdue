@@ -5,8 +5,9 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 
 ## Current state (planning 3, 2026-11-24)
 - **Live:** v1.13.1 (04cdae9). iPhone checks (Home Screen, airplane mode, backup copy) confirmed by owner.
-- **Running:** 1.14.0 part A coder "Overdue · v1.14.0 rooms + analytics + bot" (`claude/rooms-analytics-1140`), also fixing the
-  `basics` CI flake and adding a docs-only `paths-ignore` to CI. Part B (`docs/handoffs/1.14.0b-balance.md`) starts after review.
+- **1.14.0 part A:** reviewed by planner (f96a1d3: 100/100 tests, QA 776 checks green, perf boss 0.92x/61 fps, wing 10 0.97x/61 fps,
+  basics flake fixed 5/5). Branch `claude/rooms-analytics-1140`.
+- **Running:** 1.14.0 part B coder "Overdue · v1.14.0 balance" (`claude/balance-1140`, from part A), incl. CI docs `paths-ignore`.
 - **Planner branch:** `claude/brave-galileo-jyg38o` (= main + docs).
 - **Owner habits:** short replies (tables, a pick, the one word needed); ships only on "ship"; playtest mode = numbered log only;
   3-option pages only for visual choices; 08:00 SGT morning update when going to sleep; max 2 coders (usage).
