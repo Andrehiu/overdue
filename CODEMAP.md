@@ -38,12 +38,12 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/doors.js` | 88 | Story doors: after most rooms you pick the next room from 2 doors. Pure module (no DOM) so it is unit-tested. |
 | `src/enemy-art.js` | 396 | Enemy art (v1.12.0): every enemy except the boss is drawn here. Look "Blend": library characters (own face per type) |
 | `src/flowfield.js` | 102 | Dijkstra flow field: one search from the player gives every enemy a path around the shelves. |
-| `src/main.js` | 3031 | OVERDUE! — Night Shift at the Meme Library |
+| `src/main.js` | 3037 | OVERDUE! — Night Shift at the Meme Library |
 | `src/meta.js` | 99 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
 | `src/newplayer.js` | 59 | New-player help (v1.13.0): which menus a player has earned, and the scripted first room. Pure module (no DOM), unit-tested. |
 | `src/palette.js` | 58 | Projectile colours. Pure module (no DOM), unit-tested. |
 | `src/runlog.js` | 103 | Run log (v1.14.0): one compact record per finished run, kept on this phone, plus the "Share stats" code. |
-| `src/status.js` | 138 | Status effects (v1.15.0 part A): ink, chill, static + Pop-up Book maths. Pure module (no DOM), unit-tested. |
+| `src/status.js` | 139 | Status effects (v1.15.0 part A): ink, chill, static + Pop-up Book maths. Pure module (no DOM), unit-tested. |
 | `src/story.js` | 162 | Story mode: ten handmade library wings (7 rooms each), unlocked in order. Pure module (no DOM) so it is unit-tested. |
 | `src/upgrades.js` | 329 | Perks offered between waves. Pure data + a seeded roller (no DOM), so it is unit-tested. |
 | `src/util.js` | 132 | Small, dependency-free helpers shared by the game and its unit tests. |
@@ -57,7 +57,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/newplayer.test.js` | 87 | New-player help (v1.13.0): menu unlock rules from saves, the guided-room flag, the Survive room table. Pure rules, no DOM. |
 | `test/rooms.test.js` | 68 | Rooms +20% (v1.14.0): story grids are bigger, endless keeps the legacy grid, every shape stays valid at the new sizes. |
 | `test/runlog.test.js` | 70 | Run log (v1.14.0): record build, ring buffer, Share stats code. Pure rules, no DOM. |
-| `test/status.test.js` | 131 | Status effects (v1.15.0 part A): freeze rule, boss immunity, chain rule, proc scaling, ink/chill/zap maths. Pure, no DOM. |
+| `test/status.test.js` | 137 | Status effects (v1.15.0 part A): freeze rule, boss immunity, chain rule, proc scaling, ink/chill/zap maths. Pure, no DOM. |
 | `test/story-meta.test.js` | 270 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
 | `scripts/qa/run.mjs` | 1227 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 50 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
@@ -110,10 +110,10 @@ NEIGH:4 · canStep:44 · computeFlowField:54 · lineOfSight:91
 - **Spawning** (906–989): DEF:909 · hpScaleNow:920 · makeEnemy:921 · spawnPoint:940 · updateSpawning:950 · materialise:968
 - **Effects helpers** (990–1018): shake:993 · addLight:996 · floatText:1000 · particle:1003 · burst:1004 · pages:1012
 - **Update** (1019–1284): step:1022 · playerSaves:1059 · startGuideBeat:1063 · updateGuide:1070 · endGuide:1088 · moveInput:1098 · nearestEnemy:1111 · updatePlayer:1121 · collideWorld:1210 · spawnBook:1223 · fire:1239 · abilityReady:1261 · inkBurst:1272
-- **Status effects (v1.15.0 part A: ink, chill, static, pops). The maths lives in src/status.js.** (1285–1959): zaps:1291 · hitsPerSec:1293 · zapArc:1295 · onBookHit:1307 · doZap:1319 · popAt:1334 · inkSplash:1356 · tickStatus:1369 · updateStatusFx:1381 · statusSprites:1386 · statusSprite:1388 · drawStatus:1407 · drawZaps:1420 · nextToShelf:1434 · doShhh:1442 · updateFlow:1479 · seek:1490 · updateEnemies:1502 · bossAI:1595 · shootHazard:1648 · fan:1653 · radial:1654 · damageEnemy:1656 · killEnemy:1688 · buzz:1733 · hurtPlayer:1738 · updateBooks:1777 · orbitRest:1858 · orbiterPositions:1859 · updateOrbiters:1868 · updateHazards:1887 · updateRings:1913 · updatePickups:1927 · updateParticles:1944
-- **Rendering** (1960–2546): BOOK_PALETTE:1963 · buildBackground:1965 · lampPositions:2054 · lightSprite:2066 · glowCache:2072 · glowSprite:2073 · renderLights:2082 · render:2121 · drawThrownBook:2173 · drawBook:2206 · drawPlayer:2214 · rim:2257 · drawEnemy:2262 · drawBoss:2272 · drawTelegraph:2306 · drawPickup:2314 · hazardSprite:2327 · drawHazards:2335 · drawRing:2352 · drawParticles:2359 · heartPath:2372 · FONT:2382 · txt:2383 · drawHUD:2389 · drawSurviveTimer:2458 · drawGuidePrompt:2475 · cooldown:2488 · btnCache:2504 · setTouchButton:2505 · drawCrosshair:2517 · drawStick:2526 · drawAimStick:2534
-- **DOM screens, settings, leaderboard** (2547–2929): SCREENS:2550 · showScreen:2552 · pinnedObservers:2562 · fitPinnedRow:2563 · renderMenus:2588 · renderFineBadges:2601 · renderShop:2606 · defaultWing:2640 · wingStatus:2644 · renderStory:2650 · logRun:2683 · bankRun:2695 · inRun:2703 · backupMsg:2708 · readAllKeys:2721 · setSetting:2769 · toast:2783 · toggleFullscreen:2819 · loadLeaderboard:2829 · isStandalone:2852 · maybeNudge:2853 · closeNudge:2859 · showGameOver:2863
-- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2930–3031): frame:2935 · checkForUpdate:2958 · applyUpdate:2978
+- **Status effects (v1.15.0 part A: ink, chill, static, pops). The maths lives in src/status.js.** (1285–1965): zaps:1291 · hitsPerSec:1294 · zapArc:1296 · onBookHit:1308 · doZap:1320 · popAt:1335 · inkSplash:1362 · tickStatus:1375 · updateStatusFx:1387 · statusSprites:1392 · statusSprite:1394 · drawStatus:1413 · drawZaps:1426 · nextToShelf:1440 · doShhh:1448 · updateFlow:1485 · seek:1496 · updateEnemies:1508 · bossAI:1601 · shootHazard:1654 · fan:1659 · radial:1660 · damageEnemy:1662 · killEnemy:1694 · buzz:1739 · hurtPlayer:1744 · updateBooks:1783 · orbitRest:1864 · orbiterPositions:1865 · updateOrbiters:1874 · updateHazards:1893 · updateRings:1919 · updatePickups:1933 · updateParticles:1950
+- **Rendering** (1966–2552): BOOK_PALETTE:1969 · buildBackground:1971 · lampPositions:2060 · lightSprite:2072 · glowCache:2078 · glowSprite:2079 · renderLights:2088 · render:2127 · drawThrownBook:2179 · drawBook:2212 · drawPlayer:2220 · rim:2263 · drawEnemy:2268 · drawBoss:2278 · drawTelegraph:2312 · drawPickup:2320 · hazardSprite:2333 · drawHazards:2341 · drawRing:2358 · drawParticles:2365 · heartPath:2378 · FONT:2388 · txt:2389 · drawHUD:2395 · drawSurviveTimer:2464 · drawGuidePrompt:2481 · cooldown:2494 · btnCache:2510 · setTouchButton:2511 · drawCrosshair:2523 · drawStick:2532 · drawAimStick:2540
+- **DOM screens, settings, leaderboard** (2553–2935): SCREENS:2556 · showScreen:2558 · pinnedObservers:2568 · fitPinnedRow:2569 · renderMenus:2594 · renderFineBadges:2607 · renderShop:2612 · defaultWing:2646 · wingStatus:2650 · renderStory:2656 · logRun:2689 · bankRun:2701 · inRun:2709 · backupMsg:2714 · readAllKeys:2727 · setSetting:2775 · toast:2789 · toggleFullscreen:2825 · loadLeaderboard:2835 · isStandalone:2858 · maybeNudge:2859 · closeNudge:2865 · showGameOver:2869
+- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2936–3037): frame:2941 · checkForUpdate:2964 · applyUpdate:2984
 
 ## src/meta.js
 
@@ -133,7 +133,7 @@ DEALT_SOURCES:11 · newCounters:16 · addDealt:29 · addTaken:31 · bookEnded:33
 
 ## src/status.js
 
-STATUS_SOURCES:24 · isStatusSource:25 · PROC_SOURCES:27 · canProc:28 · clamp:30 · procChance:33 · canFreeze:38 · freeze:40 · chillFactor:49 · applyChill:52 · applyInk:61 · tickInk:69 · shouldShatter:78 · statusDamageMult:81 · makeBurstBudget:87 · deepFreezeHit:93 · zapChain:103 · POP_RADIUS:122 · makeMetrics:125 · tickMetrics:129 · percentile:137
+STATUS_SOURCES:25 · isStatusSource:26 · PROC_SOURCES:28 · canProc:29 · clamp:31 · procChance:34 · canFreeze:39 · freeze:41 · chillFactor:50 · applyChill:53 · applyInk:62 · tickInk:70 · shouldShatter:79 · statusDamageMult:82 · makeBurstBudget:88 · deepFreezeHit:94 · zapChain:104 · POP_RADIUS:123 · makeMetrics:126 · tickMetrics:130 · percentile:138
 
 ## src/story.js
 
@@ -277,6 +277,7 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 - 102: status perks: levels, Masterworks and combos are wired and plain-spoken
 - 122: status colours are in the player palette and none is an enemy hue
 - 126: metrics: per-second histograms and percentile
+- 132: a pop chain is capped at 6 hits and the metric tracks it
 
 ## test/story-meta.test.js
 

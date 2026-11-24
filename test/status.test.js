@@ -128,3 +128,9 @@ test('metrics: per-second histograms and percentile', () => {
   assert.deepEqual(m.burstHist, [7]); assert.equal(m.maxStatusKills1s, 3);
   assert.equal(percentile([1, 2, 3, 4, 100], 0.95), 100); assert.equal(percentile([], 0.95), 0);
 });
+
+test('a pop chain is capped at 6 hits and the metric tracks it', async () => {
+  const { POP_CHAIN_HITS, makeMetrics } = await import('../src/status.js');
+  assert.equal(POP_CHAIN_HITS, 6);
+  assert.equal(makeMetrics().maxPopChain, 0);
+});

@@ -10,7 +10,7 @@ import { composeWave } from './waves.js';
 import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips, buildChips, specialReason, levelInfo, perkTip, normalizeTips, TIPS } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist, aimSource, aimStick } from './util.js';
 import { PLAYER, bookLook } from './palette.js';
-import { isStatusSource, canProc, procChance, freeze, chillFactor, applyChill, applyInk, tickInk, shouldShatter, statusDamageMult, makeBurstBudget, deepFreezeHit, zapChain, makeMetrics, tickMetrics, ZAP_REACH, ZAP_POOL, ZAP_LIFE, DEEP_FREEZE_TIME, SUPER_FREEZE_TIME, SPLASH_RADIUS, SPLASH_STRENGTH } from './status.js';
+import { isStatusSource, canProc, procChance, freeze, chillFactor, applyChill, applyInk, tickInk, shouldShatter, statusDamageMult, makeBurstBudget, deepFreezeHit, zapChain, makeMetrics, tickMetrics, ZAP_REACH, ZAP_POOL, ZAP_LIFE, DEEP_FREEZE_TIME, SUPER_FREEZE_TIME, SPLASH_RADIUS, SPLASH_STRENGTH, POP_CHAIN_HITS } from './status.js';
 import { BURST, shadowK, drawEnemy as drawArtEnemy, drawWorms } from './enemy-art.js';
 import { SoundEngine } from './audio.js';
 import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
@@ -1290,6 +1290,7 @@ const burstBudget = makeBurstBudget();   // at most 6 pops / splashes per frame;
 let sm = makeMetrics();                  // per-second counters (balance bot reads them)
 const zaps = [];                         // pool: at most ZAP_POOL short polylines
 let popGen = 0;                          // while a pop's damage runs: 1 + that pop's generation
+let popBudget = 0, popChain = 0;         // one pop chain (a pop + its Grand Finale round) hurts at most POP_CHAIN_HITS enemies
 const hitsPerSec = () => stats.fireRate * stats.projectiles;
 
 function zapArc(from, targets) {
@@ -1335,6 +1336,7 @@ function popAt(x, y, gen) {
   if (!burstBudget.take()) return;
   sm.bursts++; sm.burstsThisSec++;
   const r = stats.popRadius, dmg = stats.damage * stats.popMult, prev = popGen;
+  if (gen === 0) { popBudget = POP_CHAIN_HITS; popChain = 0; }
   popGen = gen + 1;
   const n = enemies.length;   // coins a golem drops mid-pop are not hit by the same pop
   for (let i = 0; i < n; i++) {
@@ -1342,10 +1344,14 @@ function popAt(x, y, gen) {
     if (e.dead) continue;
     const d = Math.hypot(e.x - x, e.y - y);
     if (d >= r + e.r) continue;
+    if (popBudget <= 0) break;
+    popBudget--;
     damageEnemy(e, dmg, ((e.x - x) / (d || 1)) * 90, ((e.y - y) / (d || 1)) * 90, false, 'pop');
+    if (e.dead) popChain++;
     if (stats.inkBombs && stats.ink && !e.dead) applyInk(e, dmg, stats.ink, stats.inkDur, 1);   // Ink Bombs: pops spread ink
   }
   popGen = prev;
+  if (gen === 0 && popChain > sm.maxPopChain) sm.maxPopChain = popChain;   // metric: most kills from one pop chain
   burst(x, y, 6, [PLAYER.pop, '#ffffff'], 120, 0.35);
   rings.push({ x, y, r: 4, max: r, speed: r * 7, friendly: true, life: 1, faint: true, color: '155,231,220' });
   addLight(x, y, r * 1.1, 0.14, PLAYER.pop);

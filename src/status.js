@@ -18,6 +18,7 @@ export const ZAP_REACH = 150;
 export const ZAP_POOL = 12;           // at most this many zap arcs on screen
 export const ZAP_LIFE = 0.12;
 export const DEEP_FREEZE_EVERY = 5, DEEP_FREEZE_TIME = 1, SUPER_FREEZE_TIME = 0.5;
+export const POP_CHAIN_HITS = 6;      // one pop chain (a pop + its Grand Finale round) hurts at most this many enemies
 export const SPLASH_RADIUS = 70, SPLASH_STRENGTH = 0.5;
 
 /** Damage sources that are "status damage": silent, and they never start another status effect or burst. */
@@ -123,7 +124,7 @@ export const POP_RADIUS = [0, 45, 60, 60], POP_MULT = [0, 1, 1, 2];
 
 /** Rolling per-second counters for the balance bot (cheap: a few numbers). */
 export function makeMetrics() {
-  return { bursts: 0, burstsThisSec: 0, burstHist: [], statusKillsSec: 0, statusKillHist: [], maxStatusKills1s: 0, kills: 0, inkKills: 0,
+  return { bursts: 0, burstsThisSec: 0, burstHist: [], statusKillsSec: 0, statusKillHist: [], maxStatusKills1s: 0, maxPopChain: 0, kills: 0, inkKills: 0,
     bossSec: 0, bossFrozenSec: 0, eliteSec: 0, eliteFrozenSec: 0, sec: 0, secT: 0 };
 }
 export function tickMetrics(m, dt) {
