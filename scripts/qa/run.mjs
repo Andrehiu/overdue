@@ -794,6 +794,38 @@ async function shapesFlow() {
 }
 
 
+// ---------------------------------------------------------------- v1.15.0: status effects (ink, chill, static, pop) look right on a phone
+async function statusFlow() {
+  const record = recorder();
+  const ctx = await browser.newContext(devices['iPhone 13 landscape']);
+  const page = await ctx.newPage();
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  await page.goto(URL0 + (URL0.includes('?') ? '&' : '?') + 'debug=1'); await page.waitForTimeout(500);
+  const info = await page.evaluate(() => {
+    const O = __overdue;
+    O.startRun('endless', 1); O.god(); O.killAll();
+    for (const id of ['leakypen', 'coldstorage', 'static', 'popup']) O.grant(id);
+    const cx = O.W / 2, cy = O.H / 2;
+    const mk = (type, dx, dy) => { const e = O.makeEnemy(type, cx + dx, cy + dy); e.hp = e.maxHp = 9; return e; };
+    O.player.x = cx - 170; O.player.y = cy + 90;
+    const a = mk('bunny', -70, -40), b = mk('notice', 20, -50), c = mk('bunny', 110, -30), d = mk('patron', -20, 60), f = mk('bunny', 120, 70);
+    a.inkT = 2; a.inkDps = 1;                                    // ink
+    b.chillT = 1.5; b.chill = 0.4;                                // chill
+    c.staticT = 5;                                                // static spark
+    d.inkT = 2; d.inkDps = 1; d.chillT = 1.5; d.chill = 0.4; d.staticT = 5;   // all three
+    f.chillT = 1; f.frozenT = 1; f.stun = 1;                      // frozen
+    O.zaps.push({ pts: [a.x, a.y, (a.x + b.x) / 2, a.y - 14, b.x, b.y, (b.x + c.x) / 2, b.y - 12, c.x, c.y], life: 99 });   // one zap arc
+    O.freeze(true);
+    return { n: O.enemies.length, sprites: ['ink', 'chill', 'static'].map((k) => !!O.statusSprite(k)) };
+  });
+  await page.waitForTimeout(400);
+  await shot(page, 'status-effects');
+  record('status', 'enemies with ink / chill / static / frozen and a zap arc draw without errors', info.n >= 5 && info.sprites.every(Boolean) && errs.length === 0, errs.join('; ').slice(0, 200));
+  await ctx.close();
+  return record.list;
+}
+
 // ---------------------------------------------------------------- v1.13.0: new-player flows (guided first room, Survive timer)
 async function newPlayerFlow(name, opts) {
   const record = recorder();
@@ -1074,6 +1106,7 @@ async function basicsFlow() {
   if (want('menus')) for (const [name, opts] of TARGETS) tasks.push(() => menusFlow(name, opts));
   if (want('screens')) { tasks.push(() => rotateOverlayFlow()); for (const r of ROTATIONS) tasks.push(() => rotationFlow(...r)); }
   if (want('shapes')) tasks.push(() => shapesFlow());
+  if (want('status')) tasks.push(() => statusFlow());
   if (want('newplayer')) for (const [name, opts] of TARGETS) tasks.push(() => newPlayerFlow(name, opts));
   if (want('basics')) tasks.unshift(() => basicsFlow());
   const t0 = Date.now();
@@ -1113,6 +1146,32 @@ if (want('perf')) {
   record('perf', `late boss game speed ≥ ${PERF.sim}x`, avg('sim') >= PERF.sim, `${avg('sim').toFixed(2)}x (samples ${samples.map((s) => s.sim.toFixed(2)).join(', ')})`);
   if (PERF.fps) record('perf', `late boss fps ≥ ${PERF.fps}`, avg('fps') >= PERF.fps, `${avg('fps').toFixed(0)} fps`);
   record('perf', 'books in flight capped', Math.max(...samples.map((s) => s.books)) <= 110, `max ${Math.max(...samples.map((s) => s.books))}`);
+
+  // v1.15.0: wave-15 boss with a stacked status build (Leaky Pen 3, Static 3, Cold 3, Pop-up 3 + all 4 combos + Trilogy 3)
+  await page.evaluate(() => {
+    const O = __overdue;
+    O.startRun('endless', 1);
+    for (const id of ['leakypen', 'leakypen', 'leakypen', 'static', 'static', 'static', 'coldstorage', 'coldstorage', 'coldstorage', 'popup', 'popup', 'popup',
+      'brittle', 'conductive', 'superconductor', 'inkbombs', 'trilogy', 'trilogy', 'trilogy', 'speedreader', 'speedreader', 'speedreader', 'hardcover', 'hardcover', 'hardcover',
+      'm_indelible', 'm_deepfreeze', 'm_powergrid', 'm_finale']) O.grant(id);
+    O.startWave(15); O.god();
+  });
+  await page.waitForTimeout(3000);
+  const st = await page.evaluate(async () => {
+    const O = __overdue, out = [];
+    for (let s = 0; s < 4; s++) {
+      const b = O.enemies.find((e) => e.type === 'boss');
+      if (b) { b.hp = b.maxHp; O.player.x = b.x; O.player.y = Math.min(b.y + 160, 900); }
+      const t0 = performance.now(), sim0 = O.game.playTime; let frames = 0;
+      await new Promise((res) => { const tick = (now) => { frames++; if (now - t0 < 1000) requestAnimationFrame(tick); else res(); }; requestAnimationFrame(tick); });
+      out.push({ sim: (O.game.playTime - sim0) / ((performance.now() - t0) / 1000), fps: frames });
+    }
+    return out;
+  });
+  await shot(page, 'perf-status-boss');
+  const sav = (k) => st.reduce((a, x) => a + x[k], 0) / st.length;
+  record('perf', `status-stacked boss game speed ≥ ${PERF.sim}x`, sav('sim') >= PERF.sim, `${sav('sim').toFixed(2)}x (samples ${st.map((x) => x.sim.toFixed(2)).join(', ')})`);
+  if (PERF.fps) record('perf', `status-stacked boss fps ≥ ${PERF.fps}`, sav('fps') >= PERF.fps, `${sav('fps').toFixed(0)} fps`);
   // Story late game: wing 10 room 6, a crowd of elites firing fans of pages.
   await page.evaluate(() => { const O = __overdue; O.unlockAll(); O.startRun('story', 10); O.startWave(6); O.god(); });
   await page.waitForTimeout(5000);

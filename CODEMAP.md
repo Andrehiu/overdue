@@ -38,13 +38,14 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/doors.js` | 88 | Story doors: after most rooms you pick the next room from 2 doors. Pure module (no DOM) so it is unit-tested. |
 | `src/enemy-art.js` | 396 | Enemy art (v1.12.0): every enemy except the boss is drawn here. Look "Blend": library characters (own face per type) |
 | `src/flowfield.js` | 102 | Dijkstra flow field: one search from the player gives every enemy a path around the shelves. |
-| `src/main.js` | 2866 | OVERDUE! — Night Shift at the Meme Library |
+| `src/main.js` | 3031 | OVERDUE! — Night Shift at the Meme Library |
 | `src/meta.js` | 99 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
 | `src/newplayer.js` | 59 | New-player help (v1.13.0): which menus a player has earned, and the scripted first room. Pure module (no DOM), unit-tested. |
-| `src/palette.js` | 52 | Projectile colours. Pure module (no DOM), unit-tested. |
+| `src/palette.js` | 58 | Projectile colours. Pure module (no DOM), unit-tested. |
 | `src/runlog.js` | 103 | Run log (v1.14.0): one compact record per finished run, kept on this phone, plus the "Share stats" code. |
+| `src/status.js` | 138 | Status effects (v1.15.0 part A): ink, chill, static + Pop-up Book maths. Pure module (no DOM), unit-tested. |
 | `src/story.js` | 162 | Story mode: ten handmade library wings (7 rooms each), unlocked in order. Pure module (no DOM) so it is unit-tested. |
-| `src/upgrades.js` | 303 | Perks offered between waves. Pure data + a seeded roller (no DOM), so it is unit-tested. |
+| `src/upgrades.js` | 329 | Perks offered between waves. Pure data + a seeded roller (no DOM), so it is unit-tested. |
 | `src/util.js` | 132 | Small, dependency-free helpers shared by the game and its unit tests. |
 | `src/version.js` | 22 | Which build of the game is running. The build script injects the real values |
 | `src/waves.js` | 59 | Budget-based wave composer. Pure + seeded => every run with the same seed plays the same waves. |
@@ -56,8 +57,9 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/newplayer.test.js` | 87 | New-player help (v1.13.0): menu unlock rules from saves, the guided-room flag, the Survive room table. Pure rules, no DOM. |
 | `test/rooms.test.js` | 68 | Rooms +20% (v1.14.0): story grids are bigger, endless keeps the legacy grid, every shape stays valid at the new sizes. |
 | `test/runlog.test.js` | 70 | Run log (v1.14.0): record build, ring buffer, Share stats code. Pure rules, no DOM. |
+| `test/status.test.js` | 131 | Status effects (v1.15.0 part A): freeze rule, boss immunity, chain rule, proc scaling, ink/chill/zap maths. Pure, no DOM. |
 | `test/story-meta.test.js` | 270 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
-| `scripts/qa/run.mjs` | 1168 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
+| `scripts/qa/run.mjs` | 1227 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 50 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
 | `scripts/codemap.mjs` | 113 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
@@ -100,17 +102,18 @@ NEIGH:4 · canStep:44 · computeFlowField:54 · lineOfSight:91
 
 ## src/main.js
 
-- **Setup, settings, content** (21–58): DEBUG:28 · loadJSON:31 · saveJSON:32 · sound:36 · saveProgress:43 · isStory:44 · wingDef:45 · updateSourceBadge:48 · pickBook:52 · pickAuthor:53 · short:57
-- **Canvas sizing (logical 960x540 or 540x960 on portrait phones, letterboxed, HiDPI aware)** (59–126): isPortraitScreen:67 · applyLayout:69 · resize:83 · updateRotateOverlay:96 · relayout:106 · relayoutSoon:113
-- **Input: keyboard + mouse, touch (virtual stick), gamepad** (127–253): keys:130 · actions:131 · mouse:132 · touch:133 · pad:134 · toLogical:136 · onKeyPress:152 · endPointer:197 · enableTouch:206 · pollGamepad:220 · onPadPress:236
-- **World state** (254–281): game:257 · rng:271 · spawnQueue:272 · enemies:273 · makePlayer:275 · comboMult:280
-- **Run / wave flow** (282–903): keepAwake:286 · startRun:292 · clearWorld:319 · startWave:325 · bannerQueue:356 · banner:357 · isSurvive:363 · endSurvive:366 · waveCleared:377 · resolveMystery:407 · showUpgrades:416 · showCursedOffer:445 · resolveCursedOffer:466 · afterPick:480 · nextRoom:485 · currentDoors:496 · showDoors:497 · chooseDoor:525 · enterDoor:532 · KIND_LABEL:544 · saveTips:549 · tipSeen:550 · markTip:551 · codex:555 · saveCodex:556 · cardsArmed:560 · currentChoices:562 · rollOpts:563 · showPerkTip:566 · newIds:578 · applyNew:579 · renderCards:584 · banishCard:604 · cap:636 · buildCard:638 · freeQueue:709 · freeFresh:711 · queueFreePerk:712 · flushFreePerks:717 · hideFreePerk:718 · showNextFree:719 · hasFinishedRun:738 · updateFirstHint:741 · renderBuild:747 · pop:779 · closeBuildPop:780 · openBuildPop:784 · renderReach:834 · renderCodex:852 · pause:876 · resume:886 · die:893
-- **Spawning** (904–987): DEF:907 · hpScaleNow:918 · makeEnemy:919 · spawnPoint:938 · updateSpawning:948 · materialise:966
-- **Effects helpers** (988–1016): shake:991 · addLight:994 · floatText:998 · particle:1001 · burst:1002 · pages:1010
-- **Update** (1017–1796): step:1020 · playerSaves:1055 · startGuideBeat:1059 · updateGuide:1066 · endGuide:1084 · moveInput:1094 · nearestEnemy:1107 · updatePlayer:1117 · collideWorld:1206 · spawnBook:1219 · fire:1235 · abilityReady:1257 · inkBurst:1268 · nextToShelf:1282 · doShhh:1290 · updateFlow:1327 · seek:1338 · updateEnemies:1350 · bossAI:1440 · shootHazard:1493 · fan:1498 · radial:1499 · damageEnemy:1501 · killEnemy:1531 · buzz:1572 · hurtPlayer:1577 · updateBooks:1616 · orbitRest:1696 · orbiterPositions:1697 · updateOrbiters:1706 · updateHazards:1724 · updateRings:1750 · updatePickups:1764 · updateParticles:1781
-- **Rendering** (1797–2381): BOOK_PALETTE:1800 · buildBackground:1802 · lampPositions:1891 · lightSprite:1903 · glowCache:1909 · glowSprite:1910 · renderLights:1919 · render:1958 · drawThrownBook:2008 · drawBook:2041 · drawPlayer:2049 · rim:2092 · drawEnemy:2097 · drawBoss:2107 · drawTelegraph:2141 · drawPickup:2149 · hazardSprite:2162 · drawHazards:2170 · drawRing:2187 · drawParticles:2194 · heartPath:2207 · FONT:2217 · txt:2218 · drawHUD:2224 · drawSurviveTimer:2293 · drawGuidePrompt:2310 · cooldown:2323 · btnCache:2339 · setTouchButton:2340 · drawCrosshair:2352 · drawStick:2361 · drawAimStick:2369
-- **DOM screens, settings, leaderboard** (2382–2764): SCREENS:2385 · showScreen:2387 · pinnedObservers:2397 · fitPinnedRow:2398 · renderMenus:2423 · renderFineBadges:2436 · renderShop:2441 · defaultWing:2475 · wingStatus:2479 · renderStory:2485 · logRun:2518 · bankRun:2530 · inRun:2538 · backupMsg:2543 · readAllKeys:2556 · setSetting:2604 · toast:2618 · toggleFullscreen:2654 · loadLeaderboard:2664 · isStandalone:2687 · maybeNudge:2688 · closeNudge:2694 · showGameOver:2698
-- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2765–2866): frame:2770 · checkForUpdate:2793 · applyUpdate:2813
+- **Setup, settings, content** (22–59): DEBUG:29 · loadJSON:32 · saveJSON:33 · sound:37 · saveProgress:44 · isStory:45 · wingDef:46 · updateSourceBadge:49 · pickBook:53 · pickAuthor:54 · short:58
+- **Canvas sizing (logical 960x540 or 540x960 on portrait phones, letterboxed, HiDPI aware)** (60–127): isPortraitScreen:68 · applyLayout:70 · resize:84 · updateRotateOverlay:97 · relayout:107 · relayoutSoon:114
+- **Input: keyboard + mouse, touch (virtual stick), gamepad** (128–254): keys:131 · actions:132 · mouse:133 · touch:134 · pad:135 · toLogical:137 · onKeyPress:153 · endPointer:198 · enableTouch:207 · pollGamepad:221 · onPadPress:237
+- **World state** (255–282): game:258 · rng:272 · spawnQueue:273 · enemies:274 · makePlayer:276 · comboMult:281
+- **Run / wave flow** (283–905): keepAwake:287 · startRun:293 · clearWorld:321 · startWave:327 · bannerQueue:358 · banner:359 · isSurvive:365 · endSurvive:368 · waveCleared:379 · resolveMystery:409 · showUpgrades:418 · showCursedOffer:447 · resolveCursedOffer:468 · afterPick:482 · nextRoom:487 · currentDoors:498 · showDoors:499 · chooseDoor:527 · enterDoor:534 · KIND_LABEL:546 · saveTips:551 · tipSeen:552 · markTip:553 · codex:557 · saveCodex:558 · cardsArmed:562 · currentChoices:564 · rollOpts:565 · showPerkTip:568 · newIds:580 · applyNew:581 · renderCards:586 · banishCard:606 · cap:638 · buildCard:640 · freeQueue:711 · freeFresh:713 · queueFreePerk:714 · flushFreePerks:719 · hideFreePerk:720 · showNextFree:721 · hasFinishedRun:740 · updateFirstHint:743 · renderBuild:749 · pop:781 · closeBuildPop:782 · openBuildPop:786 · renderReach:836 · renderCodex:854 · pause:878 · resume:888 · die:895
+- **Spawning** (906–989): DEF:909 · hpScaleNow:920 · makeEnemy:921 · spawnPoint:940 · updateSpawning:950 · materialise:968
+- **Effects helpers** (990–1018): shake:993 · addLight:996 · floatText:1000 · particle:1003 · burst:1004 · pages:1012
+- **Update** (1019–1284): step:1022 · playerSaves:1059 · startGuideBeat:1063 · updateGuide:1070 · endGuide:1088 · moveInput:1098 · nearestEnemy:1111 · updatePlayer:1121 · collideWorld:1210 · spawnBook:1223 · fire:1239 · abilityReady:1261 · inkBurst:1272
+- **Status effects (v1.15.0 part A: ink, chill, static, pops). The maths lives in src/status.js.** (1285–1959): zaps:1291 · hitsPerSec:1293 · zapArc:1295 · onBookHit:1307 · doZap:1319 · popAt:1334 · inkSplash:1356 · tickStatus:1369 · updateStatusFx:1381 · statusSprites:1386 · statusSprite:1388 · drawStatus:1407 · drawZaps:1420 · nextToShelf:1434 · doShhh:1442 · updateFlow:1479 · seek:1490 · updateEnemies:1502 · bossAI:1595 · shootHazard:1648 · fan:1653 · radial:1654 · damageEnemy:1656 · killEnemy:1688 · buzz:1733 · hurtPlayer:1738 · updateBooks:1777 · orbitRest:1858 · orbiterPositions:1859 · updateOrbiters:1868 · updateHazards:1887 · updateRings:1913 · updatePickups:1927 · updateParticles:1944
+- **Rendering** (1960–2546): BOOK_PALETTE:1963 · buildBackground:1965 · lampPositions:2054 · lightSprite:2066 · glowCache:2072 · glowSprite:2073 · renderLights:2082 · render:2121 · drawThrownBook:2173 · drawBook:2206 · drawPlayer:2214 · rim:2257 · drawEnemy:2262 · drawBoss:2272 · drawTelegraph:2306 · drawPickup:2314 · hazardSprite:2327 · drawHazards:2335 · drawRing:2352 · drawParticles:2359 · heartPath:2372 · FONT:2382 · txt:2383 · drawHUD:2389 · drawSurviveTimer:2458 · drawGuidePrompt:2475 · cooldown:2488 · btnCache:2504 · setTouchButton:2505 · drawCrosshair:2517 · drawStick:2526 · drawAimStick:2534
+- **DOM screens, settings, leaderboard** (2547–2929): SCREENS:2550 · showScreen:2552 · pinnedObservers:2562 · fitPinnedRow:2563 · renderMenus:2588 · renderFineBadges:2601 · renderShop:2606 · defaultWing:2640 · wingStatus:2644 · renderStory:2650 · logRun:2683 · bankRun:2695 · inRun:2703 · backupMsg:2708 · readAllKeys:2721 · setSetting:2769 · toast:2783 · toggleFullscreen:2819 · loadLeaderboard:2829 · isStandalone:2852 · maybeNudge:2853 · closeNudge:2859 · showGameOver:2863
+- **Main loop (fixed 120 Hz simulation, render every animation frame)** (2930–3031): frame:2935 · checkForUpdate:2958 · applyUpdate:2978
 
 ## src/meta.js
 
@@ -122,11 +125,15 @@ UNLOCK_FLAG:7 · MENUS:10 · unlockToast:16 · hasPlayed:19 · unlockedMenus:27 
 
 ## src/palette.js
 
-PLAYER:7 · ENEMY:22 · hueOf:25 · isEnemyHue:34 · bookLook:45
+PLAYER:7 · ENEMY:28 · hueOf:31 · isEnemyHue:40 · bookLook:51
 
 ## src/runlog.js
 
 DEALT_SOURCES:11 · newCounters:16 · addDealt:29 · addTaken:31 · bookEnded:33 · sampleFlight:38 · histPercentile:41 · round:49 · roundMap:50 · buildRecord:56 · pushRun:72 · isRecord:78 · normalizeRuns:80 · encodeStats:85 · decodeStats:91
+
+## src/status.js
+
+STATUS_SOURCES:24 · isStatusSource:25 · PROC_SOURCES:27 · canProc:28 · clamp:30 · procChance:33 · canFreeze:38 · freeze:40 · chillFactor:49 · applyChill:52 · applyInk:61 · tickInk:69 · shouldShatter:78 · statusDamageMult:81 · makeBurstBudget:87 · deepFreezeHit:93 · zapChain:103 · POP_RADIUS:122 · makeMetrics:125 · tickMetrics:129 · percentile:137
 
 ## src/story.js
 
@@ -134,7 +141,7 @@ CURVE:18 · curveRoom:19 · SURVIVE_CHUNKS:27 · SURVIVE_ROOMS:28 · roomGoal:30
 
 ## src/upgrades.js
 
-baseStats:10 · perk:34 · cursed:35 · combo:36 · master:37 · UPGRADES:39 · times:93 · secs:94 · tier:95 · PREVIEW:96 · previewChange:118 · pct:133 · GAIN:134 · gainText:160 · comboHints:172 · comboPartners:183 · combosInReach:191 · buildChips:202 · pips:215 · byId:217 · unlockedCombos:220 · unlockedMasterworks:225 · masterworkFor:230 · rollUpgrades:236 · specialReason:254 · levelInfo:265 · TIPS:277 · TIP_ORDER:284 · normalizeTips:287 · perkTip:293
+baseStats:12 · perk:39 · cursed:40 · combo:41 · master:42 · UPGRADES:44 · times:113 · secs:114 · tier:115 · PREVIEW:116 · previewChange:138 · pct:153 · GAIN:154 · gainText:186 · comboHints:198 · comboPartners:209 · combosInReach:217 · buildChips:228 · pips:241 · byId:243 · unlockedCombos:246 · unlockedMasterworks:251 · masterworkFor:256 · rollUpgrades:262 · specialReason:280 · levelInfo:291 · TIPS:303 · TIP_ORDER:310 · normalizeTips:313 · perkTip:319
 
 ## src/util.js
 
@@ -256,6 +263,21 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 - 46: Share stats code round-trips, is one line, and rejects bad input
 - 62: decode script: turns runs into a per-run table and a summary
 
+## test/status.test.js
+
+- 11: proc chance scales by 4 / hits per second, clamped 0.5..2 and never above 100%
+- 20: freeze rule: bosses are immune; others get a 3 s cooldown after a freeze
+- 33: chill slows; bosses get half the slow; it ends with its timer
+- 43: chilled bosses take +25% damage; Brittle Pages adds +25% more when inked too
+- 53: ink: total damage = fraction x hit over its duration, lands every 0.5 s, refreshes without stacking
+- 68: Brittle Pages: inked + slowed normal enemies shatter at 20% health, bosses never
+- 75: chain rule: ink, zap and pop damage never procs; only book hits do; burst budget drops extras
+- 85: Deep Freeze counts every 5th hit
+- 91: zap chain: nearest not-yet-hit enemy in reach, up to n hops; Conductive prefers inked
+- 102: status perks: levels, Masterworks and combos are wired and plain-spoken
+- 122: status colours are in the player palette and none is an enemy hue
+- 126: metrics: per-second histograms and percentile
+
 ## test/story-meta.test.js
 
 - 7: every room is harder than the one before it, in every wing
@@ -278,7 +300,7 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 
 ## scripts/qa/run.mjs
 
-results:27 · record:28 · want:32 · recorder:34 · pool:36 · sh:39 · TYPES:55 · TARGETS:65 · FULL_TARGETS:77 · FILL_JS:80 · TITLE_FIT_JS:81 · shot:93 · PINNED_CHECK:101 · RETURNING_SAVE:135 · TITLE_MENUS_JS:141 · screensFlow:145 · menusFlow:588 · rotateOverlayFlow:694 · ROTATIONS:734 · rotationFlow:739 · shapesFlow:770 · newPlayerFlow:798 · steadyContext:890 · basicsFlow:908 · md:1155
+results:27 · record:28 · want:32 · recorder:34 · pool:36 · sh:39 · TYPES:55 · TARGETS:65 · FULL_TARGETS:77 · FILL_JS:80 · TITLE_FIT_JS:81 · shot:93 · PINNED_CHECK:101 · RETURNING_SAVE:135 · TITLE_MENUS_JS:141 · screensFlow:145 · menusFlow:588 · rotateOverlayFlow:694 · ROTATIONS:734 · rotationFlow:739 · shapesFlow:770 · statusFlow:798 · newPlayerFlow:830 · steadyContext:922 · basicsFlow:940 · md:1214
 
 ## scripts/build.mjs
 
