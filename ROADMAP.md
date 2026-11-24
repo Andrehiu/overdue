@@ -21,9 +21,11 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
   difficulty, hearts lost mostly to ring shockwaves → next lever if still hard: ring readability/size/speed). Before that v1.15.1 (eb6e5de) = 1.15.0 new perks (2a173d3) + look & feel (bigger story enemies,
   sprite ×1.2 / hit ×1.1; orbit books ×1.6, radius 56; Margin ±22.5°; Crossfire text; boss phase: small tag, 1 s immune transform)
   + stronger privacy scan (owner to add `QA_PRIVATE_TERMS` repo secret). Coders for 1.15.0/1.15.1 archived.
-- **Running:** QA-reliable (session_014kswNhyh6FhfYfdqVSDcAv,
-  `claude/qa-reliable`) BLOCKED on owner A/B/C: medians don't stabilise fps (no GPU in container; game update 0.02–0.16 ms/frame).
-  Planner pick A: fail on update ms + sim speed, fps = warning without GPU.
+- **QA-reliable merged** to main (8f9a912, owner "ship"; CI green): perf checks fail on game update ≤ 4 ms/frame and speed
+  ≥ 0.85× (median of 5 samples); fps ≥ 50 hard only with a GPU, ⚠️ warning in software render. 3 UI flakes made deterministic.
+  No coders running (all archived).
+- **Next:** owner playtest of 1.15.2. If wing 2 still hard → ring shockwave readability/size/speed (main heart loss per bot).
+  Then 1.16.0 Book Bag → 1.17.0 player look. Parked: shelf-piercing late-boss attack.
 - **Owner phone checks (1.15.0 + 1.15.1):** What's new once; status icons readable; enemy size + hitbox fair; orbit books usable;
   Margin spread; boss transformation; stacked boss smooth; cat visible; new icons distinct. Parked: shelf-piercing late-boss attack.
 - **Owner to do when convenient:** playtest wings 7–8 + an Orbit run on v1.14.1; phone checks: Take it / Walk away tap comfort,
