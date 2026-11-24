@@ -117,6 +117,13 @@ Add `?debug=1` to the URL for an FPS counter and test hooks (`window.__overdue`)
 - **Releases:** to mark a notable release, bump `"version"` in `package.json` (e.g. 1.1.0 → 1.2.0). Small fixes don't need a bump, because the commit code changes on every deploy anyway.
 - **What gets deployed:** the live site is a single bundled page (`npm run build`), so a phone can never end up with a mix of old and new code from caching.
 
+## Offline play, Home Screen nudge and backup code (v1.13.1)
+
+- **Offline play:** the game registers a service worker (`sw.js`, stamped with the build's version + commit by `npm run build`). After one online visit the game opens with no network. The page, icons and manifest are cached cache-first; `version.json` is never cached. A new build downloads in the background and **waits**; tapping the "New version" bar lets it take over and reloads, so a new version always replaces the old one (old caches are deleted). Only real builds register it: `npm run dev` and the claude.ai `--fragment` build never do. It works under the GitHub Pages `/overdue/` path because everything is relative to the worker's scope.
+- **Kill switch:** if the worker ever misbehaves, ship a release built with `OVERDUE_KILL_SW=1 npm run build` (set it on the Build step of `pages.yml`). That `sw.js` deletes every `overdue-*` cache, unregisters itself and reloads open pages; the page it ships stamps `"sw": false`, so nothing registers again. Remove the variable in a later release to bring offline play back.
+- **Home Screen nudge:** once, after the first cleared story wing or the first run of 3+ minutes, a card explains Share → Add to Home Screen (Safari can erase a website's saved data after ~7 days unused; installed apps are exempt). Never shown when already installed (`navigator.standalone` or `display-mode: standalone`). Flags `a2hs` / `a2hs-off` live in the existing `overdue.tips.v1` store.
+- **Backup code** (Settings → Backup progress, `src/backup.js`): `OVD1:` + base64url of `{"v":1,"keys":{<localStorage key>: <raw string>}}` + `.` + an 8-hex FNV-1a checksum. It carries `overdue.settings.v1`, `best`, `name`, `halloffame`, `codex`, `progress`, `tips`. Restore validates everything (prefix, checksum, version, every value is JSON) before writing anything, runs `normalizeProgress()` on the progress key, then reloads. Bad codes change nothing.
+
 ## History
 
 This game started life inside a university web-dev assignment, an Express and MongoDB "Meme Library" app, where the books came from the database. This repo is the standalone version.

@@ -15,7 +15,9 @@ const out = resolve(process.argv.find((a) => a.endsWith('.html')) || `${root}/di
 const pkg = JSON.parse(readFileSync(`${root}/package.json`, 'utf8'));
 let commit = (process.env.GITHUB_SHA || '').slice(0, 7);
 if (!commit) { try { commit = execSync('git rev-parse --short=7 HEAD', { cwd: root }).toString().trim(); } catch { commit = 'unknown'; } }
-const stamp = { version: pkg.version, commit, built: new Date().toISOString() };
+const killSw = !!process.env.OVERDUE_KILL_SW; // kill switch: ships a worker that removes itself (see README)
+// sw: true = this build registers the offline worker; false = it removes any old one. The fragment build has no sw field, so it never touches workers.
+const stamp = { version: pkg.version, commit, built: new Date().toISOString(), ...(fragment ? {} : { sw: !killSw }) };
 
 const js = (await build({ entryPoints: [`${root}/src/main.js`], bundle: true, format: 'iife', minify: true, write: false, target: 'es2020' }))
   .outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
@@ -38,5 +40,10 @@ if (fragment) {
 }
 mkdirSync(dirname(out), { recursive: true });
 writeFileSync(out, page);
-if (!fragment) writeFileSync(join(dirname(out), 'version.json'), JSON.stringify(stamp, null, 2) + '\n');
+if (!fragment) {
+  writeFileSync(join(dirname(out), 'version.json'), JSON.stringify(stamp, null, 2) + '\n');
+  // The worker is stamped with the commit, so every release is a byte-different sw.js and browsers always notice it.
+  const sw = readFileSync(`${root}/sw.js`, 'utf8').replace('__BUILD_ID__', `${stamp.version}-${commit}`).replace('__KILL__', String(killSw));
+  writeFileSync(join(dirname(out), 'sw.js'), sw);
+}
 console.log(`Wrote ${out} (${(page.length / 1024).toFixed(1)} KB) — v${stamp.version} · ${stamp.commit}`);

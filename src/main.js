@@ -14,6 +14,7 @@ import { SoundEngine } from './audio.js';
 import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
 import { DOORS, soleDoor, doorOffer, applyDoor, doorReward, mysteryPrize } from './doors.js';
 import { GUIDE_FLAG, UNLOCK_FLAG, MENUS, unlockToast, hasPlayed, unlockedMenus, newUnlocks, shouldGuide, GUIDE_BEATS, guidePrompt } from './newplayer.js';
+import { BACKUP_KEYS, encodeBackup, decodeBackup, describeBackup } from './backup.js';
 import { PROGRESS_KEY, RENOVATIONS, normalizeProgress, applyRenovations, runBonuses, recordRun, level, nextCost, canBuy, buy } from './meta.js';
 
 // ======================================================================
@@ -2276,12 +2277,12 @@ function drawAimStick() {
 // ======================================================================
 // DOM screens, settings, leaderboard
 // ======================================================================
-const SCREENS = ['title', 'howto', 'settings', 'leaderboard', 'upgrade', 'doors', 'pause', 'gameover', 'codex', 'story', 'shop'];
+const SCREENS = ['title', 'howto', 'settings', 'leaderboard', 'upgrade', 'doors', 'pause', 'gameover', 'codex', 'story', 'shop', 'backup'];
 let settingsReturn = 'title', shopReturn = 'title', currentScreen = 'title';
 function showScreen(id) {
   for (const s of SCREENS) $('#' + s).hidden = s !== id;
   currentScreen = id;
-  closeBuildPop();
+  closeBuildPop(); $('#nudge').hidden = true;
   document.body.classList.toggle('in-game', id === null);
   if (id === 'title') { renderFineBadges(); renderMenus(); }
   if (id) fitPinnedRow(document.getElementById(id));
@@ -2420,6 +2421,36 @@ const inRun = () => ['playing', 'paused', 'upgrade', 'doors', 'waveclear', 'dyin
 
 // ---- Progress tools (Settings): reset for a fresh start; debug helpers with ?debug=1 ----
 $('#btnShowTips').addEventListener('click', () => { tips = normalizeTips(null); saveTips(); toast('Tips will show again'); });
+// ---- Backup code (v1.13.1): copy all player keys as one code; restore validates fully before writing anything ----
+const backupMsg = (t, bad = false) => { const m = $('#backupMsg'); m.textContent = t; m.style.color = bad ? '#ff8a9b' : ''; };
+let pendingRestore = null;
+function readAllKeys() { const o = {}; for (const k of BACKUP_KEYS) { try { o[k] = localStorage.getItem(k); } catch { /* blocked */ } } return o; }
+$('#btnBackup').addEventListener('click', () => { pendingRestore = null; $('#restoreConfirm').hidden = true; $('#backupOut').hidden = true; $('#backupIn').value = ''; backupMsg(''); showScreen('backup'); });
+$('#btnCopyBackup').addEventListener('click', async () => {
+  const code = encodeBackup(readAllKeys());
+  const out = $('#backupOut'); out.value = code; out.hidden = false;
+  try { await navigator.clipboard.writeText(code); backupMsg('Copied! Paste it somewhere safe.'); }
+  catch { out.focus(); out.select(); backupMsg('Tap the code above, select all and copy it.'); }
+});
+$('#btnRestoreBackup').addEventListener('click', () => {
+  const r = decodeBackup($('#backupIn').value);
+  if (!r.ok) { pendingRestore = null; $('#restoreConfirm').hidden = true; backupMsg(r.error + ' Nothing was changed.', true); return; }
+  pendingRestore = r.keys;
+  $('#restoreWarn').textContent = `This replaces your progress on this phone with the backup (${describeBackup(r.keys)}).`;
+  $('#restoreConfirm').hidden = false; backupMsg('');
+});
+$('#btnRestoreNo').addEventListener('click', () => { pendingRestore = null; $('#restoreConfirm').hidden = true; });
+$('#btnRestoreYes').addEventListener('click', () => {
+  if (!pendingRestore) return;
+  const keys = pendingRestore; pendingRestore = null;
+  // Already validated. Keys the code doesn't have are removed so the phone matches the backup exactly.
+  try {
+    for (const k of BACKUP_KEYS) { if (k in keys) localStorage.setItem(k, k === PROGRESS_KEY ? JSON.stringify(normalizeProgress(JSON.parse(keys[k]))) : keys[k]); else localStorage.removeItem(k); }
+  } catch { backupMsg('Couldn’t write to this phone’s storage. Nothing may have changed.', true); return; }
+  backupMsg('Restored! Reloading…'); $('#restoreConfirm').hidden = true;
+  setTimeout(() => location.reload(), 700); // reload so every part of the game starts from the restored data
+});
+
 let resetArmedUntil = 0;
 const btnReset = $('#btnResetProgress');
 btnReset.addEventListener('click', () => {
@@ -2481,6 +2512,7 @@ document.addEventListener('click', (e) => {
   else if (act === 'codex') { renderCodex(); showScreen('codex'); }
   else if (act === 'settings') { settingsReturn = game.state === 'paused' ? 'pause' : 'title'; showScreen('settings'); }
   else if (act === 'leaderboard') { showScreen('leaderboard'); loadLeaderboard($('#lbList')); }
+  else if (act === 'backupback') showScreen('settings');
   else if (act === 'back') showScreen(game.state === 'paused' ? settingsReturn : 'title');
   else if (act === 'resume') resume();
   else if (act === 'quit' || act === 'menu') {
@@ -2522,6 +2554,17 @@ async function loadLeaderboard(list, highlight = null) {
   }
 }
 
+// ---- Home Screen nudge (v1.13.1): once, after the first cleared wing or first run of 3+ minutes; never in an installed app ----
+const isStandalone = () => navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+function maybeNudge(won, playTime) {
+  if (isStandalone() || tipSeen('a2hs') || tipSeen('a2hs-off') || !(won || playTime >= 180)) return false;
+  markTip('a2hs'); // shown at most once, ever
+  setTimeout(() => { if (game.state === 'gameover') $('#nudge').hidden = false; }, 700);
+  return true;
+}
+const closeNudge = () => { $('#nudge').hidden = true; };
+$('#btnNudgeOk').addEventListener('click', closeNudge);
+$('#btnNudgeOff').addEventListener('click', () => { markTip('a2hs-off'); closeNudge(); });
 const BEST_KEY = 'overdue.best.v1';
 function showGameOver() {
   const story = isStory(), won = story && game.wingCleared;
@@ -2567,6 +2610,7 @@ function showGameOver() {
   $('#toast').hidden = true; clearTimeout(toastTimer);
   showScreen('gameover');
   if (!story) loadLeaderboard($('#goList'));
+  maybeNudge(won, game.playTime);
   if (!touch.enabled) (story ? (nextBtn.hidden ? $('#btnAgain') : nextBtn) : $('#nameInput')).focus();
 }
 
@@ -2622,14 +2666,38 @@ async function checkForUpdate() {
   const live = await fetchLatestBuild();
   if (!live || live.commit === BUILD.commit) return;
   updateOffered = true;
+  swReg?.update().catch(() => {}); // fetch the new build in the background so the tap is instant
   const bar = $('#updateBar');
   bar.textContent = `🔄 New version v${live.version} (${live.commit}) — tap to update`;
   bar.hidden = false;
 }
+// ---- Offline play (v1.13.1): a service worker caches the game. Only real builds register one (BUILD.sw), never dev or the claude.ai fragment. ----
+let swReg = null;
+if ('serviceWorker' in navigator && BUILD.sw === true) {
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((r) => { swReg = r; }).catch(() => { /* offline play just isn't available */ });
+} else if ('serviceWorker' in navigator && BUILD.sw === false && BUILD.commit !== 'local') {
+  // Kill switch build: remove any worker + caches left by earlier releases.
+  navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
+  if (window.caches) caches.keys().then((ks) => ks.forEach((k) => k.startsWith('overdue-') && caches.delete(k))).catch(() => {});
+}
+/** Switch to the newest build: let the waiting worker take over (it already holds the new page), then reload. */
+async function applyUpdate() {
+  try {
+    const reg = swReg || (await navigator.serviceWorker?.getRegistration());
+    if (reg) {
+      await reg.update().catch(() => {});
+      if (reg.installing) await new Promise((res) => { const w = reg.installing; const t = setTimeout(res, 8000); w.addEventListener('statechange', () => { if (w.state === 'installed' || w.state === 'activated' || w.state === 'redundant') { clearTimeout(t); res(); } }); });
+      if (reg.waiting) {
+        await new Promise((res) => { const t = setTimeout(res, 3000); navigator.serviceWorker.addEventListener('controllerchange', () => { clearTimeout(t); res(); }, { once: true }); reg.waiting.postMessage('skipWaiting'); });
+      }
+    }
+  } catch { /* fall back to a plain reload */ }
+  location.reload();
+}
 $('#updateBar').addEventListener('click', () => {
   // Never yank a run out from under the player: only reload outside of play.
   if (game.state === 'playing' || game.state === 'waveclear' || game.state === 'dying') { toast('Finish or pause this shift first'); return; }
-  location.reload();
+  applyUpdate();
 });
 setTimeout(checkForUpdate, 2500);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
@@ -2661,6 +2729,7 @@ if (DEBUG) {
     stepN: (n) => { for (let i = 0; i < n; i++) step(STEP); },
     pickCard: (i) => { cardsArmedAt = 0; document.querySelectorAll('#cards .card')[i]?.click(); },
     pickDoor: (id) => { cardsArmedAt = 0; chooseDoor(id); },
+    maybeNudge: (won, secs) => maybeNudge(won, secs), isStandalone,
     setProgress: (raw) => { progress = normalizeProgress(raw); saveProgress(); }, setRenews: (n) => { game.renews = n; }, die: () => { player.hp = 1; player.inv = 0; hurtPlayer(player.x + 1, player.y); },
   };
 }

@@ -540,8 +540,7 @@ body.portrait .doors { flex-direction: column; align-items: center; }
 .build-item.fresh { animation: chip-pulse 1s ease-in-out 3; border-color: var(--chip-glow); }
 @media (prefers-reduced-motion: reduce) { .free-perk { animation: none; } .build-item.fresh { animation: none; box-shadow: 0 0 .6em rgba(255, 213, 74, .7); } }
 
-/* =====================================================================
-   v1.13.0 new-player help: plain captions under fun terms, guided first room, big Survive timer
+/* ==============================================================   v1.13.0 new-player help: plain captions under fun terms, guided first room, big Survive timer
    ===================================================================== */
 /* Caption: always shown, own line under the label, small and quiet (approved mock-up). */
 .cap { display: block; font-size: .62em; opacity: .62; font-weight: normal; line-height: 1.15; letter-spacing: 0; text-transform: none; }
@@ -565,3 +564,24 @@ body.guiding #touchUI #btnGuideSkip { display: block; }
 .cap.inl { white-space: nowrap; }
 #toast.low { top: auto; bottom: 4.2em; max-width: 60%; text-align: center; }
 #touchUI button.guide-hl { outline: .25em solid #ffd54a; outline-offset: .1em; }
+=======
+/* Backup screen (v1.13.1) */
+#backup { --bk-line: rgba(155, 231, 220, .4); }
+#backup .backup-box { display: flex; flex-direction: column; align-items: center; gap: .35em; width: min(34em, 92%); }
+#backup .backup-box > p { margin: 0; min-height: 1.2em; }
+#backup .backup-text { width: 100%; box-sizing: border-box; resize: none; font: .75em/1.3 ui-monospace, Menlo, monospace; color: #e8e4f4; background: rgba(0, 0, 0, .35); border: 1px solid var(--bk-line); border-radius: 8px; padding: .35em .5em; user-select: text; -webkit-user-select: text; }
+#backup .restore-confirm { text-align: center; border: 1px solid rgba(255, 107, 129, .6); border-radius: 8px; padding: .3em .6em; }
+#backup .restore-confirm p { margin: 0 0 .25em; font-size: .85em; }
+#backup .danger { border-color: rgba(255, 107, 129, .6); color: #ff6b81; }
+#backup > p.small { margin: 0; max-width: 34em; }
+@media (max-height: 640px) { #backup > p.small { font-size: .72em; line-height: 1.25; } }
+
+/* Home Screen nudge (v1.13.1): scoped tokens */
+.nudge { --nd-bg: #1b1230; --nd-line: rgba(255, 213, 74, .55); --nd-ink: #f3ead2;
+  position: absolute; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; background: rgba(5, 3, 12, .7); }
+.nudge[hidden] { display: none; }
+.nudge-card { width: min(26em, 92%); max-height: 94%; overflow: auto; box-sizing: border-box; padding: .7em 1em; text-align: left; color: var(--nd-ink); background: var(--nd-bg); border: 1px solid var(--nd-line); border-radius: 12px; box-shadow: 0 .5em 2em rgba(0, 0, 0, .8); font-size: .9em; line-height: 1.35; }
+.nudge-card h3 { margin: 0 0 .3em; color: #ffd54a; font-size: 1.15em; }
+.nudge-card p { margin: 0 0 .3em; }
+.nudge-card ol { margin: 0 0 .5em; padding-left: 1.3em; }
+.nudge-card .menu.row { margin: 0; justify-content: center; gap: .5em; }

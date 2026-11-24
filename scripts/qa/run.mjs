@@ -46,6 +46,7 @@ if (want('unit')) {
 sh('npm run build --silent');
 await cp(join(ROOT, 'dist/overdue.html'), join(SITE, 'index.html'));
 await cp(join(ROOT, 'dist/version.json'), join(SITE, 'version.json'));
+await cp(join(ROOT, 'dist/sw.js'), join(SITE, 'sw.js'));
 await cp(join(ROOT, 'icons'), join(SITE, 'icons'), { recursive: true });
 await cp(join(ROOT, 'manifest.webmanifest'), join(SITE, 'manifest.webmanifest'));
 const BUILD = JSON.parse(readFileSync(join(SITE, 'version.json'), 'utf8'));
@@ -144,6 +145,8 @@ const TITLE_MENUS_JS = () => [...document.querySelectorAll('#title .menu button[
 async function screensFlow(name, opts, full) {
   const record = recorder();
   const ctx = await browser.newContext(opts);
+  // v1.13.1: the Home Screen nudge has its own checks (basics); here it would cover the end-screen buttons
+  await ctx.addInitScript(() => { try { if (localStorage.getItem('overdue.tips.v1') === null) localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off"]}'); } catch {} });
   const page = await ctx.newPage();
   const errors = [], failed = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -543,6 +546,8 @@ async function screensFlow(name, opts, full) {
 async function menusFlow(name, opts) {
   const record = recorder();
   const ctx = await browser.newContext(opts);
+  // v1.13.1: the Home Screen nudge has its own checks (basics); here it would cover the end-screen buttons
+  await ctx.addInitScript(() => { try { if (localStorage.getItem('overdue.tips.v1') === null) localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off"]}'); } catch {} });
   const page = await ctx.newPage();
   const area = `menus/${name}`;
   try {
@@ -583,6 +588,17 @@ async function menusFlow(name, opts) {
       }
       await page.click(`#${id} [data-act=${back}]`); await page.waitForTimeout(250);
     }
+    // v1.13.1: Backup screen (opened from Settings) fits every size, with its code box and confirm step showing
+    await page.click('#title [data-act=settings]'); await page.waitForTimeout(250);
+    await page.click('#btnBackup'); await page.waitForTimeout(300);
+    await page.click('#btnCopyBackup'); await page.fill('#backupIn', 'OVD1:junk'); await page.click('#btnRestoreBackup'); await page.waitForTimeout(200);
+    await shot(page, `${name}-menu-backup`);
+    const bkBad = await page.evaluate(`(${PINNED_CHECK})('backup')`);
+    record(area, 'backup: pinned row covers nothing and fits the column', !bkBad.length, bkBad.join('; '));
+    const bkIn = await page.evaluate(() => { const bad = []; for (const el of document.querySelectorAll('#backup button:not([hidden]), #backup textarea:not([hidden]), #backup .backup-box > p')) { const r = el.getBoundingClientRect(); if (r.width && (r.left < -1 || r.right > innerWidth + 1)) bad.push(el.id || el.tagName); } return bad; });
+    record(area, 'backup: controls inside the screen width', !bkIn.length, bkIn.join(', '));
+    await page.click('#backup [data-act=backupback]'); await page.waitForTimeout(200);
+    await page.click('#settings [data-act=back]'); await page.waitForTimeout(250);
     // v1.12.1: 4 and 5 card hands sit in ONE row, nothing scrolls, the build strip stays on screen (every size)
     await page.evaluate(() => { __overdue.startRun('endless'); __overdue.god(); for (const id of ['trilogy', 'dewey', 'speedreader']) __overdue.grant(id); });
     await page.waitForTimeout(500);
@@ -806,6 +822,164 @@ async function newPlayerFlow(name, opts) {
     record(area, 'no script errors', errors.length === 0, errors.join('; ').slice(0, 200));
   } catch (e) { record(area, 'new-player flow ran to the end', false, e.message.split('\n')[0]); }
   await ctx.close();
+}
+// ---------------------------------------------------------------- 4c. app basics (v1.13.1): offline play, update, kill switch, backup code, Home Screen nudge
+async function basicsFlow() {
+  const record = recorder(); const area = 'basics';
+  const dir = join(OUT, 'site-live'); await cp(SITE, dir, { recursive: true });
+  // Served under /overdue/ like GitHub Pages, with a 10-minute HTTP cache like GitHub Pages (a worker must not be fooled by it).
+  const srv = createServer(async (req, res) => {
+    const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    if (!path.startsWith('/overdue/')) { res.writeHead(404).end(); return; }
+    const rel = path.slice(9) || 'index.html';
+    try { res.writeHead(200, { 'Content-Type': TYPES[extname(rel)] || 'application/octet-stream', 'Cache-Control': 'max-age=600' }).end(await readFile(join(dir, rel))); }
+    catch { res.writeHead(404).end(); }
+  }).listen(0);
+  const base = `http://localhost:${srv.address().port}/overdue/`;
+  const phone = devices['iPhone 13 landscape'];
+  try {
+    // ---- offline play ----
+    const ctx = await browser.newContext({ ...phone, permissions: ['clipboard-read', 'clipboard-write'] });
+    const page = await ctx.newPage(); const errs = [];
+    page.on('pageerror', (e) => errs.push(e.message));
+    await page.goto(`${base}?debug=1`); await page.waitForTimeout(400);
+    await page.waitForFunction(() => navigator.serviceWorker.controller, null, { timeout: 15000 }).catch(() => {});
+    const reg = await page.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); return { scope: r?.scope || '', cached: (await caches.keys()).join(',') }; });
+    record(area, 'worker registers under /overdue/ and caches the game', reg.scope === base && /^overdue-/.test(reg.cached), JSON.stringify(reg));
+    await ctx.setOffline(true);
+    await page.reload(); await page.waitForSelector('body.ready', { timeout: 10000 }).catch(() => {});
+    const offTitle = await page.evaluate(() => ({ screen: !document.getElementById('title').hidden, label: document.querySelector('.version-label').textContent }));
+    await shot(page, 'basics-title-offline');
+    record(area, 'offline: reload shows the title screen', offTitle.screen && /v1\./.test(offTitle.label), offTitle.label);
+    await page.evaluate(() => __overdue.startRun('endless')); await page.waitForTimeout(700);
+    record(area, 'offline: a run starts and plays', await page.evaluate(() => __overdue.game.state === 'playing' && Number.isFinite(__overdue.player.x)));
+    const noQuery = await ctx.newPage(); await noQuery.goto(base); await noQuery.waitForSelector('body.ready', { timeout: 10000 }).catch(() => {});
+    record(area, 'offline: opening the plain /overdue/ link works too', await noQuery.evaluate(() => !document.getElementById('title').hidden)); await noQuery.close();
+    await ctx.setOffline(false);
+
+    // ---- update N -> N+1 ----
+    const oldCommit = BUILD.commit, newCommit = 'beef123';
+    const sw0 = await page.evaluate(() => fetch('sw.js').then((r) => r.text()));
+    await page.reload(); await page.waitForSelector('body.ready');
+    for (const f of ['index.html', 'version.json', 'sw.js']) {
+      const t = (await readFile(join(dir, f), 'utf8')).split(oldCommit).join(newCommit);
+      await writeFile(join(dir, f), f === 'index.html' ? t.replace('<title>', '<title>') : t);
+    }
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.waitForSelector('#updateBar:not([hidden])', { timeout: 10000 }).catch(() => {});
+    const barOn = await page.evaluate(() => !document.getElementById('updateBar').hidden);
+    record(area, 'update: serving N+1 shows the update bar while N is open', barOn && (await page.textContent('#updateBar')).includes(newCommit), (await page.textContent('#updateBar')).slice(0, 60));
+    let waiting = false;
+    for (let i = 0; i < 40 && !waiting; i++) { waiting = await page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()).waiting); if (!waiting) await page.waitForTimeout(250); }
+    record(area, 'update: the new build is fetched in the background (worker waiting)', waiting);
+    const stayed = await page.evaluate(() => document.querySelector('.version-label').textContent);
+    record(area, 'update: the open page keeps running N until the player taps', stayed.includes(oldCommit), stayed);
+    await shot(page, 'basics-update-bar');
+    await page.tap('#updateBar');
+    await page.waitForFunction((c) => document.querySelector('.version-label')?.textContent.includes(c), newCommit, { timeout: 15000 }).catch(() => {});
+    const afterLabel = await page.evaluate(() => document.querySelector('.version-label').textContent);
+    record(area, 'update: after the tap the title shows N+1', afterLabel.includes(newCommit), afterLabel);
+    await ctx.setOffline(true); await page.reload(); await page.waitForSelector('body.ready', { timeout: 10000 }).catch(() => {});
+    const offNew = await page.evaluate(() => document.querySelector('.version-label').textContent);
+    record(area, 'update: N+1 also opens offline (old cache replaced)', offNew.includes(newCommit), offNew);
+    await ctx.setOffline(false);
+    const caches2 = await page.evaluate(async () => (await caches.keys()).filter((k) => k.startsWith('overdue-')));
+    record(area, 'update: only the newest cache is kept', caches2.length === 1 && caches2[0].includes(newCommit), caches2.join(','));
+
+    // ---- kill switch ----
+    const killDir = join(OUT, 'kill'); await mkdir(killDir, { recursive: true });
+    execSync(`node scripts/build.mjs ${join(killDir, 'overdue.html')}`, { cwd: ROOT, env: { ...process.env, OVERDUE_KILL_SW: '1' }, stdio: 'pipe' });
+    const killSw = await readFile(join(killDir, 'sw.js'), 'utf8');
+    record(area, 'kill switch: OVERDUE_KILL_SW=1 builds a self-removing worker and no page registration', /const KILL = true;/.test(killSw) && /"sw": false/.test(await readFile(join(killDir, 'version.json'), 'utf8')));
+    // The kill release replaces the page too (it stamps sw:false, so it never registers again).
+    await writeFile(join(dir, 'sw.js'), killSw); await cp(join(killDir, 'overdue.html'), join(dir, 'index.html')); await cp(join(killDir, 'version.json'), join(dir, 'version.json'));
+    await page.evaluate(async () => { await (await navigator.serviceWorker.getRegistration()).update(); });
+    // Poll from node: the page navigates itself when the kill worker takes over, which destroys evaluate contexts.
+    let killed = { regs: -1, caches: -1 };
+    for (let i = 0; i < 40; i++) {
+      await page.waitForTimeout(500);
+      try { killed = await page.evaluate(async () => ({ regs: (await navigator.serviceWorker.getRegistrations()).length, caches: (await caches.keys()).length })); } catch { continue; }
+      if (killed.regs === 0 && killed.caches === 0) break;
+    }
+    record(area, 'kill switch: worker unregisters itself and clears its caches', killed.regs === 0 && killed.caches === 0, JSON.stringify(killed));
+    record(area, 'worker: no script errors', errs.length === 0, errs.join('; ').slice(0, 200));
+    await ctx.close();
+
+    // ---- hosted (--fragment) build never registers a worker ----
+    const fragDir = join(OUT, 'frag'); await mkdir(fragDir, { recursive: true });
+    execSync(`node scripts/build.mjs --fragment ${join(fragDir, 'frag.html')}`, { cwd: ROOT, stdio: 'pipe' });
+    const frag = await readFile(join(fragDir, 'frag.html'), 'utf8');
+    record(area, 'fragment build: no worker file, no sw stamp', !existsSync(join(fragDir, 'sw.js')) && !/"sw":/.test(frag));
+
+    // ---- backup code: copy, restore, bad code ----
+    const c2 = await browser.newContext({ ...phone, permissions: ['clipboard-read', 'clipboard-write'] });
+    const bp = await c2.newPage(); await bp.goto(`http://localhost:${server.address().port}/?debug=1`); await bp.waitForSelector('body.ready');
+    await bp.evaluate(() => { localStorage.setItem('overdue.progress.v1', JSON.stringify({ fines: 4321, unlocked: 2 })); localStorage.setItem('overdue.name.v1', JSON.stringify({ name: 'Ada' })); localStorage.setItem('overdue.tips.v1', JSON.stringify({ seen: ['firstrun'] })); });
+    await bp.tap('#title [data-act=settings]'); await bp.waitForTimeout(200); await bp.tap('#btnBackup'); await bp.waitForTimeout(200);
+    await bp.tap('#btnCopyBackup'); await bp.waitForTimeout(300);
+    const code = await bp.evaluate(() => navigator.clipboard.readText());
+    record(area, 'backup: copy puts an OVD1 code on the clipboard and shows it', /^OVD1:[A-Za-z0-9_-]+\.[0-9a-f]{8}$/.test(code) && (await bp.inputValue('#backupOut')) === code, code.slice(0, 24));
+    const snap = () => bp.evaluate(() => JSON.stringify(['settings', 'best', 'name', 'halloffame', 'codex', 'progress', 'tips'].map((k) => localStorage.getItem(`overdue.${k}.v1`))));
+    const before = await snap();
+    for (const bad of [code.slice(0, code.length - 6), code.replace('OVD1:', 'OVD9:'), code.slice(0, 15) + (code[15] === 'a' ? 'b' : 'a') + code.slice(16), 'hello']) {
+      await bp.fill('#backupIn', bad); await bp.tap('#btnRestoreBackup'); await bp.waitForTimeout(120);
+      const st = await bp.evaluate(() => ({ err: document.getElementById('backupMsg').textContent, confirm: !document.getElementById('restoreConfirm').hidden }));
+      if (st.confirm || !/Nothing was changed/.test(st.err) || (await snap()) !== before) { record(area, 'backup: a bad code shows an error and changes nothing', false, `${bad.slice(0, 20)} → ${st.err}`); break; }
+    }
+    record(area, 'backup: bad, truncated, wrong-version and tampered codes change nothing', true);
+    await bp.evaluate(() => { for (const k of ['progress', 'name', 'tips']) localStorage.removeItem(`overdue.${k}.v1`); });
+    await bp.fill('#backupIn', `  ${code.slice(0, 30)}\n${code.slice(30)}  `); await bp.tap('#btnRestoreBackup'); await bp.waitForTimeout(150);
+    const confirmShown = await bp.evaluate(() => !document.getElementById('restoreConfirm').hidden);
+    await shot(bp, 'basics-backup-confirm');
+    const untouched = await bp.evaluate(() => localStorage.getItem('overdue.progress.v1'));
+    record(area, 'backup: a valid code only asks for confirmation first (nothing written yet)', confirmShown && untouched === null);
+    await bp.tap('#btnRestoreYes');
+    await bp.waitForFunction(() => document.body.classList.contains('ready') && localStorage.getItem('overdue.progress.v1'), null, { timeout: 10000 }).catch(() => {});
+    await bp.waitForTimeout(400);
+    const restored = await bp.evaluate(() => ({ p: JSON.parse(localStorage.getItem('overdue.progress.v1') || '{}'), n: JSON.parse(localStorage.getItem('overdue.name.v1') || '{}'), t: JSON.parse(localStorage.getItem('overdue.tips.v1') || '{}') }));
+    record(area, 'backup: confirm restores progress, name and tips', restored.p.fines === 4321 && restored.n.name === 'Ada' && restored.t.seen?.includes('firstrun'), JSON.stringify(restored.p).slice(0, 60));
+    await c2.close();
+
+    // ---- Home Screen nudge ----
+    const nudgeRun = async (init, secs, label, expectShow, setup) => {
+      const c = await browser.newContext(phone);
+      if (init) await c.addInitScript(init);
+      const p = await c.newPage(); await p.goto(`http://localhost:${server.address().port}/?debug=1`); await p.waitForSelector('body.ready');
+      if (setup) await p.evaluate(setup);
+      await p.evaluate((s) => { __overdue.startRun('endless'); __overdue.game.playTime = s; __overdue.drive(false); }, secs);
+      await p.evaluate(() => { __overdue.player.hp = 1; __overdue.die(); });
+      await p.waitForFunction(() => __overdue.game.state === 'gameover', null, { timeout: 20000 }).catch(() => {});
+      await p.waitForTimeout(1300);
+      const shown = await p.evaluate(() => !document.getElementById('nudge').hidden);
+      const tips = await p.evaluate(() => JSON.parse(localStorage.getItem('overdue.tips.v1') || '{}').seen || []);
+      return { c, p, shown, tips };
+    };
+    let r = await nudgeRun(null, 200, 'long run', true);
+    await shot(r.p, 'basics-nudge-card');
+    const txt = await r.p.textContent('#nudge');
+    const fit = await r.p.evaluate(() => { const b = document.querySelector('#nudge .nudge-card').getBoundingClientRect(); return b.top >= 0 && b.bottom <= innerHeight + 1 && b.left >= 0 && b.right <= innerWidth + 1; });
+    record(area, 'nudge: a 3+ minute first run shows the card once, with the Safari steps', r.shown && /Share/.test(txt) && /Add to Home Screen/.test(txt) && /Got it/.test(txt) && /Don.t show again/.test(txt) && r.tips.includes('a2hs'), r.tips.join(','));
+    record(area, 'nudge: card fits the phone screen', fit);
+    await r.p.tap('#btnNudgeOk'); await r.p.waitForTimeout(150);
+    record(area, 'nudge: Got it closes the card', await r.p.evaluate(() => document.getElementById('nudge').hidden));
+    await r.p.evaluate(() => { __overdue.startRun('endless'); __overdue.game.playTime = 400; __overdue.player.hp = 1; __overdue.player.inv = 0; __overdue.die(); });
+    await r.p.waitForFunction(() => __overdue.game.state === 'gameover', null, { timeout: 20000 }).catch(() => {});
+    await r.p.waitForTimeout(1300);
+    record(area, 'nudge: never shown a second time', await r.p.evaluate(() => document.getElementById('nudge').hidden));
+    await r.c.close();
+    r = await nudgeRun(null, 40, 'short run', false);
+    record(area, 'nudge: a short first run does not show it', !r.shown && !r.tips.includes('a2hs')); await r.c.close();
+    r = await nudgeRun(null, 200, 'off', true);
+    await r.p.tap('#btnNudgeOff'); await r.p.waitForTimeout(150);
+    record(area, 'nudge: Don’t show again is remembered', await r.p.evaluate(() => document.getElementById('nudge').hidden && JSON.parse(localStorage.getItem('overdue.tips.v1')).seen.includes('a2hs-off'))); await r.c.close();
+    r = await nudgeRun(() => Object.defineProperty(navigator, 'standalone', { get: () => true }), 200, 'ios standalone', false);
+    record(area, 'nudge: never shown when running as an installed app (navigator.standalone)', !r.shown && !r.tips.includes('a2hs')); await r.c.close();
+    r = await nudgeRun(() => { const mm = window.matchMedia.bind(window); window.matchMedia = (q) => (/display-mode:\s*standalone/.test(q) ? { matches: true, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} } : mm(q)); }, 200, 'display-mode', false);
+    record(area, 'nudge: never shown when display-mode is standalone', !r.shown && !r.tips.includes('a2hs')); await r.c.close();
+    const cw = await browser.newContext(phone); const wp = await cw.newPage(); await wp.goto(`http://localhost:${server.address().port}/?debug=1`); await wp.waitForSelector('body.ready');
+    record(area, 'nudge: a cleared story wing triggers it (rule check)', await wp.evaluate(() => __overdue.maybeNudge(true, 5) === true)); await cw.close();
+  } catch (e) { record(area, 'basics flow completed', false, e.message.split('\n')[0]); }
+  srv.close();
   return record.list;
 }
 
@@ -820,6 +994,7 @@ async function newPlayerFlow(name, opts) {
   if (want('screens')) { tasks.push(() => rotateOverlayFlow()); for (const r of ROTATIONS) tasks.push(() => rotationFlow(...r)); }
   if (want('shapes')) tasks.push(() => shapesFlow());
   if (want('newplayer')) for (const [name, opts] of TARGETS) tasks.push(() => newPlayerFlow(name, opts));
+  if (want('basics')) tasks.unshift(() => basicsFlow());
   const t0 = Date.now();
   // Report order stays stable: screens (full, then fit), menus, rotation, shapes, regardless of finish order.
   for (const list of await pool(tasks, JOBS)) results.push(...list);
