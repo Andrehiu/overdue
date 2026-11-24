@@ -7,14 +7,14 @@ import { BUILD, versionLabel, fetchLatestBuild } from './version.js';
 import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
-import { baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips, buildChips, specialReason, levelInfo, perkTip, normalizeTips, TIPS } from './upgrades.js';
+import { NEW_IN_1_15, baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips, buildChips, specialReason, levelInfo, perkTip, normalizeTips, TIPS } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist, aimSource, aimStick } from './util.js';
 import { PLAYER, bookLook } from './palette.js';
 import { BURST, shadowK, drawEnemy as drawArtEnemy, drawWorms } from './enemy-art.js';
 import { SoundEngine } from './audio.js';
 import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
 import { DOORS, soleDoor, doorOffer, applyDoor, doorReward, mysteryPrize, rarePick } from './doors.js';
-import { GUIDE_FLAG, UNLOCK_FLAG, MENUS, unlockToast, hasPlayed, unlockedMenus, newUnlocks, shouldGuide, GUIDE_BEATS, guidePrompt } from './newplayer.js';
+import { GUIDE_FLAG, UNLOCK_FLAG, MENUS, unlockToast, hasPlayed, unlockedMenus, newUnlocks, shouldGuide, GUIDE_BEATS, guidePrompt, WHATS_NEW, whatsNewAction, whatsNewFlag, badgeFlag, badgedCards } from './newplayer.js';
 import { BACKUP_KEYS, encodeBackup, decodeBackup, describeBackup } from './backup.js';
 import { PROGRESS_KEY, RENOVATIONS, normalizeProgress, applyRenovations, runBonuses, recordRun, level, nextCost, canBuy, buy } from './meta.js';
 
@@ -317,7 +317,7 @@ function startRun(mode = 'endless', wing = 1, opts = {}) {
 }
 
 function clearWorld() {
-  for (const arr of [enemies, books, hazards, rings, telegraphs, pickups, particles, texts, flashes]) arr.length = 0;
+  for (const arr of [enemies, books, hazards, rings, telegraphs, pickups, particles, texts, flashes, cats]) arr.length = 0;
   spawnQueue = [];
   game.boss = null; game.bannerT = 0; bannerQueue.length = 0;
 }
@@ -576,9 +576,15 @@ function showPerkTip(choices) {
 
 /** Ids of cards this player had never seen when dealt; the NEW ribbon shows only when some (not all) cards are new. */
 let newIds = new Set();
+let badgeIds = new Set();   // v1.15.0: cards on screen that carry the NEW badge for a release-new perk (shown once per id)
 function applyNew() {
   const all = currentChoices.length > 0 && currentChoices.every((u) => newIds.has(u.id));
-  document.querySelectorAll('#cards .card').forEach((b, i) => b.classList.toggle('new', !all && newIds.has(currentChoices[i]?.id)));
+  document.querySelectorAll('#cards .card').forEach((b, i) => { const id = currentChoices[i]?.id; b.classList.toggle('new', badgeIds.has(id) || (!all && newIds.has(id))); });
+}
+/** Mark these cards' NEW badges as shown (cleared for next time). */
+function badgeShown(cards) {
+  badgeIds = new Set(badgedCards(cards.map((u) => u.id), NEW_IN_1_15, tips.seen));
+  for (const id of badgeIds) markTip(badgeFlag(id));
 }
 
 function renderCards(choices) {
@@ -590,6 +596,7 @@ function renderCards(choices) {
   newIds = new Set(choices.filter((u) => !codex.seen.has(u.id)).map((u) => u.id));
   choices.forEach((u, i) => box.appendChild(buildCard(u, i)));
   for (const u of choices) codex.seen.add(u.id);
+  badgeShown(choices);
   applyNew();
   saveCodex();
   showPerkTip(choices);
@@ -618,6 +625,7 @@ function banishCard(wrap, u) {
     if (repl) {
       if (!codex.seen.has(repl.id)) newIds.add(repl.id);
       codex.seen.add(repl.id); saveCodex();
+      for (const id of badgedCards([repl.id], NEW_IN_1_15, tips.seen)) { badgeIds.add(id); markTip(badgeFlag(id)); }
       const fresh = buildCard(repl, i);
       fresh.classList.add('dealt-one');
       wrap.replaceWith(fresh);
@@ -1034,6 +1042,7 @@ function step(dt) {
   updateEnemies(sdt);
   updateBooks(sdt);
   updateOrbiters(sdt);
+  updateCats(sdt);
   updateHazards(sdt);
   updateRings(sdt);
   updatePickups(sdt);
@@ -1196,10 +1205,11 @@ function updatePlayer(dt) {
   for (let i = p.trail.length - 1; i >= 0; i--) if ((p.trail[i].life -= dt) <= 0) p.trail.splice(i, 1);
 
   p.fireT -= dt;
+  if (stats.lastChapter && game.state === 'playing') { rl.lcT = (rl.lcT || 0) + dt; if (p.hp <= 1) rl.lcLow = (rl.lcLow || 0) + dt; }
   p.nookOn = stats.nook > 0 && nextToShelf(p);
   p.streak = firing ? p.streak + dt : 0;
   p.inZone = stats.zone && p.streak > 2;
-  const rate = stats.fireRate * (p.rapidT > 0 ? 2 : 1) * (p.nookOn ? 1 + stats.nook : 1) * (p.inZone ? 2 : 1);
+  const rate = stats.fireRate * (stats.cliffhanger && p.hp <= 1 ? 1.5 : 1) * (p.rapidT > 0 ? 2 : 1) * (p.nookOn ? 1 + stats.nook : 1) * (p.inZone ? 2 : 1);
   if (firing && p.fireT <= 0) { p.fireT = 1 / rate; fire(); }
 }
 
@@ -1232,6 +1242,8 @@ function spawnBook(x, y, a, extra = {}) {
 }
 
 let currentLook = bookLook({});
+const MARGIN_SIDE = [Math.PI / 4], MARGIN_WIDE = [Math.PI / 6, Math.PI / 3];   // Margin Notes angles: ±45°, then ±30° and ±60°
+function marginBook(p, a) { spawnBook(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a, { bonus: true, nohome: true, margin: true }); }
 function fire() {
   const p = player, n = stats.projectiles;
   currentLook = bookLook(game.owned); // perks change how books look (cheap: a few flags per throw)
@@ -1241,6 +1253,14 @@ function fire() {
     const a = p.aim + (i - (n - 1) / 2) * stats.spread + (Math.random() - 0.5) * 0.04;
     spawnBook(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a);
   }
+  // Margin Notes (v1.15.0): books off at an angle. They never home and are skipped first at the book cap.
+  if (stats.marginLvl) {
+    const sides = stats.marginLvl >= 3 ? MARGIN_WIDE : MARGIN_SIDE;
+    for (const off of sides) { marginBook(p, p.aim + off); marginBook(p, p.aim - off); }
+    if (stats.marginLvl >= 2) marginBook(p, p.aim + Math.PI);
+  }
+  // Compass Rose: every 3rd throw fires 8 ways
+  if (stats.compass && p.throws % 3 === 0) for (let k = 0; k < 8; k++) marginBook(p, p.aim + (k * TAU) / 8);
   // Leather-Bound Tome: a giant book every Nth throw
   if (stats.tomeEvery && p.throws % stats.tomeEvery === 0) {
     spawnBook(p.x, p.y, p.aim, { r: 15, scale: 2.4, dmgMult: 5, pierce: 99, bounces: 0, color: PLAYER.tome, tome: true });
@@ -1613,6 +1633,29 @@ function hurtPlayer(sx, sy, src = 'other', elite = false) {
 }
 
 
+/** Last Chapter: +X% damage per missing heart, counting at most 3. Read live, so it follows every hit and heal. */
+function lastChapterMult() {
+  if (!stats.lastChapter) return 1;
+  const m = 1 + stats.lastChapter * Math.min(3, Math.max(0, stats.maxHp - player.hp));
+  rl.lcHits = (rl.lcHits || 0) + 1; rl.lcSum = (rl.lcSum || 0) + m;   // balance bot: average multiplier
+  return m;
+}
+
+// Crossfire (Margin Notes + Spine Breaker): side and rear books burst 50% bigger on shelves, radius capped, at most 8 such bursts a second.
+const CROSS_MAX_R = 160, CROSS_PER_SEC = 8;
+let crossWin = 0, crossN = 0;
+function shelfBurstAt(b, x, y, bounce = false) {
+  let r = stats.shelfBurst || (bounce ? 50 : 0);
+  if (!r) return;
+  if (stats.crossfire && b.margin) {
+    if (game.time - crossWin >= 1) { crossWin = game.time; crossN = 0; }
+    if (crossN >= CROSS_PER_SEC) return;
+    crossN++;
+    r = Math.min(CROSS_MAX_R, Math.round(r * 1.5));
+  }
+  inkBurst(x, y, r, stats.damage * stats.burstMult, '#ffb86b');
+}
+
 function updateBooks(dt) {
   if (game.state === 'playing') sampleFlight(rl, books.length);
   for (let i = books.length - 1; i >= 0; i--) {
@@ -1622,7 +1665,7 @@ function updateBooks(dt) {
     // Homing only on a book's first trip; Interdimensional Loan gives one homing trip (at 6) after the first wrap.
     const trips = b.wrapN || 0;
     const homing = trips === 0 ? stats.homing : trips === 1 && stats.wrapHoming ? 6 : 0;
-    if (homing > 0) {
+    if (homing > 0 && !b.nohome) {
       const t = nearestEnemy(b.x, b.y, Math.max(stats.homingRange, 240));
       if (t) {
         const cur = Math.atan2(b.vy, b.vx), want = Math.atan2(t.y - b.y, t.x - b.x);
@@ -1655,11 +1698,11 @@ function updateBooks(dt) {
           const t = nearestEnemy(b.x, b.y, 700);
           if (t) { const sp = Math.hypot(b.vx, b.vy), a = Math.atan2(t.y - b.y, t.x - b.x); b.vx = Math.cos(a) * sp; b.vy = Math.sin(a) * sp; b.hit.clear(); }
         }
-        if (stats.bounceBurst) inkBurst(b.x, b.y, stats.shelfBurst || 50, stats.damage * stats.burstMult, '#ffb86b');
+        if (stats.bounceBurst) shelfBurstAt(b, b.x, b.y, true);
         sound.play('ping');
       } else {
         remove = true; pages(b.x, b.y, 2);
-        if (stats.shelfBurst) inkBurst(ox, oy, stats.shelfBurst, stats.damage * stats.burstMult, '#ffb86b');
+        if (stats.shelfBurst) shelfBurstAt(b, ox, oy);
       }
     }
     if (!remove) {
@@ -1669,7 +1712,7 @@ function updateBooks(dt) {
         if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 < rr * rr) {
           b.hit.add(e);
           const crit = Math.random() < stats.critChance;
-          const base = stats.damage * b.dmgMult * (stats.nookDamage && player.nookOn ? 2 : 1);
+          const base = stats.damage * b.dmgMult * lastChapterMult() * (stats.nookDamage && player.nookOn ? 2 : 1);
           const dmg = crit ? base * stats.critMult : base;
           const s = Math.hypot(b.vx, b.vy) || 1;
           damageEnemy(e, dmg, (b.vx / s) * 160, (b.vy / s) * 160, crit, crit ? 'crit' : 'throw');
@@ -1719,6 +1762,55 @@ function updateOrbiters(dt) {
       }
     }
   }
+}
+
+// Library Cat (v1.15.0): pounces on the nearest enemy (ignores line of sight, it's a cat). Level 1: 2x damage every 1.6 s;
+// level 2: 30% more often and 50% harder; level 3: the pounce hits everything nearby. Stray Colony: a second cat, and pounces stun
+// (never bosses or elites; a normal enemy can be stunned once per 3 s).
+const CAT_RANGE = 380, CAT_LEAP = 0.28, CAT_AREA = 70, CAT_STUN = 0.6, CAT_STUN_CD = 3;
+const cats = [];
+function updateCats(dt) {
+  if (!stats.catLvl || game.state === 'dying') { if (cats.length) cats.length = 0; return; }
+  const want = stats.colony ? 2 : 1, lvl = stats.catLvl;
+  while (cats.length < want) { const i = cats.length; cats.push({ x: player.x, y: player.y, i, cd: 0.5 + i * 0.8, leap: 0, from: null, tx: 0, ty: 0, target: null, face: 1, hop: 0 }); }
+  const cd = 1.6 / (lvl >= 2 ? 1.3 : 1), dmg = stats.damage * 2 * (lvl >= 2 ? 1.5 : 1);
+  for (const c of cats) {
+    if (c.leap > 0) {
+      c.leap -= dt;
+      const t = 1 - Math.max(0, c.leap) / CAT_LEAP;
+      if (c.target && !c.target.dead) { c.tx = c.target.x; c.ty = c.target.y; }
+      c.x = c.fx + (c.tx - c.fx) * t; c.y = c.fy + (c.ty - c.fy) * t; c.hop = Math.sin(t * Math.PI) * 22;
+      c.face = c.tx >= c.fx ? 1 : -1;
+      if (c.leap <= 0) { c.hop = 0; catLand(c, dmg, lvl); c.cd = cd; }
+      continue;
+    }
+    // follow: sit a little behind the player (second cat on the other side)
+    const side = c.i ? -1 : 1, hx = player.x - side * 26, hy = player.y + 14;
+    const dx = hx - c.x, dy = hy - c.y, d = Math.hypot(dx, dy);
+    if (d > 4) { const sp = Math.min(d * 6, 320) * dt; c.x += (dx / d) * sp; c.y += (dy / d) * sp; c.face = dx >= 0 ? 1 : -1; }
+    c.cd -= dt;
+    if (c.cd <= 0 && game.state === 'playing') {
+      const t = nearestEnemy(player.x, player.y, CAT_RANGE);
+      if (t) { c.target = t; c.fx = c.x; c.fy = c.y; c.tx = t.x; c.ty = t.y; c.leap = CAT_LEAP; }
+      else c.cd = 0.2;
+    }
+  }
+}
+function catLand(c, dmg, lvl) {
+  const hits = [];
+  for (const e of enemies) {
+    if (e.dead) continue;
+    const d = Math.hypot(e.x - c.tx, e.y - c.ty);
+    if (e === c.target || (lvl >= 3 && d < CAT_AREA + e.r)) hits.push(e);
+  }
+  for (const e of hits) {
+    const dx = e.x - c.fx, dy = e.y - c.fy, d = Math.hypot(dx, dy) || 1;
+    damageEnemy(e, dmg, (dx / d) * 140, (dy / d) * 140, false, 'cat');
+    if (stats.colony && !e.dead && e.type !== 'boss' && !e.elite && game.time >= (e.catStunUntil || 0)) { e.stun = Math.max(e.stun || 0, CAT_STUN); e.catStunUntil = game.time + CAT_STUN_CD; }
+  }
+  burst(c.tx, c.ty, 6, [PLAYER.cat, PLAYER.catCollar], 110, 0.3);
+  if (lvl >= 3) rings.push({ x: c.tx, y: c.ty, r: 4, max: CAT_AREA, speed: 300, friendly: true, life: 1, faint: true, color: '120,200,190' });
+  sound.play('hit', 0.6);
 }
 
 function updateHazards(dt) {
@@ -1975,6 +2067,7 @@ function render() {
     orbiterPositions().forEach((o, k) => { if (orbitRest[k] > 0) ctx.globalAlpha = 0.4; drawBook(o.x, o.y, o.a * 2, PLAYER.orbit, 1.1); ctx.globalAlpha = 1; });
     drawPlayer();
   }
+  for (const c of cats) drawCat(c);
   drawHazards();
   for (const g of rings) drawRing(g);
   drawParticles();
@@ -2035,6 +2128,22 @@ function drawThrownBook(b) {
   ctx.fillStyle = '#f3ead2'; ctx.fillRect(-5, -4, 11, 8);
   ctx.fillStyle = b.color; ctx.fillRect(-7, -5, 3, 10);
   if (L.crack) { ctx.fillStyle = PLAYER.crack; ctx.fillRect(-6.6, -4.5, 1.6, 3); ctx.fillRect(-5.6, -1.5, 1.6, 3); ctx.fillRect(-6.6, 1.5, 1.6, 3); }
+  ctx.restore();
+}
+
+/** Library Cat: a small grey-blue cat with a teal collar (a sprite-sized shape, no shadowBlur). */
+function drawCat(c) {
+  const f = c.face || 1, y = c.y - (c.hop || 0), moving = c.leap > 0;
+  ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(c.x, c.y + 8, 9, 3.5, 0, 0, TAU); ctx.fill();
+  ctx.save(); ctx.translate(c.x, y); ctx.scale(f, 1);
+  ctx.fillStyle = PLAYER.cat;
+  ctx.beginPath(); ctx.ellipse(0, 2, moving ? 10 : 8, moving ? 4.5 : 5.5, 0, 0, TAU); ctx.fill();          // body (stretches mid-pounce)
+  ctx.beginPath(); ctx.arc(7, -2, 5, 0, TAU); ctx.fill();                                                    // head
+  ctx.beginPath(); ctx.moveTo(4, -5); ctx.lineTo(5.5, -10); ctx.lineTo(8, -6); ctx.moveTo(8, -6); ctx.lineTo(10.5, -10); ctx.lineTo(11, -4); ctx.fill(); // ears
+  ctx.strokeStyle = PLAYER.cat; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-7, 1); ctx.quadraticCurveTo(-14, -4 + Math.sin(game.time * 6 + c.i) * 3, -12, -9); ctx.stroke();   // tail
+  ctx.fillStyle = PLAYER.catCollar; ctx.fillRect(3, 0, 2.5, 5);                                              // teal collar
+  ctx.fillStyle = '#10202a'; ctx.fillRect(8, -3, 1.5, 1.5);                                                  // eye
   ctx.restore();
 }
 
@@ -2428,9 +2537,24 @@ function renderMenus() {
   if (menusAnnounce) fresh.forEach((id, i) => setTimeout(() => { if (game.state === 'title') toast(unlockToast(id), 3000); }, 350 + i * 3200));
   menusAnnounce = true;
   updateFirstHint();
+  maybeWhatsNew();
   const grid = document.querySelector('#title .menu-grid');
   if (grid) grid.classList.toggle('three', [...grid.children].filter((b) => !b.hidden).length % 2 === 1);
 }
+
+// ---- "What's new" card (v1.15.0): once, for big releases only, to returning players; a brand-new player just gets it stamped ----
+function maybeWhatsNew() {
+  const act = whatsNewAction({ seen: tips.seen, played: hasPlayed(playerSaves()) }, BUILD.version);
+  if (!act) return;
+  markTip(whatsNewFlag());
+  if (act === 'stamp') { for (const id of NEW_IN_1_15) markTip(badgeFlag(id)); return; }   // fresh install: nothing is "new" to them
+
+  $('#wnTitle').textContent = WHATS_NEW.title;
+  $('#wnLines').replaceChildren(...WHATS_NEW.lines.map((t) => Object.assign(document.createElement('li'), { textContent: t })));
+  $('#btnWnOk').textContent = WHATS_NEW.button;
+  setTimeout(() => { if (game.state === 'title') $('#whatsNew').hidden = false; }, 500);
+}
+$('#btnWnOk').addEventListener('click', () => { $('#whatsNew').hidden = true; sound.play('click'); });
 
 // ---- Late fees UI: fines balance, Renovations shop, story wing select ----
 function renderFineBadges() {
@@ -2842,7 +2966,7 @@ requestAnimationFrame(frame);
 // Test hooks (only with ?debug) — used by the automated Playwright smoke test.
 if (DEBUG) {
   window.__overdue = {
-    game, grid: () => `${COLS}x${ROWS}`, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, enemies, get content() { return content; },
+    game, get cats() { return cats; }, grid: () => `${COLS}x${ROWS}`, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, enemies, get content() { return content; },
     makeEnemy, freeze: (on) => { debugFreeze = !!on; }, startRun: (m, w) => startRun(m, w, { noGuide: true }), startWave, get guide() { return game.guide; }, tipsSeen: () => tips.seen.slice(), setSurviveT: (t) => { game.surviveT = t; }, killAll: () => { for (const e of [...enemies]) killEnemy(e); spawnQueue.length = 0; telegraphs.length = 0; },
     get progress() { return progress; }, setFines: (n) => { progress = { ...progress, fines: n }; saveProgress(); renderFineBadges(); },
     unlockAll: () => { progress = { ...progress, unlocked: WINGS.length }; saveProgress(); },

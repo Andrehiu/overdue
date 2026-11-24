@@ -8,7 +8,7 @@ export const MAX_RUNS = 50;
 export const STATS_PREFIX = 'OVS1:';
 
 /** Where the player's damage comes from. Fixed keys, so counting a hit is one number add (no allocation). */
-export const DEALT_SOURCES = ['throw', 'crit', 'dash', 'orbit', 'burst', 'splash', 'shhh', 'other'];
+export const DEALT_SOURCES = ['throw', 'crit', 'dash', 'orbit', 'cat', 'burst', 'splash', 'shhh', 'other'];
 /** burst = Spine Breaker / Collapsing Stacks shelf bursts, splash = Annotated Edition crit splash. */
 export const FLIGHT_BINS = 64, LIFE_BINS = 40, LIFE_BIN_S = 0.1;
 

@@ -887,6 +887,64 @@ async function newPlayerFlow(name, opts) {
 // ---------------------------------------------------------------- 4c. app basics (v1.13.1): offline play, update, kill switch, backup code, Home Screen nudge
 /** v1.13.1 basics flow: the worker taking control / the update reload navigates the page on its own, which destroys an evaluate that is running.
  *  Every evaluate on these pages waits for the planned navigation to settle and retries (reads and idempotent steps only). */
+
+// v1.15.0 part B: the "What's new" card, NEW badges, Margin Notes books and the Library Cat.
+async function newPerksFlow(name, opts) {
+  const record = recorder();
+  const area = `newperks/${name}`;
+  const mk = async (returning) => {
+    const ctx = await browser.newContext(opts);
+    await ctx.addInitScript(returning ? `(${RETURNING_SAVE})(); try { if (localStorage.getItem('overdue.tips.v1') === null) localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off"]}'); } catch {}` : `try { if (localStorage.getItem('overdue.tips.v1') === null) localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off"]}'); } catch {}`);
+    const page = await ctx.newPage(); const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    return { ctx, page, errors };
+  };
+  try {
+    // returning 1.14 save: the card shows once
+    { const { ctx, page, errors } = await mk(true);
+      await page.goto(URL0); await page.waitForTimeout(1100);
+      const vis = await page.evaluate(() => { const c = document.getElementById('whatsNew'), r = document.querySelector('#whatsNew .nudge-card').getBoundingClientRect(); return { hidden: c.hidden, text: c.textContent, inView: r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth, items: document.querySelectorAll('#wnLines li').length }; });
+      await shot(page, `${name}-whatsnew-card`);
+      record(area, "What's new card shows for a returning 1.14 save, on screen, 2-3 lines", !vis.hidden && /New in 1\.15\.0: 7 new perks and 5 new combos/.test(vis.text) && vis.inView && vis.items >= 2 && vis.items <= 3, JSON.stringify({ ...vis, text: vis.text.slice(0, 60) }));
+      await page.click('#btnWnOk'); await page.waitForTimeout(200);
+      record(area, "What's new card closes with its one button", await page.evaluate(() => document.getElementById('whatsNew').hidden));
+      await page.reload(); await page.waitForTimeout(1100);
+      record(area, "What's new card never shows twice", await page.evaluate(() => document.getElementById('whatsNew').hidden && __overdue.tipsSeen().includes('whatsnew-1.15.0')));
+      // NEW badges on the first offer; this player has not been stamped as fresh, so the badges are still pending
+      await page.evaluate(() => { localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.15.0","perk-stack"]}'); }); await page.reload(); await page.waitForTimeout(700);
+      await page.evaluate(() => { __overdue.startRun('endless'); __overdue.showUpgrades(); __overdue.showCards(['margin', 'hardcover', 'librarycat']); }); await page.waitForTimeout(900);
+      const cls = () => page.evaluate(() => [...document.querySelectorAll('#cards .card')].map((c) => c.classList.contains('new')));
+      const first = await cls(); await shot(page, `${name}-perk-new-badge`);
+      record(area, 'NEW badge shows on new perk cards the first time they are offered', first[0] && !first[1] && first[2], JSON.stringify(first));
+      await page.evaluate(() => __overdue.showCards(['margin', 'hardcover', 'librarycat'])); await page.waitForTimeout(300);
+      const second = await cls();
+      record(area, 'NEW badge clears once the card was shown', !second.some(Boolean), JSON.stringify(second));
+      record(area, 'badge flags are plain ids in the tips store (old saves load unchanged)', await page.evaluate(() => { const t = JSON.parse(localStorage.getItem('overdue.tips.v1')); return Object.keys(t).join() === 'seen' && t.seen.includes('badge-margin') && t.seen.includes('a2hs-off'); }));
+      record(area, 'no page errors (whats-new/badges)', errors.length === 0, errors.join('; ').slice(0, 200));
+      await ctx.close(); }
+    // fresh install: nothing shown, everything stamped
+    { const { ctx, page, errors } = await mk(false);
+      await page.goto(URL0); await page.waitForTimeout(1100);
+      record(area, "What's new card never shows on a fresh install", await page.evaluate(() => document.getElementById('whatsNew').hidden && __overdue.tipsSeen().includes('whatsnew-1.15.0') && __overdue.tipsSeen().includes('badge-margin')));
+      await page.evaluate(() => { __overdue.startRun('endless'); __overdue.showCards(['margin', 'hardcover', 'librarycat']); }); await page.waitForTimeout(500);
+      record(area, 'a brand-new player sees no NEW badge on new perks', await page.evaluate(() => document.querySelectorAll('#cards .card').length === 3 && !document.querySelector('#cards .card.new')));
+      await ctx.close(); }
+    // the cat and Margin Notes books in a room
+    { const { ctx, page, errors } = await mk(true);
+      await page.goto(URL0); await page.evaluate(() => localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.15.0"]}')); await page.reload(); await page.waitForTimeout(900);
+      await page.evaluate(() => { const O = __overdue; O.startRun('endless'); O.god(); O.grant('librarycat'); for (let i = 0; i < 3; i++) O.grant('margin'); O.grant('dewey'); });
+      await page.waitForFunction(() => __overdue.enemies.length >= 3, null, { timeout: 20000 }).catch(() => {});
+      await page.waitForTimeout(2500);
+      await shot(page, `${name}-cat-and-margin`);
+      const m = await page.evaluate(() => { const O = __overdue; return { cats: O.cats.length, side: O.books.filter((b) => b.margin).length, homingSide: O.books.filter((b) => b.margin && b.nohome).length, rear: O.books.filter((b) => b.margin).some((b) => Math.cos(Math.atan2(b.vy, b.vx) - O.player.aim) < -0.9), catDmg: O.runCounters.dealt.cat }; });
+      record(area, 'the cat is on screen and pounces (damage dealt by the cat)', m.cats === 1 && m.catDmg > 0, JSON.stringify(m));
+      record(area, 'Margin Notes 3/3 throws side and rear books that never home', m.side >= 4 && m.side === m.homingSide, JSON.stringify(m));
+      record(area, 'no page errors (cat/margin)', errors.length === 0, errors.join('; ').slice(0, 200));
+      await ctx.close(); }
+  } catch (e) { record(area, 'new perks flow completed', false, e.message.split('\n')[0]); }
+  return record.list;
+}
+
 async function steadyContext(opts) {
   const ctx = await browser.newContext(opts), np = ctx.newPage.bind(ctx);
   ctx.newPage = async () => {
@@ -1075,6 +1133,7 @@ async function basicsFlow() {
   if (want('screens')) { tasks.push(() => rotateOverlayFlow()); for (const r of ROTATIONS) tasks.push(() => rotationFlow(...r)); }
   if (want('shapes')) tasks.push(() => shapesFlow());
   if (want('newplayer')) for (const [name, opts] of TARGETS) tasks.push(() => newPlayerFlow(name, opts));
+  if (want('newperks')) tasks.push(() => newPerksFlow(...TARGETS[0]));
   if (want('basics')) tasks.unshift(() => basicsFlow());
   const t0 = Date.now();
   // Report order stays stable: screens (full, then fit), menus, rotation, shapes, regardless of finish order.

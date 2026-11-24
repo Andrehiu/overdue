@@ -17,6 +17,8 @@ export const PLAYER = {
   trail: '#9be7dc',    // Dewey Decimal Guidance: teal dotted homing trail
   glint: '#ffffff',    // Plot Twist: white arrowhead (pierce)
   crack: '#ffd54a',    // Spine Breaker: glowing cracked spine
+  cat: '#8fa6c0',      // Library Cat: grey-blue fur
+  catCollar: '#2fc4b2', // Library Cat: teal collar
 };
 
 export const ENEMY = { page: '#ff3b4e' };

@@ -590,5 +590,5 @@ body.guiding #touchUI #btnGuideSkip { display: block; }
 .nudge-card { width: min(26em, 92%); max-height: 94%; overflow: auto; box-sizing: border-box; padding: .7em 1em; text-align: left; color: var(--nd-ink); background: var(--nd-bg); border: 1px solid var(--nd-line); border-radius: 12px; box-shadow: 0 .5em 2em rgba(0, 0, 0, .8); font-size: .9em; line-height: 1.35; }
 .nudge-card h3 { margin: 0 0 .3em; color: #ffd54a; font-size: 1.15em; }
 .nudge-card p { margin: 0 0 .3em; }
-.nudge-card ol { margin: 0 0 .5em; padding-left: 1.3em; }
+.nudge-card ol, .nudge-card ul { margin: 0 0 .5em; padding-left: 1.3em; }
 .nudge-card .menu.row { margin: 0; justify-content: center; gap: .5em; }

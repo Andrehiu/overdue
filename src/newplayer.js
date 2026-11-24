@@ -56,3 +56,39 @@ export function guidePrompt(beat, { aimOff = false, used = false } = {}) {
   if (b.id === 'dash') return used ? 'Nice dodge! Keep throwing.' : 'Tap DASH to dodge';
   return used ? 'Nice! Finish them off.' : 'Tap SHHH to push them back';
 }
+
+// ---- v1.15.0: "What's new" card for big releases, and NEW badges on new perk cards ----
+// Flags are plain ids in the tips store's `seen` list (additive, like the unlock flags above): `whatsnew-<release>` once the card was
+// handled, `badge-<perk id>` once that perk's NEW badge was shown. Old saves load unchanged; "Show tips again" resets both.
+
+/** The one-time card for a big release. Add a new entry only for big releases; small ones never show a card. */
+export const WHATS_NEW = {
+  release: '1.15.0',
+  title: 'New in 1.15.0: 7 new perks and 5 new combos',
+  lines: ['Margin Notes, Last Chapter, Library Cat and more join the deck.', 'Look for the NEW badge on their cards.', 'Pair them up for new Collected Works.'],
+  button: 'Got it',
+};
+export const whatsNewFlag = (card = WHATS_NEW) => `whatsnew-${card.release}`;
+export const badgeFlag = (id) => `badge-${id}`;
+
+/** Compare "1.15.0"-style versions. Anything that isn't a plain x.y.z (a "dev" build) counts as newest. */
+export function cmpVersion(a, b) {
+  const v = (x) => (/^\d+\.\d+\.\d+$/.test(String(x)) ? String(x).split('.').map(Number) : null);
+  const pa = v(a), pb = v(b);
+  if (!pa || !pb) return pa ? -1 : pb ? 1 : 0;
+  for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return pa[i] < pb[i] ? -1 : 1;
+  return 0;
+}
+
+/**
+ * What to do with the "What's new" card on the title screen: 'show' (a returning player who hasn't seen it),
+ * 'stamp' (a brand-new player: record it silently, show nothing) or null (already handled, or this build is older than the card).
+ * `seen` = the saved tips ids, `played` = hasPlayed(...), `build` = the running version.
+ */
+export function whatsNewAction({ seen = [], played = false } = {}, build, card = WHATS_NEW) {
+  if (cmpVersion(build, card.release) < 0 || seen.includes(whatsNewFlag(card))) return null;
+  return played ? 'show' : 'stamp';
+}
+
+/** Which of the cards on offer get a NEW badge: ids in `newIds` whose badge hasn't been shown yet. */
+export const badgedCards = (offeredIds, newIds, seen = []) => offeredIds.filter((id) => newIds.includes(id) && !seen.includes(badgeFlag(id)));
