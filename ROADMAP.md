@@ -17,11 +17,11 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
   (usually additive; after a merge run `node --check scripts/qa/run.mjs`). QA seeds a "returning player" save since 1.13.0.
   Coders sometimes report the planner branch name by mistake: verify with `git log origin/<branch>`. Pages runs can sit in
   "waiting" a minute. "Show tips again" also clears the 1.13.0 unlock flags (small follow-up if the owner notices).
-- **Live: v1.15.1** (eb6e5de, Pages run 30 green 2026-11-24) = 1.15.0 new perks (2a173d3) + look & feel (bigger story enemies,
+- **Live: v1.15.2** (390c875, Pages run 31 green 2026-11-24; story enemy+boss HP −5%, bot p65 + --human; bot can't reproduce owner's wing-2
+  difficulty, hearts lost mostly to ring shockwaves → next lever if still hard: ring readability/size/speed). Before that v1.15.1 (eb6e5de) = 1.15.0 new perks (2a173d3) + look & feel (bigger story enemies,
   sprite ×1.2 / hit ×1.1; orbit books ×1.6, radius 56; Margin ±22.5°; Crossfire text; boss phase: small tag, 1 s immune transform)
   + stronger privacy scan (owner to add `QA_PRIVATE_TERMS` repo secret). Coders for 1.15.0/1.15.1 archived.
-- **Running:** 1.15.2 difficulty (session_014kswNkiQAa7aB3C7fVCJax, `claude/difficulty-1152`): bot at 65% Renovations + human-like
-  bot, wing-2 failure causes, story enemy HP −5% (owner playtest notes 6/8). QA-reliable (session_014kswNhyh6FhfYfdqVSDcAv,
+- **Running:** QA-reliable (session_014kswNhyh6FhfYfdqVSDcAv,
   `claude/qa-reliable`) BLOCKED on owner A/B/C: medians don't stabilise fps (no GPU in container; game update 0.02–0.16 ms/frame).
   Planner pick A: fail on update ms + sim speed, fps = warning without GPU.
 - **Owner phone checks (1.15.0 + 1.15.1):** What's new once; status icons readable; enemy size + hitbox fair; orbit books usable;
