@@ -56,11 +56,12 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/game-logic.test.js` | 614 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
 | `test/new-perks.test.js` | 90 | v1.15.0 part B: Margin Notes, Last Chapter, Library Cat, Crossfire, plus the "What's new" card and NEW badges. Pure rules, no DOM. |
 | `test/newplayer.test.js` | 87 | New-player help (v1.13.0): menu unlock rules from saves, the guided-room flag, the Survive room table. Pure rules, no DOM. |
+| `test/privacy-scan.test.js` | 39 |  |
 | `test/rooms.test.js` | 68 | Rooms +20% (v1.14.0): story grids are bigger, endless keeps the legacy grid, every shape stays valid at the new sizes. |
 | `test/runlog.test.js` | 70 | Run log (v1.14.0): record build, ring buffer, Share stats code. Pure rules, no DOM. |
 | `test/status.test.js` | 146 | Status effects (v1.15.0 part A): freeze rule, boss immunity, chain rule, proc scaling, ink/chill/zap maths. Pure, no DOM. |
 | `test/story-meta.test.js` | 270 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
-| `scripts/qa/run.mjs` | 1389 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
+| `scripts/qa/run.mjs` | 1392 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 50 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
 | `scripts/codemap.mjs` | 113 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
@@ -262,6 +263,16 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 - 65: guided room beats: slow bunnies, one charger, a small crowd; prompts match the controls
 - 80: Survive rooms: at most one per wing, never room 1 / elite / boss, later room kept for wings 3, 5, 7, 10
 
+## test/privacy-scan.test.js
+
+- 9: pasted backup / stats codes are caught
+- 13: short or prose mentions of the prefixes are fine
+- 17: save-shaped JSON is caught, bare key names are not
+- 21: synthetic fixtures are exempt only under test/ and only when marked
+- 27: private terms: case-insensitive, never echoed
+- 32: parseTerms splits on commas and newlines
+- 36: summarize counts per label
+
 ## test/rooms.test.js
 
 - 9: story grids are ~20% longer per side, even columns, follow the screen shape; endless keeps the legacy grid
@@ -315,7 +326,7 @@ ENEMY_TYPES:3 · isBossWave:11 · baseBudget:14 · waveBudget:16 · composeWave:
 
 ## scripts/qa/run.mjs
 
-results:27 · record:28 · want:32 · recorder:34 · pool:36 · sh:39 · TYPES:55 · TARGETS:65 · FULL_TARGETS:77 · FILL_JS:80 · TITLE_FIT_JS:81 · shot:93 · PINNED_CHECK:101 · RETURNING_SAVE:135 · TITLE_MENUS_JS:141 · screensFlow:145 · menusFlow:588 · rotateOverlayFlow:694 · ROTATIONS:734 · rotationFlow:739 · shapesFlow:770 · statusFlow:798 · lookFeelFlow:830 · newPlayerFlow:908 · newPerksFlow:1002 · steadyContext:1058 · basicsFlow:1076 · md:1376
+results:28 · record:29 · want:33 · recorder:35 · pool:37 · sh:40 · TYPES:56 · TARGETS:66 · FULL_TARGETS:78 · FILL_JS:81 · TITLE_FIT_JS:82 · shot:94 · PINNED_CHECK:102 · RETURNING_SAVE:136 · TITLE_MENUS_JS:142 · screensFlow:146 · menusFlow:589 · rotateOverlayFlow:695 · ROTATIONS:735 · rotationFlow:740 · shapesFlow:771 · statusFlow:799 · lookFeelFlow:831 · newPlayerFlow:909 · newPerksFlow:1003 · steadyContext:1059 · basicsFlow:1077 · md:1379
 
 ## scripts/build.mjs
 

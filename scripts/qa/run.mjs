@@ -13,6 +13,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { cpus } from 'node:os';
+import { scanText, parseTerms, summarize } from './privacy.mjs';
 
 const ROOT = resolve(new URL('../..', import.meta.url).pathname);
 const OUT = join(ROOT, 'qa-report');
@@ -1360,15 +1361,17 @@ if (want('security')) {
   const SECRET = /(ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[bp]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)/;
   const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
   const ALLOWED_EMAIL = /noreply@anthropic\.com|users\.noreply\.github\.com/;
-  const priv = existsSync(join(ROOT, '.qa-private-terms')) ? readFileSync(join(ROOT, '.qa-private-terms'), 'utf8').split('\n').map((s) => s.trim()).filter(Boolean) : [];
+  const fileTerms = existsSync(join(ROOT, '.qa-private-terms')) ? parseTerms(readFileSync(join(ROOT, '.qa-private-terms'), 'utf8')) : [];
+  const envTerms = parseTerms(process.env.QA_PRIVATE_TERMS); // CI passes the QA_PRIVATE_TERMS repository secret
+  const priv = [...new Set([...fileTerms, ...envTerms])];
   const hits = [];
   for (const [f, t] of texts) {
     if (SECRET.test(t)) hits.push(`secret-like token in ${f}`);
     for (const e of t.match(EMAIL) || []) if (!ALLOWED_EMAIL.test(e)) hits.push(`email in ${f}`);
-    for (const term of priv) if (t.toLowerCase().includes(term.toLowerCase())) hits.push(`private term in ${f}`);
+    hits.push(...scanText(f, t, priv)); // pasted OVD1/OVS1 codes, save-like JSON, private terms (never echoed)
   }
-  record('security', 'no secrets or emails in files + commit messages', hits.length === 0, [...new Set(hits)].slice(0, 5).join(' | '));
-  record('security', 'private-terms scan', true, priv.length ? `${priv.length} private terms checked` : 'skipped: create .qa-private-terms (gitignored) to also scan for your name');
+  record('security', 'no secrets, emails or pasted player data in files + commit messages', hits.length === 0, summarize(hits).slice(0, 5).join(' | '));
+  record('security', 'private-terms scan', true, priv.length ? `${priv.length} private terms checked (${fileTerms.length} file, ${envTerms.length} env)` : 'skipped: create .qa-private-terms (gitignored) or set QA_PRIVATE_TERMS');
 }
 
 // ---------------------------------------------------------------- 6. report
