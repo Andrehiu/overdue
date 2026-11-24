@@ -89,7 +89,7 @@ export const UPGRADES = [
   combo({ id: 'annotated', icon: '🖋️', short: 'Annotated', name: 'Annotated Edition', requires: ['footnotes', 'hardcover'], desc: 'Critical hits burst, hurting everything nearby.', apply: (s) => { s.critBurst = 60; } }),
   combo({ id: 'collapsing', icon: '🏚️', short: 'Collapsing', name: 'Collapsing Stacks', requires: ['spinebreaker', 'bookmark'], desc: 'Every ricochet also bursts. Bounce your way through a crowd.', apply: (s) => { s.bounceBurst = true; s.bounces += 1; } }),
 
-  combo({ id: 'crossfire', icon: '✖️', short: 'Crossfire', name: 'Crossfire', requires: ['margin', 'spinebreaker'], desc: 'Side and rear books burst 50% bigger on shelves.', apply: (s) => { s.crossfire = true; } }),
+  combo({ id: 'crossfire', icon: '✖️', short: 'Crossfire', name: 'Crossfire', requires: ['margin', 'spinebreaker'], desc: 'Margin Notes books burst 50% bigger on shelves.', apply: (s) => { s.crossfire = true; } }),
   combo({ id: 'brittle', icon: '💔', short: 'Brittle', name: 'Brittle Pages', requires: ['leakypen', 'coldstorage'], desc: 'Inked and slowed enemies shatter at 20% health. Bosses take 25% more damage instead.', apply: (s) => { s.brittle = true; } }),
   combo({ id: 'conductive', icon: '🔋', short: 'Conductive', name: 'Conductive Ink', requires: ['static', 'leakypen'], desc: 'Zaps seek out inked enemies and spread ink.', apply: (s) => { s.conductive = true; } }),
   combo({ id: 'superconductor', icon: '🥶', short: 'Superconduct', name: 'Superconductor', requires: ['coldstorage', 'static'], desc: 'Zaps freeze slowed enemies for 0.5s. Bosses are immune.', apply: (s) => { s.superconductor = true; } }),

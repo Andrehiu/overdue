@@ -826,6 +826,84 @@ async function statusFlow() {
   return record.list;
 }
 
+// ---------------------------------------------------------------- v1.15.1: look & feel (enemy size, orbit books, Margin angles, boss phase change)
+async function lookFeelFlow() {
+  const record = recorder();
+  const ctx = await browser.newContext(devices['iPhone 13 landscape']);
+  const page = await ctx.newPage();
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  await page.goto(URL0 + (URL0.includes('?') ? '&' : '?') + 'debug=1'); await page.waitForTimeout(500);
+  // enemy size: story enemies are 20% bigger (sprite and hitbox), endless unchanged, elites stay above normals
+  const sizes = await page.evaluate(() => {
+    const O = __overdue, out = {};
+    O.startRun('endless', 1); O.god(); O.killAll();
+    const en = O.makeEnemy('bunny', 100, 100); out.endless = { r: en.r, vs: en.vs };
+    O.startRun('story', 1); O.startWave(2); O.god(); O.killAll();
+    const b = O.makeEnemy('bunny', 100, 100), el = O.makeEnemy('bunny', 200, 100, { elite: true });
+    out.story = { r: b.r, vs: b.vs, eliteR: el.r, scale: O.consts.STORY_ENEMY_SCALE };
+    O.killAll();
+    const cx = O.W / 2, cy = O.H / 2; O.player.x = cx - 150; O.player.y = cy;
+    [['bunny', -20, -60], ['notice', 60, -40], ['patron', 40, 50], ['golem', 140, -10], ['coin', -60, 40], ['worm', 90, 90]].forEach(([t, dx, dy]) => { const e = O.makeEnemy(t, cx + dx, cy + dy); e.hp = e.maxHp = 9; });
+    O.makeEnemy('bunny', cx - 70, cy - 70, { elite: true });
+    O.freeze(true);
+    return out;
+  });
+  await page.waitForTimeout(400);
+  await shot(page, 'lookfeel-story-room');
+  record('lookfeel', 'story enemies drawn 20% bigger (hitbox +10%); endless unchanged; elites stay bigger than normals',
+    sizes.endless.vs === 1 && sizes.endless.r === 11 && sizes.story.vs === 1.2 && Math.abs(sizes.story.r - 12.1) < 0.01 && sizes.story.eliteR > sizes.story.r, JSON.stringify(sizes));
+  // orbit books: big, tight ring
+  const orb = await page.evaluate(() => {
+    const O = __overdue; O.freeze(false); O.startRun('story', 1); O.startWave(2); O.god(); O.killAll();
+    for (let i = 0; i < 3; i++) O.grant('audiobook');
+    O.stepN(30); O.game.bannerT = 0; O.game.bannerQ = 0; O.freeze(true);
+    const o = O.orbiterPositions()[0], d = Math.hypot(o.x - O.player.x, o.y - O.player.y);
+    return { n: O.orbiterPositions().length, d, scale: O.consts.ORBIT_SCALE, R: O.consts.ORBIT_RADIUS };
+  });
+  await page.waitForTimeout(300);
+  await shot(page, 'lookfeel-orbit');
+  record('lookfeel', 'orbit books drawn about 1.6x on a 56 px ring', orb.n >= 3 && orb.scale >= 1.5 && orb.R === 56 && Math.abs(orb.d - 56) < 1, JSON.stringify(orb));
+  // Margin Notes: diagonals at ±22.5° (level 1), ±15° / ±30° (level 3), rear unchanged
+  const mg = await page.evaluate(() => {
+    const O = __overdue; O.freeze(false); O.startRun('story', 1); O.startWave(2); O.god(); O.killAll();
+    const angs = (lvl) => {
+      O.stats.marginLvl = lvl; O.books.length = 0; O.player.aim = 0.7; O.fire();
+      return O.books.filter((b) => b.margin).map((b) => { let a = Math.atan2(b.vy, b.vx) - 0.7; a = Math.atan2(Math.sin(a), Math.cos(a)); return +(a * 180 / Math.PI).toFixed(1); }).sort((x, y) => x - y);
+    };
+    return { l1: angs(1), l2: angs(2), l3: angs(3) };
+  });
+  const near = (a, b) => a.length === b.length && a.every((x, i) => Math.abs(Math.abs(x) - Math.abs(b[i])) < 0.6 && Math.sign(x) === Math.sign(b[i]));
+  record('lookfeel', 'Margin Notes diagonals are ±22.5° (L1-2, plus rear) and ±15° / ±30° (L3)',
+    near(mg.l1, [-22.5, 22.5]) && near(mg.l2, [-180, -22.5, 22.5]) && mg.l3.some((x) => Math.abs(Math.abs(x) - 15) < 0.6) && mg.l3.some((x) => Math.abs(Math.abs(x) - 30) < 0.6) && mg.l3.every((x) => Math.abs(x) <= 30.6 || Math.abs(Math.abs(x) - 180) < 0.6), JSON.stringify(mg));
+  // boss phase change: player keeps control, boss is immune and harmless for ~1 s
+  const bs = await page.evaluate(() => {
+    const O = __overdue; O.freeze(false); O.startRun('story', 1); O.god(); O.startWave(7); O.killAll();
+    const boss = O.makeEnemy('boss', O.W - 150, O.H / 2, { name: 'Test Author', tier: 0, phase: 1, modeT: 0, spiral: 0, summonT: 7 });
+    boss.hp = boss.maxHp = 500; O.stepN(3); O.game.bannerT = 0;   // (room-intro banner cleared: only the phase change is under test)
+    const out = { before: boss.hp };
+    boss.hp = boss.maxHp * 0.6;                      // crosses into phase 2
+    O.stepN(2);
+    out.trans = boss.trans; out.phase = boss.phase; out.banner = O.game.bannerT; out.freeze = O.game.freeze; out.state = O.game.state;
+    const hp0 = boss.hp; O.damageEnemy(boss, 5, 0, 0, false, 'throw'); out.hpAfterHit = boss.hp - hp0;
+    O.player.x = 100; O.player.y = O.H / 2; O.player.inv = 0; const x0 = O.player.x, hearts = O.player.hp;
+    O.drive(true); O.setBotInput({ x: 1, y: 0 }); O.stepN(30); O.setBotInput(null);
+    out.moved = O.player.x - x0; out.hurt = hearts - O.player.hp; out.transLeft = boss.trans;
+    boss.x = O.player.x; boss.y = O.player.y; O.stepN(2); out.contactHurt = hearts - O.player.hp;   // standing inside the boss while it transforms
+    O.stepN(120); out.after = boss.trans; const hp1 = boss.hp; O.damageEnemy(boss, 5, 0, 0, false, 'throw'); out.hitAfter = hp1 - boss.hp;
+    O.drive(false);
+    return out;
+  });
+  record('lookfeel', 'boss phase change: no screen-centre banner or freeze, player moves, boss immune and harmless ~1 s, then hittable again',
+    bs.trans > 0 && bs.phase === 2 && bs.banner === 0 && bs.freeze === 0 && bs.state === 'playing' && bs.hpAfterHit === 0 && bs.moved > 20 && bs.contactHurt === 0 && bs.after === 0 && bs.hitAfter === 5 && errs.length === 0, JSON.stringify(bs) + errs.join(';').slice(0, 100));
+  // screenshot mid-transformation
+  await page.evaluate(() => { const O = __overdue; O.freeze(false); O.startRun('story', 1); O.god(); O.startWave(7); O.killAll(); const b = O.makeEnemy('boss', O.W / 2 + 120, O.H / 2, { name: 'Test Author', tier: 0, phase: 1, modeT: 0, spiral: 0, summonT: 7 }); b.hp = b.maxHp = 500; O.stepN(3); b.hp = b.maxHp * 0.6; O.stepN(20); O.game.bannerT = 0; O.game.bannerQ = 0; O.freeze(true); });
+  await page.waitForTimeout(300);
+  await shot(page, 'lookfeel-boss-phase');
+  await ctx.close();
+  return record.list;
+}
+
 // ---------------------------------------------------------------- v1.13.0: new-player flows (guided first room, Survive timer)
 async function newPlayerFlow(name, opts) {
   const record = recorder();
@@ -1165,6 +1243,7 @@ async function basicsFlow() {
   if (want('screens')) { tasks.push(() => rotateOverlayFlow()); for (const r of ROTATIONS) tasks.push(() => rotationFlow(...r)); }
   if (want('shapes')) tasks.push(() => shapesFlow());
   if (want('status')) tasks.push(() => statusFlow());
+  if (want('lookfeel')) tasks.push(() => lookFeelFlow());
   if (want('newplayer')) for (const [name, opts] of TARGETS) tasks.push(() => newPlayerFlow(name, opts));
   if (want('newperks')) tasks.push(() => newPerksFlow(...TARGETS[0]));
   if (want('basics')) tasks.unshift(() => basicsFlow());
