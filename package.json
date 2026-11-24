@@ -1,6 +1,6 @@
 {
   "name": "overdue",
-  "version": "1.15.2",
+  "version": "1.15.3",
   "description": "OVERDUE! Night shift at the Meme Library: a static, phone-friendly arcade roguelite.",
   "private": true,
   "type": "module",

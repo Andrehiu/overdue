@@ -1251,7 +1251,7 @@ function spawnBook(x, y, a, extra = {}) {
 }
 
 let currentLook = bookLook({});
-const MARGIN_SIDE = [Math.PI / 8], MARGIN_WIDE = [Math.PI / 12, Math.PI / 6];   // Margin Notes angles: ±22.5°, then ±15° and ±30°
+const MARGIN_SIDE = [Math.PI / 8 * 0.7], MARGIN_WIDE = [Math.PI / 12 * 0.7, Math.PI / 6 * 0.7];   // Margin Notes angles: ±15.75°, then ±10.5° and ±21° (v1.15.3: 30% narrower)
 function marginBook(p, a) { spawnBook(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a, { bonus: true, nohome: true, margin: true, pierce: stats.pierce + 1 }); }
 function fire() {
   const p = player, n = stats.projectiles;

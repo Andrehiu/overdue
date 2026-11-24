@@ -869,7 +869,7 @@ async function lookFeelFlow() {
   await page.waitForTimeout(300);
   await shot(page, 'lookfeel-orbit');
   record('lookfeel', 'orbit books drawn about 1.6x on a 56 px ring', orb.n >= 3 && orb.scale >= 1.5 && orb.R === 56 && Math.abs(orb.d - 56) < 1, JSON.stringify(orb));
-  // Margin Notes: diagonals at ±22.5° (level 1), ±15° / ±30° (level 3), rear unchanged
+  // Margin Notes: diagonals at ±15.75° (level 1), ±10.5° / ±21° (level 3), rear unchanged
   const mg = await page.evaluate(() => {
     const O = __overdue; O.freeze(false); O.startRun('story', 1); O.startWave(2); O.god(); O.killAll();
     const angs = (lvl) => {
@@ -879,8 +879,8 @@ async function lookFeelFlow() {
     return { l1: angs(1), l2: angs(2), l3: angs(3) };
   });
   const near = (a, b) => a.length === b.length && a.every((x, i) => Math.abs(Math.abs(x) - Math.abs(b[i])) < 0.6 && Math.sign(x) === Math.sign(b[i]));
-  record('lookfeel', 'Margin Notes diagonals are ±22.5° (L1-2, plus rear) and ±15° / ±30° (L3)',
-    near(mg.l1, [-22.5, 22.5]) && near(mg.l2, [-180, -22.5, 22.5]) && mg.l3.some((x) => Math.abs(Math.abs(x) - 15) < 0.6) && mg.l3.some((x) => Math.abs(Math.abs(x) - 30) < 0.6) && mg.l3.every((x) => Math.abs(x) <= 30.6 || Math.abs(Math.abs(x) - 180) < 0.6), JSON.stringify(mg));
+  record('lookfeel', 'Margin Notes diagonals are ±15.75° (L1-2, plus rear) and ±10.5° / ±21° (L3)',
+    near(mg.l1, [-15.75, 15.75]) && near(mg.l2, [-180, -15.75, 15.75]) && mg.l3.some((x) => Math.abs(Math.abs(x) - 10.5) < 0.6) && mg.l3.some((x) => Math.abs(Math.abs(x) - 21) < 0.6) && mg.l3.every((x) => Math.abs(x) <= 21.6 || Math.abs(Math.abs(x) - 180) < 0.6), JSON.stringify(mg));
   // boss phase change: player keeps control, boss is immune and harmless for ~1 s
   const bs = await page.evaluate(() => {
     const O = __overdue; O.freeze(false); O.startRun('story', 1); O.god(); O.startWave(7); O.killAll();
