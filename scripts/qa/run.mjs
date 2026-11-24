@@ -13,6 +13,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { cpus } from 'node:os';
+import { median } from './stats.mjs';
 
 const ROOT = resolve(new URL('../..', import.meta.url).pathname);
 const OUT = join(ROOT, 'qa-report');
@@ -348,7 +349,9 @@ async function screensFlow(name, opts, full) {
       const O = __overdue;
       for (let i = 0; i < 60 && O.game.state === 'playing'; i++) { O.killAll(); await new Promise((r) => setTimeout(r, 100)); }
     });
-    await clearRoom(); await page.waitForTimeout(2600);
+    await clearRoom();
+    await page.waitForFunction(() => __overdue.game.state === 'upgrade' && document.querySelectorAll('#cards .card').length >= 4, null, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(300);
     const hand = await page.evaluate(() => ({ state: __overdue.game.state, title: document.querySelector('#upgradeTitle').textContent,
       cards: [...document.querySelectorAll('#cards .card')].map((c) => { const r = c.getBoundingClientRect(); return { l: r.left, r: r.right }; }) }));
     await shot(page, `${name}-11-story-perks`);
@@ -540,7 +543,8 @@ async function screensFlow(name, opts, full) {
       const saved = await p3.evaluate(() => __overdue.settings.autoaim); await p3.close();
       record(area, 'auto-aim off persists across reload', saved === false, String(saved));
       // Deterministic: the sim is stepped by hand (real loop paused) and we count THROWS, not books in flight.
-      const sim = (body) => page.evaluate(`(async () => { const O = __overdue; O.drive(true); try { ${body} } finally { O.drive(false); } })()`);
+      // A throw needs state 'playing' with enemies alive; if the room already cleared (timing under load), start a fresh one first.
+      const sim = (body) => page.evaluate(`(async () => { const O = __overdue; O.drive(true); try { if (O.game.state !== 'playing' || !O.enemies.length) { O.startRun('endless'); O.god(); O.touch.enabled = true; O.stepN(300); } ${body} } finally { O.drive(false); } })()`);
       await sim(`O.stepN(300);`); // let the room's enemies materialise
       const idle = await sim(`const t0 = O.player.throws; const en = O.enemies.length; O.stepN(150); return { enemies: en, throws: O.player.throws - t0 };`);
       record(area, 'auto-aim off, no second finger: no throws at enemies', idle.enemies > 0 && idle.throws === 0, JSON.stringify(idle));
@@ -1175,6 +1179,29 @@ async function basicsFlow() {
 }
 
 // ---------------------------------------------------------------- 4. performance budget
+
+// Perf sampling: warm up, then 5 x 2 s timed samples; judged on the MEDIAN so one slow sample (software raster, load) can't flip a check.
+// Also times the game update alone (JS we control, no canvas) per step with the real loop paused.
+const PERF_SAMPLES = 5, PERF_SAMPLE_MS = 2000;
+const PERF_SAMPLE_JS = `(async (N, MS) => {
+  const O = __overdue, out = [];
+  const reset = () => { const b = O.enemies.find((e) => e.type === 'boss'); if (b) { b.hp = b.maxHp; O.player.x = b.x; O.player.y = Math.min(b.y + 160, 900); } };
+  const run = (ms) => new Promise((res) => { reset(); const t0 = performance.now(), sim0 = O.game.playTime; let frames = 0;
+    const tick = (now) => { frames++; if (now - t0 < ms) requestAnimationFrame(tick); else res({ sim: (O.game.playTime - sim0) / ((performance.now() - t0) / 1000), fps: frames / ((now - t0) / 1000), books: O.counts().books, hazards: O.counts().hazards }); };
+    requestAnimationFrame(tick); });
+  await run(1000); // warm-up, discarded
+  for (let s = 0; s < N; s++) out.push(await run(MS));
+  O.drive(true);
+  try { reset(); const t0 = performance.now(); O.stepN(120); var upd = (performance.now() - t0) / 120; } finally { O.drive(false); }
+  return { out, upd };
+})`;
+const perfSample = async (page) => {
+  const r = await page.evaluate(`${PERF_SAMPLE_JS}(${PERF_SAMPLES}, ${PERF_SAMPLE_MS})`);
+  const col = (k) => r.out.map((x) => x[k]);
+  return { sim: median(col('sim')), fps: median(col('fps')), books: Math.max(...col('books')), hazards: Math.max(...col('hazards')), upd: r.upd,
+    simS: col('sim'), fpsS: col('fps') };
+};
+const perfDetail = (m) => `median ${m.fps.toFixed(0)} fps, ${m.sim.toFixed(2)}x · game update ${m.upd.toFixed(2)} ms/frame · fps samples ${m.fpsS.map((v) => v.toFixed(0)).join(', ')}`;
 // Late-game boss with a stacked build: this once ran at 0.4x game speed (chained hit-stop) and ~40fps.
 if (want('perf')) {
   const ctx = await steadyContext(devices['iPhone 13 landscape']);
@@ -1189,22 +1216,12 @@ if (want('perf')) {
     O.startWave(15); O.god();
   });
   await page.waitForTimeout(3000);
-  const samples = await page.evaluate(async () => {
-    const O = __overdue, out = [];
-    for (let s = 0; s < 4; s++) {
-      const b = O.enemies.find((e) => e.type === 'boss');
-      if (b) { b.hp = b.maxHp; O.player.x = b.x; O.player.y = Math.min(b.y + 160, 900); }
-      const t0 = performance.now(), sim0 = O.game.playTime; let frames = 0;
-      await new Promise((res) => { const tick = (now) => { frames++; if (now - t0 < 1000) requestAnimationFrame(tick); else res(); }; requestAnimationFrame(tick); });
-      out.push({ sim: (O.game.playTime - sim0) / ((performance.now() - t0) / 1000), fps: frames, books: O.counts().books });
-    }
-    return out;
-  });
+  const samples = await perfSample(page);
   await shot(page, 'perf-late-boss');
-  const avg = (k) => samples.reduce((a, s) => a + s[k], 0) / samples.length;
-  record('perf', `late boss game speed ≥ ${PERF.sim}x`, avg('sim') >= PERF.sim, `${avg('sim').toFixed(2)}x (samples ${samples.map((s) => s.sim.toFixed(2)).join(', ')})`);
-  if (PERF.fps) record('perf', `late boss fps ≥ ${PERF.fps}`, avg('fps') >= PERF.fps, `${avg('fps').toFixed(0)} fps`);
-  record('perf', 'books in flight capped', Math.max(...samples.map((s) => s.books)) <= 110, `max ${Math.max(...samples.map((s) => s.books))}`);
+
+  record('perf', `late boss game speed ≥ ${PERF.sim}x`, samples.sim >= PERF.sim, perfDetail(samples));
+  if (PERF.fps) record('perf', `late boss fps ≥ ${PERF.fps}`, samples.fps >= PERF.fps, perfDetail(samples));
+  record('perf', 'books in flight capped', samples.books <= 110, `max ${samples.books}`);
   // v1.15.0: stress build (Trilogy 3, Margin 3, Speed Reader 3, In the Zone, Saga, Crossfire, Demolition) on the wave-15 boss.
   await page.evaluate(() => {
     const O = __overdue; O.startRun('endless');
@@ -1213,22 +1230,12 @@ if (want('perf')) {
     O.startWave(15); O.god();
   });
   await page.waitForTimeout(3000);
-  const stress = await page.evaluate(async () => {
-    const O = __overdue, out = [];
-    for (let s = 0; s < 4; s++) {
-      const b = O.enemies.find((e) => e.type === 'boss');
-      if (b) { b.hp = b.maxHp; O.player.x = b.x; O.player.y = Math.min(b.y + 160, 900); }
-      const t0 = performance.now(), sim0 = O.game.playTime; let frames = 0;
-      await new Promise((res) => { const tick = (now) => { frames++; if (now - t0 < 1000) requestAnimationFrame(tick); else res(); }; requestAnimationFrame(tick); });
-      out.push({ sim: (O.game.playTime - sim0) / ((performance.now() - t0) / 1000), fps: frames, books: O.counts().books });
-    }
-    return out;
-  });
+  const stress = await perfSample(page);
   await shot(page, 'perf-stress-margin');
-  const savg = (k) => stress.reduce((a, s) => a + s[k], 0) / stress.length;
-  record('perf', `v1.15.0 stress build (Margin 3 + Crossfire + Demolition...) late boss game speed ≥ ${PERF.sim}x`, savg('sim') >= PERF.sim, `${savg('sim').toFixed(2)}x (samples ${stress.map((s) => s.sim.toFixed(2)).join(', ')})`);
-  if (PERF.fps) record('perf', `v1.15.0 stress build late boss fps ≥ ${PERF.fps}`, savg('fps') >= PERF.fps, `${savg('fps').toFixed(0)} fps`);
-  record('perf', 'v1.15.0 stress build: books in flight capped', Math.max(...stress.map((s) => s.books)) <= 110, `max ${Math.max(...stress.map((s) => s.books))}`);
+
+  record('perf', `v1.15.0 stress build (Margin 3 + Crossfire + Demolition...) late boss game speed ≥ ${PERF.sim}x`, stress.sim >= PERF.sim, perfDetail(stress));
+  if (PERF.fps) record('perf', `v1.15.0 stress build late boss fps ≥ ${PERF.fps}`, stress.fps >= PERF.fps, perfDetail(stress));
+  record('perf', 'v1.15.0 stress build: books in flight capped', stress.books <= 110, `max ${stress.books}`);
 
   // v1.15.0: wave-15 boss with a stacked status build (Leaky Pen 3, Static 3, Cold 3, Pop-up 3 + all 4 combos + Trilogy 3)
   await page.evaluate(() => {
@@ -1240,32 +1247,18 @@ if (want('perf')) {
     O.startWave(15); O.god();
   });
   await page.waitForTimeout(3000);
-  const st = await page.evaluate(async () => {
-    const O = __overdue, out = [];
-    for (let s = 0; s < 4; s++) {
-      const b = O.enemies.find((e) => e.type === 'boss');
-      if (b) { b.hp = b.maxHp; O.player.x = b.x; O.player.y = Math.min(b.y + 160, 900); }
-      const t0 = performance.now(), sim0 = O.game.playTime; let frames = 0;
-      await new Promise((res) => { const tick = (now) => { frames++; if (now - t0 < 1000) requestAnimationFrame(tick); else res(); }; requestAnimationFrame(tick); });
-      out.push({ sim: (O.game.playTime - sim0) / ((performance.now() - t0) / 1000), fps: frames });
-    }
-    return out;
-  });
+  const st = await perfSample(page);
   await shot(page, 'perf-status-boss');
-  const sav = (k) => st.reduce((a, x) => a + x[k], 0) / st.length;
-  record('perf', `status-stacked boss game speed ≥ ${PERF.sim}x`, sav('sim') >= PERF.sim, `${sav('sim').toFixed(2)}x (samples ${st.map((x) => x.sim.toFixed(2)).join(', ')})`);
-  if (PERF.fps) record('perf', `status-stacked boss fps ≥ ${PERF.fps}`, sav('fps') >= PERF.fps, `${sav('fps').toFixed(0)} fps`);
+
+  record('perf', `status-stacked boss game speed ≥ ${PERF.sim}x`, st.sim >= PERF.sim, perfDetail(st));
+  if (PERF.fps) record('perf', `status-stacked boss fps ≥ ${PERF.fps}`, st.fps >= PERF.fps, perfDetail(st));
   // Story late game: wing 10 room 6, a crowd of elites firing fans of pages.
   await page.evaluate(() => { const O = __overdue; O.unlockAll(); O.startRun('story', 10); O.startWave(6); O.god(); });
   await page.waitForTimeout(5000);
-  const story = await page.evaluate(async () => {
-    const O = __overdue, t0 = performance.now(), sim0 = O.game.playTime; let frames = 0;
-    await new Promise((res) => { const tick = (now) => { frames++; if (now - t0 < 2000) requestAnimationFrame(tick); else res(); }; requestAnimationFrame(tick); });
-    return { sim: (O.game.playTime - sim0) / ((performance.now() - t0) / 1000), fps: frames / 2, hazards: O.counts().hazards };
-  });
+  const story = await perfSample(page);
   await shot(page, 'perf-story-late');
-  record('perf', `story wing 10 game speed ≥ ${PERF.sim}x`, story.sim >= PERF.sim, `${story.sim.toFixed(2)}x · ${story.hazards} pages in flight`);
-  if (PERF.fps) record('perf', `story wing 10 fps ≥ ${PERF.fps}`, story.fps >= PERF.fps, `${story.fps.toFixed(0)} fps`);
+  record('perf', `story wing 10 game speed ≥ ${PERF.sim}x`, story.sim >= PERF.sim, `${perfDetail(story)} · ${story.hazards} pages in flight`);
+  if (PERF.fps) record('perf', `story wing 10 fps ≥ ${PERF.fps}`, story.fps >= PERF.fps, perfDetail(story));
   await ctx.close();
 }
 await browser.close();
