@@ -12,7 +12,8 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
   3-option pages only for visual choices; 08:00 SGT morning update when going to sleep; max 2 coders (usage).
 - **Token rules:** keep this file short (move shipped rows to `docs/roadmap-archive.md` at each release); filter tool output
   (failing lines, last result only); one roadmap commit per conversation; coders wait on background jobs, don't poll; review only
-  the changed screens (2–3 screenshots); fresh planner session per release with this section as the handover.
+  the changed screens (2–3 screenshots). The owner compacts the planner chat when they choose (no fresh planner per release),
+  so keep this section current: it must be enough to carry on after a compaction.
 - **Gotchas:** parallel coders conflict in `CODEMAP.md`, `package.json`, `src/main.js`, `src/game.css`, `scripts/qa/run.mjs`
   (usually additive; after a merge run `node --check scripts/qa/run.mjs`). QA seeds a "returning player" save since 1.13.0.
   Coders sometimes report the planner branch name by mistake: verify with `git log origin/<branch>`. Pages runs can sit in
