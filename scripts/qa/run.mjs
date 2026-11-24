@@ -1049,7 +1049,8 @@ async function newPerksFlow(name, opts) {
       await page.goto(URL0); await page.evaluate(() => localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.15.0"]}')); await page.reload(); await page.waitForTimeout(900);
       await page.evaluate(() => { const O = __overdue; O.startRun('endless'); O.god(); O.grant('librarycat'); for (let i = 0; i < 3; i++) O.grant('margin'); O.grant('dewey'); });
       await page.waitForFunction(() => __overdue.enemies.length >= 3, null, { timeout: 20000 }).catch(() => {});
-      await page.waitForTimeout(2500);
+      // books in flight at one instant is a race with their lifetime: wait until 4+ Margin books are airborne and the cat has hit something
+      await page.waitForFunction(() => { const O = __overdue; return O.books.filter((b) => b.margin).length >= 4 && O.runCounters.dealt.cat > 0; }, null, { timeout: 15000, polling: 'raf' }).catch(() => {});
       await shot(page, `${name}-cat-and-margin`);
       const m = await page.evaluate(() => { const O = __overdue; return { cats: O.cats.length, side: O.books.filter((b) => b.margin).length, homingSide: O.books.filter((b) => b.margin && b.nohome).length, rear: O.books.filter((b) => b.margin).some((b) => Math.cos(Math.atan2(b.vy, b.vx) - O.player.aim) < -0.9), catDmg: O.runCounters.dealt.cat }; });
       record(area, 'the cat is on screen and pounces (damage dealt by the cat)', m.cats === 1 && m.catDmg > 0, JSON.stringify(m));
