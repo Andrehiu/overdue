@@ -5,7 +5,7 @@ export const POLICIES = ['rare', 'rest', 'mixed'];
 export const EXTRA_POLICIES = ['mystery'];   // only on request (--policies=mystery): always the Mystery Shelf when offered, to measure cursed books
 export const WINGS_TESTED = [1, 4, 7, 10];
 export const DEALT_SOURCES = ['throw', 'crit', 'dash', 'orbit', 'cat', 'burst', 'splash', 'shhh', 'other'];   // = src/runlog.js (this file runs in the game page too, so it imports nothing)
-export const RENO_PRESETS = ['none', 'half', 'max'];
+export const RENO_PRESETS = ['none', 'half', 'p65', 'max'];
 export const ROOMS = 7;   // = ROOMS_PER_WING in src/story.js (a unit test keeps them equal; this file also runs inside the game page, so it imports nothing)
 
 /** Door preference per policy, best first. Mystery Shelf is always last: only taken when nothing else is offered. */

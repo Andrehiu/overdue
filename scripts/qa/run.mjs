@@ -14,6 +14,7 @@ import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { cpus } from 'node:os';
 import { median } from './stats.mjs';
+import { scanText, parseTerms, summarize } from './privacy.mjs';
 
 const ROOT = resolve(new URL('../..', import.meta.url).pathname);
 const OUT = join(ROOT, 'qa-report');
@@ -830,6 +831,84 @@ async function statusFlow() {
   return record.list;
 }
 
+// ---------------------------------------------------------------- v1.15.1: look & feel (enemy size, orbit books, Margin angles, boss phase change)
+async function lookFeelFlow() {
+  const record = recorder();
+  const ctx = await browser.newContext(devices['iPhone 13 landscape']);
+  const page = await ctx.newPage();
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  await page.goto(URL0 + (URL0.includes('?') ? '&' : '?') + 'debug=1'); await page.waitForTimeout(500);
+  // enemy size: story enemies are 20% bigger (sprite and hitbox), endless unchanged, elites stay above normals
+  const sizes = await page.evaluate(() => {
+    const O = __overdue, out = {};
+    O.startRun('endless', 1); O.god(); O.killAll();
+    const en = O.makeEnemy('bunny', 100, 100); out.endless = { r: en.r, vs: en.vs };
+    O.startRun('story', 1); O.startWave(2); O.god(); O.killAll();
+    const b = O.makeEnemy('bunny', 100, 100), el = O.makeEnemy('bunny', 200, 100, { elite: true });
+    out.story = { r: b.r, vs: b.vs, eliteR: el.r, scale: O.consts.STORY_ENEMY_SCALE };
+    O.killAll();
+    const cx = O.W / 2, cy = O.H / 2; O.player.x = cx - 150; O.player.y = cy;
+    [['bunny', -20, -60], ['notice', 60, -40], ['patron', 40, 50], ['golem', 140, -10], ['coin', -60, 40], ['worm', 90, 90]].forEach(([t, dx, dy]) => { const e = O.makeEnemy(t, cx + dx, cy + dy); e.hp = e.maxHp = 9; });
+    O.makeEnemy('bunny', cx - 70, cy - 70, { elite: true });
+    O.freeze(true);
+    return out;
+  });
+  await page.waitForTimeout(400);
+  await shot(page, 'lookfeel-story-room');
+  record('lookfeel', 'story enemies drawn 20% bigger (hitbox +10%); endless unchanged; elites stay bigger than normals',
+    sizes.endless.vs === 1 && sizes.endless.r === 11 && sizes.story.vs === 1.2 && Math.abs(sizes.story.r - 12.1) < 0.01 && sizes.story.eliteR > sizes.story.r, JSON.stringify(sizes));
+  // orbit books: big, tight ring
+  const orb = await page.evaluate(() => {
+    const O = __overdue; O.freeze(false); O.startRun('story', 1); O.startWave(2); O.god(); O.killAll();
+    for (let i = 0; i < 3; i++) O.grant('audiobook');
+    O.stepN(30); O.game.bannerT = 0; O.game.bannerQ = 0; O.freeze(true);
+    const o = O.orbiterPositions()[0], d = Math.hypot(o.x - O.player.x, o.y - O.player.y);
+    return { n: O.orbiterPositions().length, d, scale: O.consts.ORBIT_SCALE, R: O.consts.ORBIT_RADIUS };
+  });
+  await page.waitForTimeout(300);
+  await shot(page, 'lookfeel-orbit');
+  record('lookfeel', 'orbit books drawn about 1.6x on a 56 px ring', orb.n >= 3 && orb.scale >= 1.5 && orb.R === 56 && Math.abs(orb.d - 56) < 1, JSON.stringify(orb));
+  // Margin Notes: diagonals at ±22.5° (level 1), ±15° / ±30° (level 3), rear unchanged
+  const mg = await page.evaluate(() => {
+    const O = __overdue; O.freeze(false); O.startRun('story', 1); O.startWave(2); O.god(); O.killAll();
+    const angs = (lvl) => {
+      O.stats.marginLvl = lvl; O.books.length = 0; O.player.aim = 0.7; O.fire();
+      return O.books.filter((b) => b.margin).map((b) => { let a = Math.atan2(b.vy, b.vx) - 0.7; a = Math.atan2(Math.sin(a), Math.cos(a)); return +(a * 180 / Math.PI).toFixed(1); }).sort((x, y) => x - y);
+    };
+    return { l1: angs(1), l2: angs(2), l3: angs(3) };
+  });
+  const near = (a, b) => a.length === b.length && a.every((x, i) => Math.abs(Math.abs(x) - Math.abs(b[i])) < 0.6 && Math.sign(x) === Math.sign(b[i]));
+  record('lookfeel', 'Margin Notes diagonals are ±22.5° (L1-2, plus rear) and ±15° / ±30° (L3)',
+    near(mg.l1, [-22.5, 22.5]) && near(mg.l2, [-180, -22.5, 22.5]) && mg.l3.some((x) => Math.abs(Math.abs(x) - 15) < 0.6) && mg.l3.some((x) => Math.abs(Math.abs(x) - 30) < 0.6) && mg.l3.every((x) => Math.abs(x) <= 30.6 || Math.abs(Math.abs(x) - 180) < 0.6), JSON.stringify(mg));
+  // boss phase change: player keeps control, boss is immune and harmless for ~1 s
+  const bs = await page.evaluate(() => {
+    const O = __overdue; O.freeze(false); O.startRun('story', 1); O.god(); O.startWave(7); O.killAll();
+    const boss = O.makeEnemy('boss', O.W - 150, O.H / 2, { name: 'Test Author', tier: 0, phase: 1, modeT: 0, spiral: 0, summonT: 7 });
+    boss.hp = boss.maxHp = 500; O.stepN(3); O.game.bannerT = 0;   // (room-intro banner cleared: only the phase change is under test)
+    const out = { before: boss.hp };
+    boss.hp = boss.maxHp * 0.6;                      // crosses into phase 2
+    O.stepN(2);
+    out.trans = boss.trans; out.phase = boss.phase; out.banner = O.game.bannerT; out.freeze = O.game.freeze; out.state = O.game.state;
+    const hp0 = boss.hp; O.damageEnemy(boss, 5, 0, 0, false, 'throw'); out.hpAfterHit = boss.hp - hp0;
+    O.player.x = 100; O.player.y = O.H / 2; O.player.inv = 0; const x0 = O.player.x, hearts = O.player.hp;
+    O.drive(true); O.setBotInput({ x: 1, y: 0 }); O.stepN(30); O.setBotInput(null);
+    out.moved = O.player.x - x0; out.hurt = hearts - O.player.hp; out.transLeft = boss.trans;
+    boss.x = O.player.x; boss.y = O.player.y; O.stepN(2); out.contactHurt = hearts - O.player.hp;   // standing inside the boss while it transforms
+    O.stepN(120); out.after = boss.trans; const hp1 = boss.hp; O.damageEnemy(boss, 5, 0, 0, false, 'throw'); out.hitAfter = hp1 - boss.hp;
+    O.drive(false);
+    return out;
+  });
+  record('lookfeel', 'boss phase change: no screen-centre banner or freeze, player moves, boss immune and harmless ~1 s, then hittable again',
+    bs.trans > 0 && bs.phase === 2 && bs.banner === 0 && bs.freeze === 0 && bs.state === 'playing' && bs.hpAfterHit === 0 && bs.moved > 20 && bs.contactHurt === 0 && bs.after === 0 && bs.hitAfter === 5 && errs.length === 0, JSON.stringify(bs) + errs.join(';').slice(0, 100));
+  // screenshot mid-transformation
+  await page.evaluate(() => { const O = __overdue; O.freeze(false); O.startRun('story', 1); O.god(); O.startWave(7); O.killAll(); const b = O.makeEnemy('boss', O.W / 2 + 120, O.H / 2, { name: 'Test Author', tier: 0, phase: 1, modeT: 0, spiral: 0, summonT: 7 }); b.hp = b.maxHp = 500; O.stepN(3); b.hp = b.maxHp * 0.6; O.stepN(20); O.game.bannerT = 0; O.game.bannerQ = 0; O.freeze(true); });
+  await page.waitForTimeout(300);
+  await shot(page, 'lookfeel-boss-phase');
+  await ctx.close();
+  return record.list;
+}
+
 // ---------------------------------------------------------------- v1.13.0: new-player flows (guided first room, Survive timer)
 async function newPlayerFlow(name, opts) {
   const record = recorder();
@@ -1169,6 +1248,7 @@ async function basicsFlow() {
   if (want('screens')) { tasks.push(() => rotateOverlayFlow()); for (const r of ROTATIONS) tasks.push(() => rotationFlow(...r)); }
   if (want('shapes')) tasks.push(() => shapesFlow());
   if (want('status')) tasks.push(() => statusFlow());
+  if (want('lookfeel')) tasks.push(() => lookFeelFlow());
   if (want('newplayer')) for (const [name, opts] of TARGETS) tasks.push(() => newPlayerFlow(name, opts));
   if (want('newperks')) tasks.push(() => newPerksFlow(...TARGETS[0]));
   if (want('basics')) tasks.unshift(() => basicsFlow());
@@ -1190,18 +1270,36 @@ const PERF_SAMPLE_JS = `(async (N, MS) => {
     const tick = (now) => { frames++; const b = O.enemies.find((e) => e.type === 'boss'); if (b && b.hp < b.maxHp * 0.5) b.hp = b.maxHp; if (now - t0 < ms) requestAnimationFrame(tick); else res({ sim: (O.game.playTime - sim0) / ((performance.now() - t0) / 1000), fps: frames / ((now - t0) / 1000), books: O.counts().books, hazards: O.counts().hazards }); };
     requestAnimationFrame(tick); });
   await run(4000); // warm-up, discarded (fps climbs for the first few seconds as caches and JIT settle)
-  for (let s = 0; s < N; s++) out.push(await run(MS));
-  O.drive(true);
-  try { reset(); O.game.freeze = 0; O.stepN(30); const t0 = performance.now(); for (let i = 0; i < 120; i++) { O.game.freeze = 0; O.stepN(1); } var upd = (performance.now() - t0) / 120; } finally { O.drive(false); }
-  return { out, upd };
+  for (let s = 0; s < N; s++) {
+    const r = await run(MS);
+    // game-update time alone (no canvas): 60 steps with the real loop paused
+    O.drive(true);
+    try { reset(); O.game.freeze = 0; const t0 = performance.now(); for (let i = 0; i < 60; i++) { O.game.freeze = 0; O.stepN(1); } r.upd = (performance.now() - t0) / 60; } finally { O.drive(false); }
+    out.push(r);
+  }
+  return { out };
 })`;
 const perfSample = async (page) => {
   const r = await page.evaluate(`${PERF_SAMPLE_JS}(${PERF_SAMPLES}, ${PERF_SAMPLE_MS})`);
   const col = (k) => r.out.map((x) => x[k]);
-  return { sim: median(col('sim')), fps: median(col('fps')), books: Math.max(...col('books')), hazards: Math.max(...col('hazards')), upd: r.upd,
-    simS: col('sim'), fpsS: col('fps') };
+  return { sim: median(col('sim')), fps: median(col('fps')), books: Math.max(...col('books')), hazards: Math.max(...col('hazards')), upd: median(col('upd')),
+    simS: col('sim'), fpsS: col('fps'), updS: col('upd') };
 };
-const perfDetail = (m) => `median ${m.fps.toFixed(0)} fps, ${m.sim.toFixed(2)}x · game update ${m.upd.toFixed(2)} ms/frame · fps samples ${m.fpsS.map((v) => v.toFixed(0)).join(', ')}`;
+const perfDetail = (m) => `median ${m.fps.toFixed(0)} fps, ${m.sim.toFixed(2)}x · game update median ${m.upd.toFixed(2)} ms/frame · fps samples ${m.fpsS.map((v) => v.toFixed(0)).join(', ')}`;
+
+// Update time and sim speed always fail QA. fps fails only when a GPU is present; with software rendering (SwiftShader/llvmpipe) it is a ⚠️ warning
+// (canvas raster dominates there, ~78% of frame time, so fps swings 35-59 on one commit).
+const UPDATE_MS_MAX = 4;
+let GPU = null;
+const perfChecks = async (page, label, m) => {
+  if (GPU === null) GPU = await page.evaluate(() => { try { const gl = document.createElement('canvas').getContext('webgl'); const e = gl && gl.getExtension('WEBGL_debug_renderer_info');
+    const r = e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : 'none'; return { renderer: String(r), gpu: !!e && !/swiftshader|llvmpipe|software|softpipe|none/i.test(String(r)) }; } catch { return { renderer: 'error', gpu: false }; } });
+  record('perf', `${label} game update ≤ ${UPDATE_MS_MAX} ms/frame`, m.upd <= UPDATE_MS_MAX, perfDetail(m));
+  if (!PERF.fps) return;
+  const ok = m.fps >= PERF.fps;
+  if (GPU.gpu) record('perf', `${label} fps ≥ ${PERF.fps} (GPU: ${GPU.renderer})`, ok, perfDetail(m));
+  else record('perf', `${label} fps ≥ ${PERF.fps} ${ok ? '' : '⚠️ warning only'} (no GPU: ${GPU.renderer})`, true, `${ok ? '' : '⚠️ below limit, not failing: '}${perfDetail(m)}`);
+};
 // Late-game boss with a stacked build: this once ran at 0.4x game speed (chained hit-stop) and ~40fps.
 if (want('perf')) {
   const ctx = await steadyContext(devices['iPhone 13 landscape']);
@@ -1220,7 +1318,7 @@ if (want('perf')) {
   await shot(page, 'perf-late-boss');
 
   record('perf', `late boss game speed ≥ ${PERF.sim}x`, samples.sim >= PERF.sim, perfDetail(samples));
-  if (PERF.fps) record('perf', `late boss fps ≥ ${PERF.fps}`, samples.fps >= PERF.fps, perfDetail(samples));
+  await perfChecks(page, 'late boss', samples);
   record('perf', 'books in flight capped', samples.books <= 110, `max ${samples.books}`);
   // v1.15.0: stress build (Trilogy 3, Margin 3, Speed Reader 3, In the Zone, Saga, Crossfire, Demolition) on the wave-15 boss.
   await page.evaluate(() => {
@@ -1234,7 +1332,7 @@ if (want('perf')) {
   await shot(page, 'perf-stress-margin');
 
   record('perf', `v1.15.0 stress build (Margin 3 + Crossfire + Demolition...) late boss game speed ≥ ${PERF.sim}x`, stress.sim >= PERF.sim, perfDetail(stress));
-  if (PERF.fps) record('perf', `v1.15.0 stress build late boss fps ≥ ${PERF.fps}`, stress.fps >= PERF.fps, perfDetail(stress));
+  await perfChecks(page, 'v1.15.0 stress build late boss', stress);
   record('perf', 'v1.15.0 stress build: books in flight capped', stress.books <= 110, `max ${stress.books}`);
 
   // v1.15.0: wave-15 boss with a stacked status build (Leaky Pen 3, Static 3, Cold 3, Pop-up 3 + all 4 combos + Trilogy 3)
@@ -1251,14 +1349,14 @@ if (want('perf')) {
   await shot(page, 'perf-status-boss');
 
   record('perf', `status-stacked boss game speed ≥ ${PERF.sim}x`, st.sim >= PERF.sim, perfDetail(st));
-  if (PERF.fps) record('perf', `status-stacked boss fps ≥ ${PERF.fps}`, st.fps >= PERF.fps, perfDetail(st));
+  await perfChecks(page, 'status-stacked boss', st);
   // Story late game: wing 10 room 6, a crowd of elites firing fans of pages.
   await page.evaluate(() => { const O = __overdue; O.unlockAll(); O.startRun('story', 10); O.startWave(6); O.god(); });
   await page.waitForTimeout(5000);
   const story = await perfSample(page);
   await shot(page, 'perf-story-late');
   record('perf', `story wing 10 game speed ≥ ${PERF.sim}x`, story.sim >= PERF.sim, `${perfDetail(story)} · ${story.hazards} pages in flight`);
-  if (PERF.fps) record('perf', `story wing 10 fps ≥ ${PERF.fps}`, story.fps >= PERF.fps, perfDetail(story));
+  await perfChecks(page, 'story wing 10', story);
   await ctx.close();
 }
 await browser.close();
@@ -1274,15 +1372,17 @@ if (want('security')) {
   const SECRET = /(ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[bp]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)/;
   const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
   const ALLOWED_EMAIL = /noreply@anthropic\.com|users\.noreply\.github\.com/;
-  const priv = existsSync(join(ROOT, '.qa-private-terms')) ? readFileSync(join(ROOT, '.qa-private-terms'), 'utf8').split('\n').map((s) => s.trim()).filter(Boolean) : [];
+  const fileTerms = existsSync(join(ROOT, '.qa-private-terms')) ? parseTerms(readFileSync(join(ROOT, '.qa-private-terms'), 'utf8')) : [];
+  const envTerms = parseTerms(process.env.QA_PRIVATE_TERMS); // CI passes the QA_PRIVATE_TERMS repository secret
+  const priv = [...new Set([...fileTerms, ...envTerms])];
   const hits = [];
   for (const [f, t] of texts) {
     if (SECRET.test(t)) hits.push(`secret-like token in ${f}`);
     for (const e of t.match(EMAIL) || []) if (!ALLOWED_EMAIL.test(e)) hits.push(`email in ${f}`);
-    for (const term of priv) if (t.toLowerCase().includes(term.toLowerCase())) hits.push(`private term in ${f}`);
+    hits.push(...scanText(f, t, priv)); // pasted OVD1/OVS1 codes, save-like JSON, private terms (never echoed)
   }
-  record('security', 'no secrets or emails in files + commit messages', hits.length === 0, [...new Set(hits)].slice(0, 5).join(' | '));
-  record('security', 'private-terms scan', true, priv.length ? `${priv.length} private terms checked` : 'skipped: create .qa-private-terms (gitignored) to also scan for your name');
+  record('security', 'no secrets, emails or pasted player data in files + commit messages', hits.length === 0, summarize(hits).slice(0, 5).join(' | '));
+  record('security', 'private-terms scan', true, priv.length ? `${priv.length} private terms checked (${fileTerms.length} file, ${envTerms.length} env)` : 'skipped: create .qa-private-terms (gitignored) or set QA_PRIVATE_TERMS');
 }
 
 // ---------------------------------------------------------------- 6. report

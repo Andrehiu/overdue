@@ -77,7 +77,7 @@ npm run build   # dist/overdue.html (single file) + dist/version.json; this is e
 |---|---|
 | Card colours were defined on `:root` and turned every menu dark-on-dark | Scope component tokens to the component; QA checks menu text contrast |
 | A deploy was reported live but had failed | Check the Pages run is green before saying live |
-| Late boss ran at 0.4x speed (hit-stop chained on every hit) | Perf budget: wave-15 boss with a stacked build ≥ 0.85x speed, ≥ 50 fps |
+| Late boss ran at 0.4x speed (hit-stop chained on every hit) | Perf budget (median of 5 samples): wave-15 boss with a stacked build ≥ 0.85x speed and game update ≤ 4 ms/frame; ≥ 50 fps fails only with a GPU, else ⚠️ warning (software raster swings 35-59 fps) |
 | A privacy scan checked files but not commit messages | QA scans files *and* commit messages |
 | Flow-field heap compared float64 keys to a Float32Array | Pure logic stays in pure modules with unit tests |
 

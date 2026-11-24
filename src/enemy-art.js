@@ -294,6 +294,7 @@ export function drawEnemy(ctx, e, env) {
   if (!set) return;
   let lift = 0;
   ctx.save(); ctx.translate(e.x, e.y);
+  if (e.vs > 1) ctx.scale(e.vs, e.vs);   // story rooms: 20% bigger (hitbox scaled in main.js)
   if (e.stun > 0) ctx.rotate(Math.sin(e.t * 20) * 0.15);
   switch (type) {
     case 'bunny':
@@ -341,7 +342,7 @@ export function drawEnemy(ctx, e, env) {
       const st = Math.abs(Math.sin(e.t * 6));
       ctx.translate(0, 24); ctx.scale(1 + st * 0.03, 1 - st * 0.06); ctx.translate(0, -24);
       bodyWithOutline(ctx, set.body, e, flash, warn);
-      ctx.restore(); ctx.save(); ctx.translate(e.x, e.y); // HP bar stays level and unscaled
+      ctx.restore(); ctx.save(); ctx.translate(e.x, e.y); if (e.vs > 1) ctx.scale(e.vs, e.vs); // HP bar stays level
       if (e.hp < e.maxHp) { ctx.fillStyle = '#000'; ctx.fillRect(-18, 29, 36, 4); ctx.fillStyle = GOLD; ctx.fillRect(-18, 29, 36 * (e.hp / e.maxHp), 4); }
       break;
     }
@@ -356,7 +357,7 @@ export function drawEnemy(ctx, e, env) {
   ctx.restore();
   if (e.elite) { // crown stays upright, perched on the top of the own silhouette
     const c = crownSprite();
-    ctx.drawImage(c, e.x - c.half, e.y + lift - set.top - 7 - c.half, c.half * 2, c.half * 2);
+    ctx.drawImage(c, e.x - c.half, e.y + (lift - set.top - 7) * (e.vs || 1) - c.half, c.half * 2, c.half * 2);
   }
 }
 
@@ -375,19 +376,19 @@ export function drawWorms(ctx, enemies) {
   ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.strokeStyle = OL;
   for (const [d, list] of outl) {
-    ctx.lineWidth = wormRad(d) * 2 + 3.4; ctx.beginPath();
+    ctx.lineWidth = (wormRad(d) * 2 + 3.4) * (list[0].vs || 1); ctx.beginPath();
     for (const e of list) { ctx.moveTo(e.x, e.y); ctx.lineTo(e.leader.x, e.leader.y); }
     ctx.stroke();
   }
   for (const [k, list] of body) {
     const [d, col] = k.split('|');
-    ctx.strokeStyle = col; ctx.lineWidth = wormRad(+d) * 2; ctx.beginPath();
+    ctx.strokeStyle = col; ctx.lineWidth = wormRad(+d) * 2 * (list[0].vs || 1); ctx.beginPath();
     for (const e of list) { ctx.moveTo(e.x, e.y); ctx.lineTo(e.leader.x, e.leader.y); }
     ctx.stroke();
   }
   ctx.strokeStyle = COL.worm.band; ctx.lineWidth = 1; ctx.lineCap = 'butt'; ctx.beginPath();
   for (const e of bands) {
-    const L = e.leader, a = Math.atan2(L.y - e.y, L.x - e.x) + Math.PI / 2, r = wormRad(depthOf(e)) * 0.92;
+    const L = e.leader, a = Math.atan2(L.y - e.y, L.x - e.x) + Math.PI / 2, r = wormRad(depthOf(e)) * 0.92 * (e.vs || 1);
     ctx.moveTo(e.x - Math.cos(a) * r, e.y - Math.sin(a) * r); ctx.lineTo(e.x + Math.cos(a) * r, e.y + Math.sin(a) * r);
   }
   ctx.stroke();

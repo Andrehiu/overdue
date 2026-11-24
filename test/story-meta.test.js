@@ -30,7 +30,7 @@ test('every wing is harder than the previous wing, room for room', async () => {
 });
 
 test('wing 1 plays like the opening of endless (mapped onto the old curve); room 4 is elite and room 7 a boss', async () => {
-  const { difficulty, roomKind, composeRoom, WINGS, CURVE, curveRoom, ROOMS_PER_WING, ELITE_ROOM, BOSS_ROOM, wingHp, BOSS_BUDGET_STEP } = await load('story');
+  const { difficulty, roomKind, composeRoom, WINGS, CURVE, curveRoom, ROOMS_PER_WING, ELITE_ROOM, BOSS_ROOM, wingHp, BOSS_BUDGET_STEP, STORY_HP_MULT } = await load('story');
   const { Rng } = await load('util');
   assert.deepEqual(CURVE, [1, 2, 4, 5, 7, 8, 10]);
   assert.equal(CURVE.length, ROOMS_PER_WING);
@@ -38,7 +38,7 @@ test('wing 1 plays like the opening of endless (mapped onto the old curve); room
   assert.equal(CURVE[ELITE_ROOM - 1], 5); assert.equal(CURVE[BOSS_ROOM - 1], 10);
   assert.equal(curveRoom(1), 1);
   // Room 3 sits at old position 4: its numbers are the old room 4's.
-  assert.equal(difficulty(1, 3).hpMult, 1 + 0.08 * 3);
+  assert.equal(difficulty(1, 3).hpMult, (1 + 0.08 * 3) * STORY_HP_MULT);   // v1.15.2: story HP -5%
   assert.equal(difficulty(1, 1).eliteChance, 0);
   assert.equal(roomKind(4), 'elite'); assert.equal(roomKind(7), 'boss'); assert.equal(roomKind(5), 'normal');
   for (let w = 1; w <= WINGS.length; w++) {
@@ -47,8 +47,8 @@ test('wing 1 plays like the opening of endless (mapped onto the old curve); room
     const boss = composeRoom(w, BOSS_ROOM, new Rng(w));
     assert.equal(boss.spawns.filter((s) => s.type === 'boss').length, 1);
     for (let r = 1; r < BOSS_ROOM; r++) assert.ok(!composeRoom(w, r, new Rng(r)).spawns.some((s) => s.type === 'boss'));
-    // Boss HP follows the flattened wing curve (v1.14.0); wing 1 is still 330.
-    assert.equal(difficulty(w, BOSS_ROOM).bossHp, Math.round(330 * wingHp(w - 1) * (1 + BOSS_BUDGET_STEP * (w - 1))));
+    // Boss HP follows the flattened wing curve (v1.14.0); story HP -5% since v1.15.2.
+    assert.equal(difficulty(w, BOSS_ROOM).bossHp, Math.round(330 * STORY_HP_MULT * wingHp(w - 1) * (1 + BOSS_BUDGET_STEP * (w - 1))));
   }
 });
 

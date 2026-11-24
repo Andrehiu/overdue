@@ -77,6 +77,8 @@ export const BUDGET_EARLY_STEP = 0.08, BUDGET_LATE_STEP = 0.05;
 export const wingBudget = (w) => 1 + BUDGET_EARLY_STEP * Math.min(w, 2) + BUDGET_LATE_STEP * Math.max(0, w - 2);
 export const wingHp = (w) => 1 + HP_EARLY_STEP * Math.min(w, 2) + HP_LATE_STEP * Math.max(0, w - 2);
 export const BOSS_BUDGET_STEP = 0.08;
+// v1.15.2: story enemies (and bosses) have 5% less HP in every wing. A flat factor, so the curve still only goes up. Endless doesn't use difficulty().
+export const STORY_HP_MULT = 0.95;
 
 export function difficulty(wing, room) {
   const w = wing - 1, r = curveRoom(room);   // r: position on the old 10-room curve
@@ -89,7 +91,7 @@ export function difficulty(wing, room) {
   return {
     wing, room, kind, goal, pos: r,
     budget,
-    hpMult: (1 + 0.08 * (r - 1)) * wingHp(w),
+    hpMult: (1 + 0.08 * (r - 1)) * wingHp(w) * STORY_HP_MULT,
     speedMult: (1 + Math.min(0.35, r * 0.015)) * (1 + 0.02 * w),
     eliteChance: kind === 'elite' ? 1 : Math.min(0.5, 0.025 * w + 0.008 * (r - 1) + Math.max(...WINGS.slice(0, w + 1).map((x) => x.eliteBonus || 0))),
     hazardSpeed: 1 + 0.03 * w + 0.01 * (r - 1),
@@ -98,7 +100,7 @@ export function difficulty(wing, room) {
     eliteShootEvery: Math.max(1.5, 3.2 - 0.15 * w),
     deathBurst: w >= 3 ? 2 + w : 0,          // from wing 4, elites burst into pages when they go down
     bossTier: Math.floor(w / 3),             // 0..3: bosses learn a new pattern every 3 wings
-    bossHp: kind === 'boss' ? Math.round(330 * wingHp(w) * (1 + BOSS_BUDGET_STEP * w)) : 0,
+    bossHp: kind === 'boss' ? Math.round(330 * wingHp(w) * STORY_HP_MULT * (1 + BOSS_BUDGET_STEP * w)) : 0,
     shelvesPerHalf: Math.max(1, Math.min(7, 2 + Math.floor((r + 1) / 2) + (def.density || 0))),
   };
 }

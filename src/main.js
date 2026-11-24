@@ -914,6 +914,8 @@ function die() {
 // ======================================================================
 // Spawning
 // ======================================================================
+/** Story only: every enemy (boss and elites too, so they keep their size above normals) is drawn 20% bigger; the hitbox grows 10% (20% made the bot stall on elites in the elite room: see ROADMAP). */
+const STORY_ENEMY_SCALE = 1.2, STORY_HIT_SCALE = 1.1;
 const DEF = {
   bunny: { r: 11, hp: 2, speed: 88, score: 50 },
   notice: { r: 10, hp: 1, speed: 150, score: 70 },
@@ -934,7 +936,9 @@ function makeEnemy(type, x, y, extra = {}) {
   const hp = Math.max(1, Math.round(d.hp > 1 ? d.hp * hpScale : oneHp));
   const speedScale = game.diff ? game.diff.speedMult : 1 + Math.min(0.35, game.wave * 0.015);
   const e = { type, x, y, vx: 0, vy: 0, r: d.r, hp, maxHp: hp, speed: d.speed * speedScale * stats.enemySpeedMult,
-    score: d.score, t: Math.random() * 10, stun: 0, flash: 0, dead: false, leader: null, atkT: 1.5 + Math.random() * 1.5, orbitHit: 0, ...extra };
+    score: d.score, t: Math.random() * 10, stun: 0, flash: 0, dead: false, leader: null, atkT: 1.5 + Math.random() * 1.5, orbitHit: 0, vs: 1, trans: 0, ...extra };
+  // Story rooms are ~20% bigger than 1.13 (everything draws smaller on a phone): enemies are drawn 20% bigger, hitbox with them. Endless unchanged.
+  if (game.diff) { e.vs = STORY_ENEMY_SCALE; e.r = Math.round(e.r * STORY_HIT_SCALE * 10) / 10; }
   // Elites: bigger, ~2.2x HP, worth double, and they fire aimed pages (story mode).
   if (e.elite) {
     e.hp = e.maxHp = Math.max(2, Math.round(e.hp * 2.2 * (game.diff?.eliteHpMult || 1)));
@@ -1037,6 +1041,7 @@ function step(dt) {
   game.trauma = Math.max(0, game.trauma - dt * 1.5);
   game.flash = Math.max(0, game.flash - dt * 2.5);
   game.bannerT = Math.max(0, game.bannerT - dt);
+  if (game.phaseTag) game.phaseTag.t -= dt;
   if (game.bannerT <= 0 && bannerQueue.length) { const [t, sb] = bannerQueue.shift(); banner(t, sb); }
 
   if (game.state === 'playing') updateSpawning(sdt);
@@ -1246,7 +1251,7 @@ function spawnBook(x, y, a, extra = {}) {
 }
 
 let currentLook = bookLook({});
-const MARGIN_SIDE = [Math.PI / 4], MARGIN_WIDE = [Math.PI / 6, Math.PI / 3];   // Margin Notes angles: ±45°, then ±30° and ±60°
+const MARGIN_SIDE = [Math.PI / 8], MARGIN_WIDE = [Math.PI / 12, Math.PI / 6];   // Margin Notes angles: ±22.5°, then ±15° and ±30°
 function marginBook(p, a) { spawnBook(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a, { bonus: true, nohome: true, margin: true, pierce: stats.pierce + 1 }); }
 function fire() {
   const p = player, n = stats.projectiles;
@@ -1570,7 +1575,7 @@ function updateEnemies(dt) {
       case 'worm': {
         if (e.leader && !e.leader.dead) {
           const L = e.leader, dx = e.x - L.x, dy = e.y - L.y, d = Math.hypot(dx, dy) || 1;
-          if (d > 15) { e.x = L.x + (dx / d) * 15; e.y = L.y + (dy / d) * 15; }
+          const gap = 15 * (e.vs || 1); if (d > gap) { e.x = L.x + (dx / d) * gap; e.y = L.y + (dy / d) * gap; }
         } else {
           if (e.leader) { e.leader = null; e.head = true; }
           const s = seek(e); const w = Math.sin(e.t * 5) * 0.5;
@@ -1616,7 +1621,7 @@ function updateEnemies(dt) {
     // Contact damage
     if (game.state === 'playing' || game.state === 'waveclear') {
       const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy);
-      if (d < p.r + e.r - 3) hurtPlayer(e.x, e.y, e.type === 'boss' && e.mode === 'charge' ? 'boss:charge' : e.type, !!e.elite);
+      if (d < p.r + e.r - 3 && !(e.trans > 0)) hurtPlayer(e.x, e.y, e.type === 'boss' && e.mode === 'charge' ? 'boss:charge' : e.type, !!e.elite);
     }
   }
   for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].dead) enemies.splice(i, 1);
@@ -1627,9 +1632,16 @@ function bossAI(e, dt) {
   const frac = e.hp / e.maxHp;
   const phase = frac > 0.66 ? 1 : frac > 0.33 ? 2 : 3;
   if (phase !== e.phase) {
-    if (e.phase) { banner(`PHASE ${phase}`, phase === 3 ? 'The author is furious!' : 'Plot thickens…'); shake(0.5); sound.play('boss'); }
+    if (e.phase) {
+      // Phase change: the player keeps full control. The boss transforms for BOSS_TRANS seconds (no attacks, no contact damage, can't be hit);
+      // the PHASE label is a small non-blocking tag, not the big screen-centre banner.
+      e.trans = BOSS_TRANS; e.mode = 'idle'; e.modeT = 0; e.atkT = Math.max(e.atkT, 0.6);
+      game.phaseTag = { text: `PHASE ${phase}`, t: 1.1 };
+      shake(0.2); sound.play('boss');
+    }
     e.phase = phase;
   }
+  if (e.trans > 0) { e.trans = Math.max(0, e.trans - dt); return; }
   const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1;
   const aim = Math.atan2(dy, dx);
   e.modeT -= dt;
@@ -1674,6 +1686,7 @@ function bossAI(e, dt) {
     }
   }
 }
+const BOSS_TRANS = 1.0;   // seconds the boss is busy (and immune) at a phase change
 const MAX_HAZARDS = 260;
 function shootHazard(x, y, a, s) {
   if (hazards.length >= MAX_HAZARDS) return;
@@ -1683,8 +1696,14 @@ function shootHazard(x, y, a, s) {
 function fan(x, y, a, n, spread, s) { for (let i = 0; i < n; i++) shootHazard(x, y, a + (i - (n - 1) / 2) * spread, s); sound.play('shoot'); }
 function radial(x, y, n, s, off) { for (let i = 0; i < n; i++) shootHazard(x, y, off + (i / n) * TAU, s); sound.play('shoot'); }
 
+/** Small 'immune' cue (rate-limited) while the boss transforms. */
+function bossImmune(e) {
+  if (game.time - (e.immuneCue || -1) < 0.3) return;
+  e.immuneCue = game.time; floatText(e.x, e.y - e.r - 6, 'IMMUNE', '#cfc4ff', 13, 0.5);
+}
 function damageEnemy(e, dmg, kx, ky, crit, src = 'other') {
   if (e.dead) return;
+  if (e.trans > 0) { bossImmune(e); return; }   // boss is mid-transformation
   const quiet = isStatusSource(src);   // ink / zap / pop damage is silent and never chains
   if (e.type === 'boss') dmg *= statusDamageMult(e, stats.brittle);   // chilled bosses take +25%
   addDealt(rl, src, dmg < e.hp ? dmg : e.hp);   // effective damage: overkill is not counted
@@ -1880,6 +1899,7 @@ function updateBooks(dt) {
       for (const e of enemies) {
         if (e.dead || b.hit.has(e)) continue;
         const rr = e.r + b.r;
+        if (e.trans > 0 && (e.x - b.x) ** 2 + (e.y - b.y) ** 2 < rr * rr) { bossImmune(e); continue; }   // books pass through
         if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 < rr * rr) {
           b.hit.add(e);
           const crit = Math.random() < stats.critChance;
@@ -1907,7 +1927,7 @@ function updateBooks(dt) {
 }
 
 // Audiobook Orbit (v1.14.0 fair version): no page blocking, no stun. Only Surround Sound blocks, one page per book, then it rests.
-const ORBIT_RADIUS = 64, ORBIT_SPIN = 3.6, ORBIT_DAMAGE = 1.25, ORBIT_REHIT = 0.3, ORBIT_KNOCK = 90, ORBIT_CRIT_MAX = 2.5, ORBIT_BLOCK_REST = 2.5;
+const ORBIT_RADIUS = 56, ORBIT_SCALE = 1.6, ORBIT_SPIN = 3.6, ORBIT_DAMAGE = 1.25, ORBIT_REHIT = 0.3, ORBIT_KNOCK = 90, ORBIT_CRIT_MAX = 2.5, ORBIT_BLOCK_REST = 2.5;
 const orbitRest = [];   // Surround Sound: seconds until each book can block another page
 function orbiterPositions() {
   const n = stats.orbiters, out = [];
@@ -1924,7 +1944,7 @@ function updateOrbiters(dt) {
   for (const o of orbiterPositions()) {
     for (const e of enemies) {
       if (e.dead || e.orbitHit > 0) continue;
-      if ((e.x - o.x) ** 2 + (e.y - o.y) ** 2 < (e.r + 8) ** 2) {
+      if ((e.x - o.x) ** 2 + (e.y - o.y) ** 2 < (e.r + 8 * ORBIT_SCALE / 1.1) ** 2) {
         e.orbitHit = ORBIT_REHIT;
         const dx = e.x - player.x, dy = e.y - player.y, d = Math.hypot(dx, dy) || 1;
         // Crits use your crit chance but never more than x2.5 (Bibliography doesn't apply, and no Annotated splash).
@@ -2238,7 +2258,7 @@ function render() {
   if (stats.ink || stats.chill || stats.staticChance) for (const e of enemies) if (e.inkT > 0 || e.chillT > 0 || e.frozenT > 0 || e.staticT > 0) drawStatus(e);   // only runs with a status perk
   for (const b of books) drawThrownBook(b);
   if (game.state !== 'title' && game.state !== 'gameover' && !(game.state === 'dying' && game.deathT < 1.5)) {
-    orbiterPositions().forEach((o, k) => { if (orbitRest[k] > 0) ctx.globalAlpha = 0.4; drawBook(o.x, o.y, o.a * 2, PLAYER.orbit, 1.1); ctx.globalAlpha = 1; });
+    orbiterPositions().forEach((o, k) => { if (orbitRest[k] > 0) ctx.globalAlpha = 0.4; drawBook(o.x, o.y, o.a * 2, PLAYER.orbit, ORBIT_SCALE); ctx.globalAlpha = 1; });
     drawPlayer();
   }
   for (const c of cats) drawCat(c);
@@ -2383,8 +2403,10 @@ function drawEnemy(e) {
   if (e.type !== 'boss') return drawArtEnemy(ctx, e, { player, playing: game.state === 'playing' });
   const look = Math.atan2(player.y - e.y, player.x - e.x);
   ctx.save(); ctx.translate(e.x, e.y);
+  if (e.vs !== 1) ctx.scale(e.vs, e.vs);
+  if (e.trans > 0) { const k = 1 + 0.18 * Math.sin((e.trans / BOSS_TRANS) * Math.PI); ctx.scale(k, k); }
   if (e.stun > 0) { ctx.rotate(Math.sin(e.t * 20) * 0.15); }
-  drawBoss(e, look, e.flash > 0);
+  drawBoss(e, look, e.flash > 0 || (e.trans > 0 && Math.sin(e.trans * 40) > 0));
   ctx.restore();
 }
 
@@ -2559,6 +2581,10 @@ function drawHUD() {
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(bx - 2, by - 2, bw + 4, 14);
     ctx.fillStyle = b.phase === 3 ? '#ff2d55' : b.bar || '#6c3cff'; ctx.fillRect(bx, by, bw * clamp(b.hp / b.maxHp, 0, 1), 10);
     ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(bx + bw * 0.33, by, 2, 10); ctx.fillRect(bx + bw * 0.66, by, 2, 10);
+  }
+  // Phase tag: small, top of the screen, never covers the play area
+  if (game.phaseTag && game.phaseTag.t > 0) {
+    ctx.globalAlpha = clamp(game.phaseTag.t * 4, 0, 1); txt(game.phaseTag.text, UW / 2, 70 * uiK + 22, 22, '#fff3c4', 'center'); ctx.globalAlpha = 1;
   }
   // Banner
   if (game.bannerT > 0) {
@@ -3142,6 +3168,7 @@ requestAnimationFrame(frame);
 if (DEBUG) {
   window.__overdue = {
     game, get cats() { return cats; }, grid: () => `${COLS}x${ROWS}`, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, enemies, get content() { return content; },
+    fire, damageEnemy, orbiterPositions, consts: { STORY_ENEMY_SCALE, ORBIT_RADIUS, ORBIT_SCALE, BOSS_TRANS, MARGIN_SIDE, MARGIN_WIDE },   // QA only (v1.15.1 look & feel checks)
     makeEnemy, freeze: (on) => { debugFreeze = !!on; }, startRun: (m, w) => startRun(m, w, { noGuide: true }), startWave, get guide() { return game.guide; }, tipsSeen: () => tips.seen.slice(), setSurviveT: (t) => { game.surviveT = t; }, killAll: () => { for (const e of [...enemies]) killEnemy(e, 'cleanup'); spawnQueue.length = 0; telegraphs.length = 0; },
     get progress() { return progress; }, setFines: (n) => { progress = { ...progress, fines: n }; saveProgress(); renderFineBadges(); },
     unlockAll: () => { progress = { ...progress, unlocked: WINGS.length }; saveProgress(); },
