@@ -2235,7 +2235,7 @@ function render() {
   for (const e of enemies) { const k = shadowK(e); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(e.x + 3, e.y + e.r * 0.8, e.r * 0.9 * k, e.r * 0.4 * k, 0, 0, TAU); ctx.fill(); }
   drawWorms(ctx, enemies);
   for (let i = enemies.length - 1; i >= 0; i--) drawEnemy(enemies[i]);
-  for (const e of enemies) if (e.inkT > 0 || e.chillT > 0 || e.frozenT > 0 || e.staticT > 0) drawStatus(e);
+  if (stats.ink || stats.chill || stats.staticChance) for (const e of enemies) if (e.inkT > 0 || e.chillT > 0 || e.frozenT > 0 || e.staticT > 0) drawStatus(e);   // only runs with a status perk
   for (const b of books) drawThrownBook(b);
   if (game.state !== 'title' && game.state !== 'gameover' && !(game.state === 'dying' && game.deathT < 1.5)) {
     orbiterPositions().forEach((o, k) => { if (orbitRest[k] > 0) ctx.globalAlpha = 0.4; drawBook(o.x, o.y, o.a * 2, PLAYER.orbit, 1.1); ctx.globalAlpha = 1; });
@@ -2244,7 +2244,7 @@ function render() {
   for (const c of cats) drawCat(c);
   drawHazards();
   for (const g of rings) drawRing(g);
-  drawZaps();
+  if (zaps.length) drawZaps();
   drawParticles();
 
   if (settings.lights) renderLights();
