@@ -8,6 +8,8 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 - **1.14.0 part A:** reviewed by planner (f96a1d3: 100/100 tests, QA 776 checks green, perf boss 0.92x/61 fps, wing 10 0.97x/61 fps,
   basics flake fixed 5/5). Branch `claude/rooms-analytics-1140`.
 - **Running:** 1.14.0 part B coder "Overdue · v1.14.0 balance" (`claude/balance-1140`, from part A), incl. CI docs `paths-ignore`.
+- **Running in parallel:** 1.14.1 coder "Overdue · v1.14.1 rare + cursed" (`claude/rare-cursed-1141`, from part A; avoids part B's files).
+  Merge order: 1.14.0 (A+B) first, then 1.14.1 on top.
 - **Planner branch:** `claude/brave-galileo-jyg38o` (= main + docs).
 - **Owner habits:** short replies (tables, a pick, the one word needed); ships only on "ship"; playtest mode = numbered log only;
   3-option pages only for visual choices; 08:00 SGT morning update when going to sleep; max 2 coders (usage).
