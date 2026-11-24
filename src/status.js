@@ -119,8 +119,8 @@ export function zapChain(from, enemies, n, reach = ZAP_REACH, prefer = null) {
   return out;
 }
 
-/** Pop-up Book levels: radius 45 / 60 / 60, damage ×1 / ×1 / ×2. */
-export const POP_RADIUS = [0, 45, 60, 60], POP_MULT = [0, 1, 1, 2];
+/** Pop-up Book levels: radius 52 / 60 / 60, damage ×1 / ×1 / ×2. */
+export const POP_RADIUS = [0, 52, 60, 60], POP_MULT = [0, 1, 1, 2];
 
 /** Rolling per-second counters for the balance bot (cheap: a few numbers). */
 export function makeMetrics() {
