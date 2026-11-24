@@ -4,12 +4,12 @@
 // Offers come from their own seeded RNG (run seed + wing + room), so Renew / Banish / perk rolls never change them.
 import { Rng, hashString } from './util.js';
 import { ROOMS_PER_WING, ELITE_ROOM, roomReward } from './story.js';
-import { UPGRADES } from './upgrades.js';
+import { UPGRADES, comboHints, masterworkFor } from './upgrades.js';
 
 // id · icon · name · line (plain words, shown on the card) · banner (room banner subtitle)
 // eliteAdd: extra elite share · budgetMult: spawn budget multiplier · biteWing: from this wing elites also get +50% HP and fire 30% faster · fineMult: fines multiplier · fineMin: floor for the reduced fines
 export const DOORS = {
-  rare:    { id: 'rare', icon: '💰', name: 'Rare Books', line: 'More enemies, more elites · ×2 fines', banner: '💰 Rare Books: double fines', eliteAdd: 0.5, budgetMult: 1.3, biteWing: 4, eliteHpMult: 1.5, eliteFireMult: 1.3, fineMult: 2 },
+  rare:    { id: 'rare', icon: '💰', name: 'Rare Books', line: 'More enemies, more elites · ×2 fines + a better pick', banner: '💰 Rare Books: double fines, better pick', eliteAdd: 0.5, budgetMult: 1.3, biteWing: 4, eliteHpMult: 1.5, eliteFireMult: 1.3, fineMult: 2 },
   rest:    { id: 'rest', icon: '☕', name: 'Break Room', line: 'Heal 1 ♥ · fewer fines', banner: '☕ Break Room: +1 ♥, fewer fines', fineMult: 0.5, fineMin: 3, heal: 1 },
   mystery: { id: 'mystery', icon: '🎲', name: 'Mystery Shelf', line: 'Same room · 50/50: bonus perk or a cursed book', banner: '🎲 Mystery Shelf: 50/50 bonus perk or cursed book' },
   stacks:  { id: 'stacks', icon: '🚪', name: 'The Stacks', line: 'A normal room · normal fines', banner: '🚪 The Stacks: a normal room' },
@@ -64,4 +64,24 @@ export function mysteryPrize(seed, wing, room, owned = {}, { banned = new Set(),
   const pool = UPGRADES.filter((u) => u.kind === 'cursed' && !(owned[u.id] > 0) && !banned.has(u.id) && !(u.needsLights && lights === false));
   if (pool.length && rng.chance(0.5)) return { kind: 'cursed', id: rng.pick(pool).id };
   return { kind: 'perk' };
+}
+
+/**
+ * The guaranteed card of a Rare Books pick (v1.14.1), or null. Best first:
+ *  1. a perk you don't own that completes a Collected Works with a perk you do own;
+ *  2. a perk you own (below max) that leads to a Masterwork, the one closest to max;
+ *  3. any perk you own below max, the one closest to max.
+ * Banned perks and Lights-Out-style cards that can't be used are skipped. Ties are broken by `rng`.
+ */
+export function rarePick(rng, owned = {}, { banned = new Set(), lights = true } = {}) {
+  const ok = (u) => u.kind === 'perk' && !banned.has(u.id) && !(u.needsLights && lights === false);
+  const perks = UPGRADES.filter(ok);
+  const completes = perks.filter((u) => comboHints(u, owned).length > 0);
+  if (completes.length) return rng.pick(completes);
+  const below = perks.filter((u) => (owned[u.id] || 0) > 0 && owned[u.id] < u.max);
+  const closest = (list) => { const top = Math.max(...list.map((u) => owned[u.id])); return rng.pick(list.filter((u) => owned[u.id] === top)); };
+  const toMaster = below.filter((u) => masterworkFor(u.id));
+  if (toMaster.length) return closest(toMaster);
+  if (below.length) return closest(below);
+  return null;
 }

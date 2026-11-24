@@ -215,6 +215,12 @@ body.portrait .card .preview { flex-basis: 100%; }
 }
 /* Masterwork: leather-bound edge with gold foil */
 .cards .card.master { box-shadow: 0 .5em 1.4em rgba(0,0,0,.6), inset 0 0 0 5px #5a3417, inset 0 0 0 7px #d4a72c; }
+/* v1.14.1: Rare Books pick stamp, and the Mystery Shelf Take it / Walk away buttons */
+.cards .card.rare .stamp { color: #8a5a00; font-size: .7em; transform: rotate(-6deg); background: rgba(212, 167, 44, .25); }
+.cards .card.rare { box-shadow: 0 .5em 1.2em rgba(0,0,0,.55), 0 0 0 3px rgba(212, 167, 44, .85); }
+.offer-actions { display: flex; gap: .6em; width: 100%; justify-content: center; }
+.offer-actions .offer-btn { flex: 1 1 0; min-height: 2.6em; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; }
+.offer-actions .offer-btn.take { border-color: #b3122e; }
 /* NEW ribbon (first time this player ever sees the card) */
 .cards .card.new::before { content: "NEW"; position: absolute; top: -.5em; left: -.4em; transform: rotate(-8deg);
   background: #d3263a; color: #fff; font: bold .7em var(--type); letter-spacing: .1em; padding: .15em .5em; border-radius: 2px; box-shadow: 0 2px 4px rgba(0,0,0,.4); }

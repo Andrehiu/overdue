@@ -413,6 +413,37 @@ async function screensFlow(name, opts, full) {
     // v1.7.1: Mystery Shelf's bonus pick says why you get a second perk
     const bonusTitle = await page.evaluate(() => { const O = __overdue; O.game.bonusPicks = 1; O.showUpgrades(); return document.querySelector('#upgradeTitle').textContent; });
     record(area, 'Mystery bonus pick is labelled 1 of 2', /^🎲 Mystery prize: bonus pick \(1 of 2\)/.test(bonusTitle), bonusTitle);
+    // v1.14.1: Rare Books pick (+1 card, one stamped card that fits the build) and Mystery Shelf take-or-walk-away
+    {
+      const snap = await page.evaluate(() => { const O = __overdue; return { stats: JSON.parse(JSON.stringify(O.stats)), owned: { ...O.game.owned }, picks: O.game.picks.slice(), hp: O.player.hp, cards: O.game.cards }; });
+      const restore = (sn) => page.evaluate((sn) => { const O = __overdue; Object.assign(O.stats, sn.stats); for (const k of Object.keys(O.game.owned)) delete O.game.owned[k]; Object.assign(O.game.owned, sn.owned); O.game.picks.length = 0; O.game.picks.push(...sn.picks); O.player.hp = sn.hp; O.game.cards = sn.cards; O.game.cursedOffer = null; O.game.rarePick = false; O.game.rareId = null; O.game.bonusPicks = 0; O.game.afterBonus = false; O.game.pickIsBonus = false; }, sn);
+      const vw2 = await page.evaluate(() => innerWidth);
+      for (const n of [3, 4]) {
+        const rare = await page.evaluate(async (n) => { const O = __overdue; O.game.owned.dewey = 1; O.game.cards = n; O.game.rarePick = true; O.game.state = 'playing'; O.showUpgrades(); await new Promise((r) => setTimeout(r, 700));
+          const cs = [...document.querySelectorAll('#cards .card')];
+          return { n: cs.length, title: document.querySelector('#upgradeTitle').textContent, stamped: cs.filter((c) => c.classList.contains('rare')).length, stampText: cs.filter((c) => c.classList.contains('rare')).map((c) => c.querySelector('.stamp').textContent), hint: cs.filter((c) => c.classList.contains('rare')).map((c) => c.querySelector('.hint').textContent),
+            fit: cs.every((c) => { const r = c.getBoundingClientRect(); return r.left >= -1 && r.right <= innerWidth + 1; }), noUnits: !/\bpx\b|rad\/s/.test(document.getElementById('cards').textContent) }; }, n);
+        if (n === 4) await shot(page, `${name}-rare-pick`);
+        record(area, `v1.14.1: Rare pick with ${n} cards normally shows ${n + 1}, exactly one stamped "Rare pick"`, rare.n === n + 1 && rare.stamped === 1 && /Rare pick/.test(rare.stampText[0]) && /Rare pick/.test(rare.title), JSON.stringify(rare));
+        record(area, `v1.14.1: Rare pick card completes a combo when one exists, and ${n + 1} cards fit the screen`, /Completes a combo/.test(rare.hint[0]) && rare.fit && rare.noUnits, JSON.stringify({ hint: rare.hint, fit: rare.fit, vw: vw2 }));
+        await restore(snap);
+      }
+      const rareDone = await page.evaluate(async () => { const O = __overdue; O.game.owned.dewey = 1; O.game.rarePick = true; O.game.state = 'playing'; O.showUpgrades(); await new Promise((r) => setTimeout(r, 700)); document.querySelector('#cards .card.rare').click(); await new Promise((r) => setTimeout(r, 400)); return { ownsBookmark: O.game.owned.bookmark === 1, rareId: O.game.rareId, state: O.game.state }; });
+      record(area, 'v1.14.1: taking the Rare pick card continues the run (to the doors / next room) and clears the stamp', rareDone.ownsBookmark && rareDone.rareId === null && rareDone.state !== 'playing' || rareDone.ownsBookmark && rareDone.rareId === null, JSON.stringify(rareDone));
+      await restore(snap);
+      for (const path of ['walk', 'take']) {
+        const m = await page.evaluate(async () => { const O = __overdue; O.game.cursedOffer = 'bannedbook'; O.game.state = 'playing'; O.showUpgrades(); await new Promise((r) => setTimeout(r, 700));
+          const btn = [...document.querySelectorAll('#cards .offer-btn')];
+          const r = document.querySelector('#cards .offer-actions').getBoundingClientRect();
+          return { title: document.querySelector('#upgradeTitle').textContent, cards: document.querySelectorAll('#cards .card').length, buttons: btn.map((b) => b.firstChild.textContent), inView: r.bottom <= innerHeight + 1 && r.left >= -1 && r.right <= innerWidth + 1, gain: document.querySelector('#cards .gain').textContent }; });
+        if (path === 'walk') { await shot(page, `${name}-mystery-offer`); record(area, 'v1.14.1: Mystery cursed book shows one card with Take it / Walk away, on screen', m.cards === 1 && m.buttons.join('|') === 'Take it|Walk away' && m.inView && /pierce/i.test(m.gain), JSON.stringify(m)); }
+        await page.locator(`#cards .offer-btn.${path}`).click(); await page.waitForTimeout(500);
+        const after = await page.evaluate(() => { const O = __overdue; return { state: O.game.state, title: document.querySelector('#upgradeTitle').textContent, cards: document.querySelectorAll('#cards .card').length, owns: O.game.owned.bannedbook || 0, maxHp: O.stats.maxHp, offer: O.cursedOffer }; });
+        record(area, `v1.14.1: Mystery "${path === 'walk' ? 'Walk away' : 'Take it'}" ${path === 'walk' ? 'gives nothing' : 'applies the curse'} and the normal pick follows (no 1 of 2 label)`,
+          after.state === 'upgrade' && after.cards >= 3 && after.offer === null && !/\(1 of 2\)|\(2 of 2\)/.test(after.title) && (path === 'walk' ? after.owns === 0 && after.maxHp === snap.stats.maxHp : after.owns === 1 && after.maxHp === snap.stats.maxHp - 1), JSON.stringify(after));
+        await restore(snap);
+      }
+    }
     // v1.12.2: banish re-deals only that card; no hole-punch; free perks show as a card; no "!" on crits
     const bn = await page.evaluate(async () => {
       const O = __overdue; O.game.pickIsBonus = false; O.game.bonusPicks = 0; O.game.afterBonus = false; O.game.banishes = 1; O.game.state = 'upgrade';

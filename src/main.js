@@ -13,7 +13,7 @@ import { PLAYER, bookLook } from './palette.js';
 import { BURST, shadowK, drawEnemy as drawArtEnemy, drawWorms } from './enemy-art.js';
 import { SoundEngine } from './audio.js';
 import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
-import { DOORS, soleDoor, doorOffer, applyDoor, doorReward, mysteryPrize } from './doors.js';
+import { DOORS, soleDoor, doorOffer, applyDoor, doorReward, mysteryPrize, rarePick } from './doors.js';
 import { GUIDE_FLAG, UNLOCK_FLAG, MENUS, unlockToast, hasPlayed, unlockedMenus, newUnlocks, shouldGuide, GUIDE_BEATS, guidePrompt } from './newplayer.js';
 import { BACKUP_KEYS, encodeBackup, decodeBackup, describeBackup } from './backup.js';
 import { PROGRESS_KEY, RENOVATIONS, normalizeProgress, applyRenovations, runBonuses, recordRun, level, nextCost, canBuy, buy } from './meta.js';
@@ -259,7 +259,7 @@ const game = {
   seed: 1, freeze: 0, timeScale: 1, trauma: 0, flash: 0, banner: '', bannerSub: '', bannerT: 0,
   owned: {}, noHitWave: true, clearT: 0, boss: null, deathT: 0, waveT: 0, surviveT: 0, ammoT: 0, ammo: null,
   mode: 'endless', wingN: 1, diff: null, fines: 0, cards: 3, banked: null, wingCleared: false,
-  door: null, bonusPicks: 0, pickIsBonus: false, picks: [], doorLog: [], banished: new Set(), lastHit: null, lastHitElite: false, lastRun: null,
+  door: null, bonusPicks: 0, pickIsBonus: false, rarePick: false, rareId: null, cursedOffer: null, picks: [], doorLog: [], banished: new Set(), lastHit: null, lastHitElite: false, lastRun: null,
 };
 let stats = baseStats();
 let rl = newCounters();          // run log counters (damage by source, book stats); reset every run
@@ -300,7 +300,7 @@ function startRun(mode = 'endless', wing = 1, opts = {}) {
   const bonus = runBonuses(progress);
   Object.assign(game, { wave: 0, score: 0, kills: 0, combo: 0, comboT: 0, bestCombo: 0, playTime: 0, owned: {}, renews: bonus.renews, banishes: bonus.banishes, banished: new Set(),
     freeze: 0, timeScale: 1, trauma: 0, flash: 0, boss: null, mode, wingN: mode === 'story' ? clamp(wing, 1, WINGS.length) : 1, diff: null,
-    guide: null, fines: 0, cards: bonus.cards, banked: null, wingCleared: false, door: null, bonusPicks: 0, pickIsBonus: false, afterBonus: false });
+    guide: null, fines: 0, cards: bonus.cards, banked: null, wingCleared: false, door: null, bonusPicks: 0, pickIsBonus: false, afterBonus: false, rarePick: false, rareId: null, cursedOffer: null });
   stats = applyRenovations(baseStats(), progress);
   rl = newCounters(); Object.assign(game, { picks: [], doorLog: [], lastHit: null, lastHitElite: false, lastRun: null });
   player = makePlayer();
@@ -378,7 +378,7 @@ function waveCleared() {
   const bonus = Math.round((250 * game.wave + (game.noHitWave ? 500 : 0)) * stats.scoreMult);
   game.score += bonus;
   // Fines for the clear: story rooms pay by room type; endless pays more every 5 waves and for bosses.
-  const fine = isStory() ? doorReward(game.wingN, game.wave, game.door) : 1 + Math.floor(game.wave / 5) + (game.wave % 5 === 0 ? 15 : 0);
+  const fine = isStory() ? Math.round(doorReward(game.wingN, game.wave, game.door) * stats.fineMult) : 1 + Math.floor(game.wave / 5) + (game.wave % 5 === 0 ? 15 : 0);
   game.fines += fine;
   const wingDone = isStory() && game.wave >= BOSS_ROOM;
   banner(wingDone ? 'WING CLEARED!' : 'SHELF CLEARED!', `${isStory() ? '' : `+${bonus.toLocaleString()} · `}+${fine} 🪙 fines${game.noHitWave ? ' · flawless!' : ''}`);
@@ -392,6 +392,7 @@ function waveCleared() {
     floatText(player.x, player.y - 40, '+1 ♥ Reading break', '#ff6b81', 13, 1.4);
   }
   if (isStory() && game.door === 'mystery') resolveMystery();
+  if (isStory() && game.door === 'rare') game.rarePick = true;   // v1.14.1: the next perk pick is the Rare pick
   game.wingCleared = wingDone;
   sound.play('wave');
   for (const h of hazards) burst(h.x, h.y, 3, ['#ff6b6b', '#fff'], 60, 0.3);
@@ -402,20 +403,18 @@ function waveCleared() {
   for (const p of pickups) p.magnet = true;
 }
 
-/** Mystery Shelf prize: 50% a cursed book you don't own (applied now), otherwise a bonus perk pick before the normal one. */
+/** Mystery Shelf prize: 50% a cursed book you don't own (offered: take it or walk away), otherwise a bonus perk pick before the normal one. */
 function resolveMystery() {
   const prize = mysteryPrize(game.seed, game.wingN, game.wave, game.owned, { banned: game.banished, lights: settings.lights });
   if (prize.kind === 'cursed') {
-    const u = byId(prize.id);
-    queueFreePerk(u, 'Mystery Shelf');   // shown as a card once the next room starts
-    game.owned[u.id] = 1; game.picks.push(u.id); u.apply(stats, player);
-    sound.play('upgrade');
+    game.cursedOffer = prize.id;   // v1.14.1: shown before the perk pick as Take it / Walk away
   } else {
     game.bonusPicks++;   // the bonus pick screen is labelled "1 of 2" / "2 of 2"
   }
 }
 
 function showUpgrades() {
+  if (game.cursedOffer) return showCursedOffer();
   game.state = 'upgrade';
   game.bannerT = 0; texts.length = 0;
   sound.setMuffled(true);
@@ -424,14 +423,57 @@ function showUpgrades() {
   const second = !bonus && game.afterBonus;   // the normal pick that follows a Mystery bonus pick
   if (bonus) game.afterBonus = true; else game.afterBonus = false;
   game.pickIsBonus = bonus;
-  const choices = rollUpgrades(rng, game.owned, game.cards || 3, rollOpts());
+  const rare = game.rarePick && !bonus; game.rarePick = false; game.rareId = null;
+  let choices;
+  if (rare) {
+    // Rare Books: one more card than usual, and one of them is guaranteed to fit the build (combo / Masterwork path).
+    const g = rarePick(rng, game.owned, { banned: game.banished, lights: settings.lights });
+    choices = rollUpgrades(rng, game.owned, game.cards || 3, rollOpts(g ? { exclude: new Set([g.id]) } : {}));
+    if (g) { choices.splice(rng.int(0, choices.length), 0, g); game.rareId = g.id; }
+    else choices = rollUpgrades(rng, game.owned, (game.cards || 3) + 1, rollOpts());
+  } else choices = rollUpgrades(rng, game.owned, game.cards || 3, rollOpts());
   if (!choices.length) return bonus ? showUpgrades() : nextRoom();
   const title = $('#upgradeTitle');
-  title.textContent = bonus ? '🎲 Mystery prize: bonus pick (1 of 2)' : second ? `Room ${game.wave} cleared — your normal pick (2 of 2)` : isStory() ? `Room ${game.wave}/${ROOMS_PER_WING} cleared — choose a perk` : `Wave ${game.wave} cleared — choose a perk`;
+  title.textContent = rare ? `Room ${game.wave}/${ROOMS_PER_WING} cleared — 💰 Rare pick: one extra card` : bonus ? '🎲 Mystery prize: bonus pick (1 of 2)' : second ? `Room ${game.wave} cleared — your normal pick (2 of 2)` : isStory() ? `Room ${game.wave}/${ROOMS_PER_WING} cleared — choose a perk` : `Wave ${game.wave} cleared — choose a perk`;
   if (bonus || second) { const p = document.createElement('span'); p.className = 'pick-pips'; p.textContent = bonus ? '●○' : '●●'; p.setAttribute('aria-hidden', 'true'); title.appendChild(p); }
   renderCards(choices);
   showScreen('upgrade');
   if (!touch.enabled) $('#cards button').focus();
+}
+
+/** Mystery Shelf cursed book: one card, "Take it" or "Walk away" (nothing happens), then the normal pick. */
+function showCursedOffer() {
+  const u = byId(game.cursedOffer);
+  game.state = 'upgrade';
+  game.bannerT = 0; texts.length = 0;
+  sound.setMuffled(true);
+  const title = $('#upgradeTitle');
+  title.textContent = '🎲 Mystery prize: a cursed book';
+  const box = $('#cards');
+  box.textContent = '';
+  cardsArmedAt = performance.now() + 550;
+  box.classList.remove('dealing'); void box.offsetWidth; box.classList.add('dealing');
+  codex.seen.add(u.id); saveCodex();
+  const wrap = buildCard(u, 0, 'offer');
+  box.appendChild(wrap);
+  $('#perkTip').hidden = true;
+  $('#btnRenew').hidden = true;
+  renderBuild($('#buildStrip'), []);
+  showScreen('upgrade');
+  if (!touch.enabled) wrap.querySelector('[data-act="take"]').focus();
+}
+
+function resolveCursedOffer(take) {
+  if (!cardsArmed() || game.state !== 'upgrade' || !game.cursedOffer) return;
+  const u = byId(game.cursedOffer);
+  game.cursedOffer = null;
+  if (take) {
+    game.owned[u.id] = 1; game.picks.push(u.id); u.apply(stats, player);
+    freeFresh.add(u.id);
+    sound.play('upgrade');
+    toast(`💀 ${u.name} taken`);
+  } else { sound.play('click'); toast(`🚶 Walked away from ${u.name}`); }
+  showUpgrades();
 }
 
 /** After a perk pick: a bonus pick first if one is owed, then (story) the door screen, then the next room. */
@@ -441,7 +483,7 @@ function afterPick() {
 }
 
 function nextRoom() {
-  game.pickIsBonus = false; game.afterBonus = false;
+  game.pickIsBonus = false; game.afterBonus = false; game.rareId = null;
   const full = player.hp >= stats.maxHp;
   const offer = isStory() ? doorOffer(game.seed, game.wingN, game.wave, { atFullHp: full }) : [];
   if (!offer.length) { game.door = null; return startWave(game.wave + 1); }
@@ -593,7 +635,7 @@ function banishCard(wrap, u) {
 /** A small plain-words caption under (or beside) a fun term. */
 function cap(text, inline = false) { const c = document.createElement('small'); c.className = inline ? 'cap inl' : 'cap'; c.textContent = text; return c; }
 
-function buildCard(u, i) {
+function buildCard(u, i, mode = '') {
   const wrap = document.createElement('div');
   wrap.className = 'card-wrap';
   const b = document.createElement('button');
@@ -602,7 +644,8 @@ function buildCard(u, i) {
   b.innerHTML = '<span class="key"></span><span class="stamp"></span><span class="icon"></span><strong></strong><span class="why"></span><span class="gain"></span><span class="hint"></span><span class="lvl"></span><span class="mw"></span>';
   b.querySelector('.key').textContent = String(i + 1);
   b.querySelector('.icon').textContent = u.icon;
-  b.querySelector('.stamp').textContent = KIND_LABEL[u.kind] || '';
+  b.querySelector('.stamp').textContent = u.id === game.rareId && mode === '' ? '💰 Rare pick' : (KIND_LABEL[u.kind] || '');
+  if (u.id === game.rareId && mode === '') { b.classList.add('rare'); b.dataset.rare = '1'; }
   b.querySelector('strong').textContent = u.name;
   // Option B: just the gain, in plain words. Specials describe their unique effect instead.
   const gain = u.kind === 'perk' || u.kind === 'cursed' ? gainText(u, stats, player) : [];
@@ -623,6 +666,7 @@ function buildCard(u, i) {
   else if (/Masterwork/.test(info.mwText)) b.querySelector('.mw').append(cap('max-level bonus', true));
   if (info.mw) b.classList.add(info.mw === 'finale' ? 'finale' : 'near');
   b.addEventListener('click', () => {
+    if (mode === 'offer') return;   // the offer card is read-only: use its two buttons
     if (!cardsArmed() || game.state !== 'upgrade' || wrap.classList.contains('leaving')) return;
     game.owned[u.id] = lvl; game.picks.push(u.id);
     u.apply(stats, player);
@@ -635,6 +679,17 @@ function buildCard(u, i) {
     afterPick();
   });
   wrap.appendChild(b);
+  if (mode === 'offer') {
+    b.querySelector('.key').textContent = '';
+    const row = document.createElement('div'); row.className = 'offer-actions';
+    for (const [act, label, small] of [['take', 'Take it', 'gain and curse'], ['walk', 'Walk away', 'nothing changes']]) {
+      const x = document.createElement('button'); x.type = 'button'; x.dataset.act = act; x.className = `offer-btn ${act}`;
+      x.append(label, cap(small)); x.addEventListener('click', () => resolveCursedOffer(act === 'take'));
+      row.appendChild(x);
+    }
+    wrap.appendChild(row);
+    return wrap;
+  }
   // Banish: remove a normal perk from this run's pool, and deal a replacement.
   if (game.banishes > 0 && (u.kind === 'perk' || u.kind === 'cursed')) {
     const x = document.createElement('button');
@@ -1243,7 +1298,7 @@ function doShhh() {
     if (d < R + e.r) {
       const kb = e.type === 'boss' ? 60 : 420;
       e.vx += (dx / d) * kb; e.vy += (dy / d) * kb;
-      e.stun = e.type === 'boss' ? 0.4 : 1.5;
+      e.stun = (e.type === 'boss' ? 0.4 : 1.5) * stats.shhhStun;
       damageEnemy(e, 1, 0, 0, false, 'shhh');
     }
   }
@@ -2776,7 +2831,7 @@ if (DEBUG) {
     grant: (id) => { const u = UPGRADES.find((x) => x.id === id); game.owned[id] = (game.owned[id] || 0) + 1; game.picks.push(id); u.apply(stats, player); },
     get runCounters() { return rl; }, get lastRun() { return game.lastRun; }, ui: () => ({ uiK, viewScale, dpr, W, H, UW, UH }),
     showCards: (ids) => renderCards(ids.map(byId)),
-    showFreePerk: (id, label) => { queueFreePerk(byId(id), label); flushFreePerks(); }, showUpgrades, showDoors, nextRoom, texts, get door() { return game.door; },
+    showFreePerk: (id, label) => { queueFreePerk(byId(id), label); flushFreePerks(); }, showUpgrades, showDoors, nextRoom, texts, get cursedOffer() { return game.cursedOffer; }, takeCursed: (take) => { cardsArmedAt = 0; resolveCursedOffer(take); }, get rareId() { return game.rareId; }, get door() { return game.door; },
     // ---- balance bot (scripts/balance.mjs): drives the sim headless, faster than real time ----
     actions, hazards, STEP, books, touch, settings, setSetting, get W() { return W; }, get H() { return H; }, isSolid: (x, y) => isSolidPx(arena.solid, x, y),
     get choices() { return currentChoices; }, get doors() { return currentDoors; },

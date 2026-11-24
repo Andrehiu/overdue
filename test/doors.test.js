@@ -135,3 +135,21 @@ test('v1.12.2: fixed Elite / Author doors are walked through without a screen; r
   assert.equal(soleDoor([]), null);
   assert.ok(DOORS.mystery.line.includes('50/50'), 'Mystery Shelf says what it is');
 });
+
+test('Rare pick (v1.14.1): completes a combo first, else advances a Masterwork perk, else any owned perk, else nothing', async () => {
+  const { rarePick, DOORS } = await load('doors');
+  const { Rng } = await load('util');
+  assert.match(DOORS.rare.line, /better pick/);
+  for (let seed = 1; seed <= 30; seed++) {
+    const r = () => new Rng(seed);
+    assert.equal(rarePick(r(), {}), null, 'nothing owned: no guarantee');
+    assert.equal(rarePick(r(), { dewey: 1 }).id, 'bookmark', 'bookmark completes Dewey combo (also the only combo partner)');
+    // Owning two perks at 1/3 each with no combo path: the closest to max is advanced, ties are allowed
+    const a = rarePick(r(), { hardcover: 2, coffee: 1 });
+    assert.ok(['hardcover', 'coffee'].includes(a.id));
+    assert.equal(a.id, 'hardcover', 'closest to its Masterwork wins');
+    assert.equal(rarePick(r(), { hardcover: 3 }), null, 'a maxed perk is not a path (Masterworks come as specials)');
+    // banned perks are skipped
+    assert.notEqual(rarePick(r(), { dewey: 1 }, { banned: new Set(['bookmark']) })?.id, 'bookmark');
+  }
+});
