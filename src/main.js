@@ -2911,6 +2911,15 @@ function renderStory() {
   else if (nextLocked && (nextLocked.act || 1) === storyAct) $('#wingLock').textContent = `🔒 Clear ${WINGS[unlocked - 1].name} to unlock ${nextLocked.name}.`;
   else if (!pageUnlocked) { const first = onPage[0].w; $('#wingLock').textContent = `🔒 Locked: clear ${WINGS[first - 2].name} (wing ${first - 1}) to open ${th.short}.`; }
   else $('#wingLock').textContent = '';
+  if (!pageUnlocked) {   // a locked act page shows the act, not the last Act I wing that was selected
+    const first = onPage[0].w;
+    $('#wingName').textContent = `🔒 ${th.short} · ${th.name}`;
+    $('#wingBlurb').textContent = th.blurb;
+    $('#wingInfo').textContent = `Clear wing ${first - 1} to open`;
+    $('#btnEnterWing').textContent = '🔒 Locked';
+    $('#btnEnterWing').disabled = true;
+    return;
+  }
   $('#wingName').textContent = `${def.icon} Wing ${selectedWing}: ${def.name}`;
   $('#wingBlurb').textContent = def.blurb;
   const d1 = difficulty(selectedWing, 1);
@@ -3293,7 +3302,7 @@ if (DEBUG) {
     showCards: (ids) => renderCards(ids.map(byId)),
     showFreePerk: (id, label) => { queueFreePerk(byId(id), label); flushFreePerks(); }, showUpgrades, showDoors, nextRoom, texts, get cursedOffer() { return game.cursedOffer; }, takeCursed: (take) => { cardsArmedAt = 0; resolveCursedOffer(take); }, get rareId() { return game.rareId; }, get door() { return game.door; },
     // ---- balance bot (scripts/balance.mjs): drives the sim headless, faster than real time ----
-    actions, hazards, STEP, books, touch, settings, setSetting, get W() { return W; }, get H() { return H; }, isSolid: (x, y) => isSolidPx(arena.solid, x, y), setAimVariant: (v) => { aimVariant = v; autoTarget = null; }, setSolid: (x, y, v) => { const [cx, cy] = cellOf(x, y); arena.solid[cy * COLS + cx] = v ? 1 : 0; },
+    actions, hazards, STEP, books, touch, settings, setSetting, get W() { return W; }, get H() { return H; }, isSolid: (x, y) => isSolidPx(walkGrid(), x, y),   // bot steering + QA: what WALKERS can't enter (shelves + Act II water) setAimVariant: (v) => { aimVariant = v; autoTarget = null; }, setSolid: (x, y, v) => { const [cx, cy] = cellOf(x, y); arena.solid[cy * COLS + cx] = v ? 1 : 0; },
     get choices() { return currentChoices; }, get doors() { return currentDoors; },
     setBotInput: (mv) => { botInput = mv; }, drive: (on) => { botDrive = !!on; if (!on) botInput = null; },
     stepN: (n) => { for (let i = 0; i < n; i++) step(STEP); },

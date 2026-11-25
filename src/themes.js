@@ -3,8 +3,8 @@
 // lighting system (dark room, lamp pools, lantern) is NOT part of a theme, only colours are.
 // Later acts (Overgrown Conservatory, Clockwork Archive) are one more entry each.
 export const ACTS = [
-  { act: 1, name: 'The Library', short: 'Act I' },
-  { act: 2, name: 'The Sunken Stacks', short: 'Act II' },
+  { act: 1, name: 'The Library', short: 'Act I', blurb: 'Ten wings of the library, front desk to Restricted Section.' },
+  { act: 2, name: 'The Sunken Stacks', short: 'Act II', blurb: 'The basement flooded. Stone walkways, deep water, cold lanterns.' },
 ];
 
 const BOOKS_WARM = ['#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400', '#16a085', '#f1c40f', '#7f8c8d', '#e84393', '#2c3e50', '#b33939', '#218c74'];

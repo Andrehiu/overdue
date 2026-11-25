@@ -840,6 +840,8 @@ async function act2Flow() {
   const t2 = await actTitle();
   record('act2', 'swipe left shows "Act II · The Sunken Stacks"', t2 === 'Act II · The Sunken Stacks', t2);
   const locked = await page.evaluate(() => { const t = [...document.querySelectorAll('#wingGrid .wing')]; return { n: t.length, w11: t[0]?.dataset.wing, off: t.every((b) => b.disabled), lock: document.querySelector('#wingLock').textContent, enter: document.querySelector('#btnEnterWing').disabled }; });
+  const info = await page.evaluate(() => ({ name: document.querySelector('#wingName').textContent, enter: document.querySelector('#btnEnterWing').disabled, info: document.querySelector('#wingInfo').textContent }));
+  record('act2', 'locked Act II page shows Act II info and a disabled Enter (not an Act I wing)', /Act II · The Sunken Stacks/.test(info.name) && info.enter && /Clear wing 10/.test(info.info), JSON.stringify(info));
   record('act2', 'Act II is visible but locked on a fresh save', locked.n === 10 && locked.w11 === '11' && locked.off && /Locked|🔒/.test(locked.lock), JSON.stringify(locked));
   await shot(page, 'act2-wingmap-locked');
   await swipe(140); await page.waitForTimeout(200);
