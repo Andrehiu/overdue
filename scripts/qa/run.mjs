@@ -927,6 +927,22 @@ async function act2Flow() {
   record('act2', 'game over after an Act II run shows room x/9', /Room reached\s*5\/9/i.test(goText), goText.replace(/\s+/g, ' ').slice(0, 120));
   await page.evaluate(() => { __overdue.drive(false); __overdue.game.state = 'title'; document.querySelectorAll('.screen').forEach((e) => { e.hidden = e.id !== 'title'; }); });
 
+  // v1.16.1: no walker gets stuck at a shore. In water rooms (islands/causeway) with the player standing still, every ground enemy keeps moving
+  // toward them (before the fix, enemies across a pond walked into the water edge and stood there for good).
+  const stuck = await page.evaluate(() => {
+    const O = __overdue, bad = [], realRandom = Math.random;
+    for (const [w, room] of [[11, 2], [11, 4], [11, 6], [12, 6]]) for (const seed of [1, 2, 3]) {
+      let a = (seed * 2654435761) >>> 0; Math.random = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      O.unlockAll(); O.startRun('story', w); O.startWave(room); O.god(); O.drive(true); O.setBotInput({ x: 0, y: 0 });
+      O.stepN(40 * 120);                                         // spawns done and everyone has walked for a while
+      const before = new Map(O.enemies.map((e) => [e, [e.x, e.y]]));
+      O.stepN(15 * 120);
+      for (const e of O.enemies) { const b = before.get(e); if (!b || ['eel', 'boat', 'coin', 'worm', 'boss', 'patron'].includes(e.type)) continue; if (Math.hypot(e.x - b[0], e.y - b[1]) < 12 && Math.hypot(e.x - O.player.x, e.y - O.player.y) > 140) bad.push(`w${w} r${room} s${seed} ${e.type}@${Math.round(e.x)},${Math.round(e.y)}`); }
+    }
+    Math.random = realRandom; O.drive(false); return bad;
+  });
+  record('act2', 'no ground enemy stands still at a shore in Act II water rooms (player standing still, 3 seeds x 4 rooms)', stuck.length === 0, stuck.slice(0, 4).join(' | '));
+
   // 3. an Act II water room: renders, the player can't step into water, books fly over it
   const pick = (() => { for (const w of [11, 12]) for (let r = 1; r <= roomsIn(w); r++) if (WATER_SHAPES.includes(roomShape(w, r))) return [w, r]; return null; })();
   await page.evaluate(([w, r]) => { const O = __overdue; O.unlockAll(); O.startRun('story', w); O.startWave(r); O.god(); O.killAll(); O.freeze(false); }, pick);
