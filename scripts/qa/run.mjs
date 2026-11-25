@@ -917,11 +917,12 @@ async function act2Flow() {
     O.setSetting('autoaim', false); O.settings.autofire = false; O.startWave(O.game.wave); O.god(); O.freeze(false); O.killAll(); O.hazards.length = 0; O.player.x = O.W / 2; O.player.y = O.H / 2; O.god();
     const spot = (n) => { let best = null; for (let i = 0; i < 400 && !best; i++) { const x = (2 + Math.floor(Math.random() * (cols - 4))) * C + C / 2, y = (2 + Math.floor(Math.random() * (rows - 4))) * C + C / 2; if ([[-1, 0], [1, 0], [0, -1], [0, 1]].every(([dx, dy]) => inW(x + dx * C, y + dy * C)) && inW(x, y) && Math.hypot(x - O.player.x, y - O.player.y) > 150) best = { x, y }; } return best; };
     const mk = (type, elite) => { const p = spot(); if (!p) return null; O.materialise(type, p.x, p.y, elite); return O.enemies[O.enemies.length - 1]; };
+    O.makeEnemy('golem', 40, 40); O.enemies[0].speed = 0;   // a still dry enemy keeps these three out of 'hunt' mode
     const eel = mk('eel'), boat = mk('boat'), eel2 = mk('eel', true);
     if (!eel || !boat) return { noSpot: true };
     const out = { eelOutOfWater: 0, boatOutOfWater: 0, up: 0, under: 0, phases: new Set(), hurtWhileUnder: 0, hitWhileUp: 0, noticesOnWater: 0, noticesDry: 0, pages: 0, shotsCap: 0, hp0: eel.hp };
     let wasUnderHp = eel.hp, deadUnder = false, bookHpChecks = 0, bookHpOk = 0;
-    for (let i = 0; i < 60 * 24; i++) {
+    for (let i = 0; i < 120 * 24; i++) {   // 24 s (STEP is 1/120 s)
       O.stepN(1);
       for (const e of [eel, eel2]) if (!e.dead && !inW(e.x, e.y)) out.eelOutOfWater++;
       if (!boat.dead && !inW(boat.x, boat.y)) out.boatOutOfWater++;
@@ -943,7 +944,8 @@ async function act2Flow() {
     out.boatDbg = { dead: boat.dead, dropT: boat.dropT, state: O.game.state, hp: boat.hp, n: O.enemies.length }; out.bookHpChecks = bookHpChecks; out.bookHpOk = bookHpOk; out.phases = [...out.phases];
     // it can be hit while up: wait for 'up', then hit it
     O.killAll();
-    const e3 = mk('eel'); for (let i = 0; i < 60 * 8 && e3.ph !== 'up'; i++) O.stepN(1);
+    O.makeEnemy('golem', 40, 40); O.enemies[O.enemies.length - 1].speed = 0;   // a dry enemy keeps the eel out of 'hunt' mode, so it surfaces on its normal timer
+    const e3 = mk('eel'); for (let i = 0; i < 120 * 8 && e3.ph !== 'up'; i++) O.stepN(1);
     const hp = e3.hp; O.damageEnemy(e3, 1, 0, 0, false, 'throw'); out.hitWhileUp = hp - e3.hp;
     out.codex = [...JSON.parse(localStorage.getItem('overdue.codex.v1') || '{}').seen || []].filter((x) => x.startsWith('enemy:'));
     return out;
@@ -956,6 +958,20 @@ async function act2Flow() {
   record('act2', 'Ink Eel surfaces and fires pages (page:eel)', wat.pages > 0 || wat.up > 0, `${wat.pages} pages in flight at the end`);
   record('act2', 'Paper Boat stays on the water and drops Overdue Notices onto walkways (none on water)', wat.boatOutOfWater === 0 && wat.noticesDry >= 3 && wat.noticesOnWater === 0, `${JSON.stringify(wat.boatDbg)} out-of-water frames ${wat.boatOutOfWater}, notices ${wat.noticesDry}, on water ${wat.noticesOnWater}`);
   record('act2', 'Codex remembers both creatures (ids enemy:eel, enemy:boat)', wat.codex?.includes('enemy:eel') && wat.codex?.includes('enemy:boat'), String(wat.codex));
+  // 3c. the last water enemies hunt you and can never stall a room
+  const hunt = await page.evaluate(() => {
+    const O = __overdue, C = 30, [cols, rows] = O.grid().split('x').map(Number), a = O.arena;
+    O.startWave(O.game.wave); O.god(); O.freeze(false); O.killAll(); O.setSetting('autoaim', false); O.player.x = O.W / 2; O.player.y = O.H / 2;
+    let far = null, fd = -1; for (let y = 2; y < rows - 2; y++) for (let x = 2; x < cols - 2; x++) if ([[0,0],[-1,0],[1,0],[0,-1],[0,1]].every(([dx,dy]) => a.water[(y+dy)*cols+x+dx])) { const d = Math.hypot(x * C - O.W / 2, y * C - O.H / 2); if (d > fd) { fd = d; far = [x, y]; } }
+    O.materialise('eel', far[0] * C + C / 2, far[1] * C + C / 2, false);
+    const e = O.enemies[0]; O.stepN(2);
+    const out = { hunting: O.waterHunt, d0: Math.round(Math.hypot(e.x - O.player.x, e.y - O.player.y)) };
+    let minD = out.d0, maxUp = 0, t = 0, inWaterAll = true;
+    for (; t < 120 * 60 && O.enemies.length; t++)   /* STEP is 1/120 s */ { O.stepN(1); minD = Math.min(minD, Math.hypot(e.x - O.player.x, e.y - O.player.y)); if (e.ph === 'up') maxUp = Math.max(maxUp, e.upLen || 0); const cx = Math.floor(e.x / C), cy = Math.floor(e.y / C); if (!a.water[cy * cols + cx]) inWaterAll = false; }
+    out.minD = Math.round(minD); out.upLen = maxUp; out.seconds = Math.round(t / 120); out.left = O.enemies.length; out.inWaterAll = inWaterAll;
+    return out;
+  });
+  record('act2', 'the last eel hunts: it swims toward you, stays up longer, stays on water, and the room cannot stall (gone within 60 s)', hunt.hunting && hunt.minD < hunt.d0 && hunt.upLen > 2 && hunt.inWaterAll && hunt.left === 0, JSON.stringify(hunt));
   // a look at them for the screenshot: two eels (one up), two boats
   await page.evaluate(() => { const O = __overdue, C = 30, [cols, rows] = O.grid().split('x').map(Number), a = O.arena;
     O.killAll(); O.player.x = O.W / 2; O.player.y = O.H / 2; O.god();

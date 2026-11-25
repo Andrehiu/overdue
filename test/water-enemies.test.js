@@ -105,3 +105,25 @@ test('a room without water swaps water enemies for dry ones of similar cost', as
   const W = await load('water-enemies'), { ENEMY_TYPES } = await load('waves');
   for (const t of W.WATER_TYPES) assert.ok(Math.abs(ENEMY_TYPES[W.DRY_SWAP[t]].cost - ENEMY_TYPES[t].cost) <= 1, t);
 });
+
+test('hunt: only when just water enemies (and their boats\' notices) are left; ponds are labelled and the nearest pond cell is found', async () => {
+  const W = await load('water-enemies');
+  const eel = { type: 'eel' }, boat = { type: 'boat' };
+  assert.equal(W.huntActive([eel]), true);
+  assert.equal(W.huntActive([eel, boat, { type: 'notice', boat: true }]), true, 'notices dropped by boats do not stop it');
+  assert.equal(W.huntActive([eel, { type: 'bunny' }]), false, 'a dry enemy is still around');
+  assert.equal(W.huntActive([eel, { type: 'notice' }]), false, 'a spawned (not dropped) notice counts as dry');
+  assert.equal(W.huntActive([eel], 1), false, 'spawns still queued');
+  assert.equal(W.huntActive([]), false);
+  assert.equal(W.huntActive([eel, eel, eel, eel]), false, 'more than 3 left: no hunt yet');
+  assert.equal(W.huntActive([{ type: 'eel', dead: true }]), false);
+  // two ponds on a 8x4 grid
+  const cols = 8, rows = 4, water = new Uint8Array(cols * rows);
+  for (const [x, y] of [[0, 0], [1, 0], [0, 1], [1, 1], [6, 2], [7, 2], [6, 3], [7, 3]]) water[y * cols + x] = 1;
+  const { labels, count } = W.labelPonds(water, cols, rows);
+  assert.equal(count, 2);
+  assert.notEqual(labels[0], labels[6 * 1 + 2 * cols]);
+  assert.equal(labels[2 * cols + 3], -1);
+  const c = W.nearestInPond(labels, labels[0], cols, rows, 30, 7 * 30, 0);
+  assert.deepEqual(c, [1, 0], 'nearest cell of the left pond to a point on the right');
+});

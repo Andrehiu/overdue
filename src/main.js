@@ -9,7 +9,7 @@ import { BUILD, versionLabel, fetchLatestBuild } from './version.js';
 import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
-import { isWaterType, DRY_SWAP, EEL, BOAT, eelInit, eelStep, boatInit, boatStep, moveInWater, discInWater, inWater, waterSpawn, nearestWalkway, hasWater } from './water-enemies.js';
+import { isWaterType, DRY_SWAP, EEL, BOAT, eelInit, eelStep, boatInit, boatStep, moveInWater, discInWater, inWater, waterSpawn, nearestWalkway, hasWater, HUNT, huntActive, labelPonds, nearestInPond } from './water-enemies.js';
 import { NEW_IN_1_15, baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips, buildChips, specialReason, levelInfo, perkTip, normalizeTips, TIPS } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist, aimSource, aimStick } from './util.js';
 import { PLAYER, bookLook } from './palette.js';
@@ -1183,7 +1183,7 @@ function updatePlayer(dt) {
   else if (src === 'touch') { p.aim = stick.angle; firing = true; }
   else if (src === 'auto') {
     const vis = (e) => lineOfSight(arena.solid, COLS, ROWS, CELL, p.x, p.y, e.x, e.y);
-    const rng = PORTRAIT ? 600 : 460;
+    const rng = waterHunt ? Infinity : PORTRAIT ? 600 : 460;   // the last eels / boats can be anywhere: no range cap
     const t = aimVariant === 'today' ? nearestEnemy(p.x, p.y, rng) : chooseTarget(p, enemies, rng, vis, aimVariant === 'open' ? null : autoTarget);
     autoTarget = t;
     if (t) {
@@ -1595,8 +1595,35 @@ function boatDrop(e) {
   sound.play('spawn');
 }
 
+/** Hunt (v1.16.0 fix): when only water enemies are left they come to you. One flow field per pond, aimed at the pond cell nearest the player. */
+let waterHunt = false, huntT = 0;
+const ponds = { arena: null, labels: null, count: 0, fields: [], notWater: null };
+function huntDir(e) {
+  if (ponds.arena !== arena) { const l = labelPonds(arena.water, COLS, ROWS); ponds.arena = arena; ponds.labels = l.labels; ponds.count = l.count; ponds.fields = []; ponds.notWater = Uint8Array.from(arena.water, (v) => (v ? 0 : 1)); }
+  const [ex, ey] = cellOf(e.x, e.y), pond = ponds.labels[ey * COLS + ex];
+  if (pond < 0) return null;
+  const [pcx, pcy] = cellOf(player.x, player.y);
+  let f = ponds.fields[pond];
+  if (!f || game.time - f.t > 0.5) {
+    // the spot to wait at: the nearest cell of this pond with a clear line to the player (so the surfaced eel can be hit); any nearest cell if none
+    const see = (cx, cy) => lineOfSight(arena.solid, COLS, ROWS, CELL, (cx + 0.5) * CELL, (cy + 0.5) * CELL, player.x, player.y);
+    const c = nearestInPond(ponds.labels, pond, COLS, ROWS, CELL, player.x, player.y, see) || nearestInPond(ponds.labels, pond, COLS, ROWS, CELL, player.x, player.y);
+    f = ponds.fields[pond] = { pc: pcy * COLS + pcx, t: game.time, c, flow: c ? computeFlowField(ponds.notWater, COLS, ROWS, c[0], c[1]) : null };
+  }
+  if (!f.flow) return null;
+  const i = ey * COLS + ex, fx = f.flow.dirX[i], fy = f.flow.dirY[i];
+  if (!fx && !fy) return { a: e.hd, stay: true };   // already at the nearest spot: stay put there (surfaces in place), don't wander away
+  return { a: Math.atan2(fy, fx) };
+}
+
 function updateEnemies(dt) {
   const p = player;
+  waterHunt = game.state === 'playing' && huntActive(enemies, spawnQueue.length + telegraphs.filter((t) => !t.boat).length);
+  huntT = waterHunt ? huntT + dt : 0;
+  if (huntT > HUNT.giveUp) {   // safety net: stragglers nobody can reach sink ("the water drains"), so a room can never stall
+    for (const e of enemies) if (isWaterType(e.type) && !e.dead) { e.dead = true; burst(e.x, e.y, 14, ['#9ad8e0', '#fff'], 100, 0.6); floatText(e.x, e.y - 14, 'Sunk', '#bfeaf0', 13, 1); }
+    huntT = 0;
+  }
   for (const e of enemies) {
     e.t += dt;
     e.flash = Math.max(0, e.flash - dt);
@@ -1645,19 +1672,24 @@ function updateEnemies(dt) {
         break;
       }
       case 'eel': {
+        const hd = waterHunt && huntDir(e);   // last water enemies: swim to the part of their pond nearest to you, and don't surface from far away
+        if (hd && !hd.stay && e.ph === 'under' && Math.hypot(p.x - e.x, p.y - e.y) > HUNT.surfaceRange) e.phT = Math.max(e.phT, 0.2);
         // Under water it swims toward you (staying on water); then rises (ripple + fin: the tell), spits a 3-page fan, dives. It can only be hit while it is up.
-        const st = eelStep(e, dt);
+        const st = eelStep(e, dt, Math.random, waterHunt);
         if (st.fire && game.state === 'playing') { const a = Math.atan2(p.y - e.y, p.x - e.x); hazPat = 'page:eel'; fan(e.x, e.y, a, EEL.fanPages, EEL.fanSpread, EEL.pageSpeed); }
         const sp = e.ph === 'under' ? e.speed : e.ph === 'dive' ? e.speed * 0.25 : e.speed * 0.15;
-        waterHeading(e, dt, p.x, p.y, 1.2);
-        mx = Math.cos(e.hd) * sp; my = Math.sin(e.hd) * sp; break;
+        if (hd) { e.hd = hd.a; e.hdT = 0.3; } else waterHeading(e, dt, p.x, p.y, 1.2);
+        const hk = hd ? (hd.stay ? 0 : e.ph === 'under' ? 1.4 : 1) : 1;
+        mx = Math.cos(e.hd) * sp * hk; my = Math.sin(e.hd) * sp * hk; break;
       }
       case 'boat': {
         // Drifts slowly along the water and drops an Overdue Notice on the nearest walkway about every 4 s (never more than BOAT.maxNotices alive).
         const st = boatStep(e, dt);
         if (st.drop) boatDrop(e);
-        waterHeading(e, dt, p.x, p.y, 2.2);
-        mx = Math.cos(e.hd) * e.speed; my = Math.sin(e.hd) * e.speed; break;
+        const hd = waterHunt && huntDir(e);
+        if (hd) { e.hd = hd.a; e.hdT = 0.3; } else waterHeading(e, dt, p.x, p.y, 2.2);
+        const bk = hd ? (hd.stay ? 0 : 1.8) : 1;
+        mx = Math.cos(e.hd) * e.speed * bk; my = Math.sin(e.hd) * e.speed * bk; break;
       }
       case 'boss': bossAI(e, dt); break;
     }
@@ -3359,7 +3391,7 @@ if (DEBUG) {
   window.__overdue = {
     game, get bg() { return bg; }, get arena() { return arena; }, get tester() { return tester; }, get cats() { return cats; }, grid: () => `${COLS}x${ROWS}`, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, enemies, get content() { return content; },
     fire, damageEnemy, orbiterPositions, consts: { STORY_ENEMY_SCALE, ORBIT_RADIUS, ORBIT_SCALE, BOSS_TRANS, MARGIN_SIDE, MARGIN_WIDE },   // QA only (v1.15.1 look & feel checks)
-    materialise, makeEnemy, freeze: (on) => { debugFreeze = !!on; }, startRun: (m, w) => startRun(m, w, { noGuide: true }), startWave, get guide() { return game.guide; }, tipsSeen: () => tips.seen.slice(), setSurviveT: (t) => { game.surviveT = t; }, killAll: () => { for (const e of [...enemies]) killEnemy(e, 'cleanup'); spawnQueue.length = 0; telegraphs.length = 0; },
+    get waterHunt() { return waterHunt; }, materialise, makeEnemy, freeze: (on) => { debugFreeze = !!on; }, startRun: (m, w) => startRun(m, w, { noGuide: true }), startWave, get guide() { return game.guide; }, tipsSeen: () => tips.seen.slice(), setSurviveT: (t) => { game.surviveT = t; }, killAll: () => { for (const e of [...enemies]) killEnemy(e, 'cleanup'); spawnQueue.length = 0; telegraphs.length = 0; },
     get progress() { return progress; }, setFines: (n) => { progress = { ...progress, fines: n }; saveProgress(); renderFineBadges(); },
     unlockAll: () => { progress = { ...progress, unlocked: WINGS.length }; saveProgress(); },
 

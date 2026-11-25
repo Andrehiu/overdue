@@ -20,17 +20,18 @@ export const eelHittable = (e) => e.ph === 'up';
  * Advance the surface cycle. Returns { fire: true } on the frame it spits (once per surfacing). Sets `e.under` = untargetable
  * (under, rise and dive). `dt` is game seconds; a very long dt just moves through the phases in order.
  */
-export function eelStep(e, dt, rng = Math.random) {
+export function eelStep(e, dt, rng = Math.random, hunt = false) {
   if (!e.ph) eelInit(e, rng);
   let fire = false;
   e.phT -= dt;
   if (e.ph === 'under' && e.phT <= 0) { e.ph = 'rise'; e.phT = EEL.rise; e.fired = false; }
-  else if (e.ph === 'rise' && e.phT <= 0) { e.ph = 'up'; e.phT = EEL.up; }
+  else if (e.ph === 'rise' && e.phT <= 0) { e.ph = 'up'; e.upLen = hunt ? HUNT.upLen : EEL.up; e.phT = e.upLen; }
   else if (e.ph === 'up') {
-    if (!e.fired && EEL.up - e.phT >= EEL.fireAt) { e.fired = true; fire = true; }
+    if (!e.fired && (e.upLen || EEL.up) - e.phT >= EEL.fireAt) { e.fired = true; fire = true; }
     if (e.phT <= 0) { e.ph = 'dive'; e.phT = EEL.dive; }
   } else if (e.ph === 'dive' && e.phT <= 0) {
-    e.ph = 'under'; e.phT = EEL.under[0] + (EEL.under[1] - EEL.under[0]) * rng();
+    const u = hunt ? HUNT.under : EEL.under;
+    e.ph = 'under'; e.phT = u[0] + (u[1] - u[0]) * rng();
   }
   e.under = e.ph !== 'up';
   return { fire };
@@ -96,3 +97,49 @@ export function nearestWalkway(walk, cols, rows, cell, x, y) {
 }
 /** Does this room have enough water for water enemies? */
 export const hasWater = (arena) => !!(arena && arena.water && arena.water.some(Boolean));
+
+// ---- the last water enemies hunt the player (v1.16.0 part B fix): otherwise a lone eel can sit in a far pond and stall the room ----
+/** When only water enemies (and the notices their boats dropped) are left, they come to the player. */
+/** upLen / under: while hunted down to the last few, an eel stays up longer (a thrown book takes ~0.9 s to cross the room) and dives for less. */
+export const HUNT = { maxLeft: 3, surfaceRange: 250, upLen: 2.4, under: [0.7, 1.0], giveUp: 45 };   // giveUp: seconds of hunting after which unreachable stragglers sink (a safety net so a room can never stall)
+export function huntActive(enemies, queued = 0) {
+  if (queued) return false;
+  let water = 0;
+  for (const e of enemies) {
+    if (e.dead) continue;
+    if (isWaterType(e.type)) water++;
+    else if (!e.boat) return false;   // a real dry enemy is still around: no hunt
+  }
+  return water > 0 && water <= HUNT.maxLeft;
+}
+/** Label each connected body of water (4-neighbour): returns { labels: Int16Array (-1 = not water), count }. */
+export function labelPonds(water, cols, rows) {
+  const labels = new Int16Array(cols * rows).fill(-1); let count = 0;
+  for (let i = 0; i < labels.length; i++) {
+    if (water[i] !== 1 || labels[i] !== -1) continue;
+    const stack = [i]; labels[i] = count;
+    while (stack.length) {
+      const c = stack.pop(), x = c % cols, y = (c / cols) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+        const n = ny * cols + nx;
+        if (water[n] === 1 && labels[n] === -1) { labels[n] = count; stack.push(n); }
+      }
+    }
+    count++;
+  }
+  return { labels, count };
+}
+/** The cell of pond `pond` (passing `ok`, if given) nearest to (px,py) (prefers cells whose 4 neighbours are water too, so a disc fits). null if none. */
+export function nearestInPond(labels, pond, cols, rows, cell, px, py, ok = null) {
+  let best = null, bd = Infinity;
+  for (let cy = 0; cy < rows; cy++) for (let cx = 0; cx < cols; cx++) {
+    if (labels[cy * cols + cx] !== pond) continue;
+    if (ok && !ok(cx, cy)) continue;   // e.g. only cells with a clear line to the player (books fly over water, shelves block)
+    const inner = [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dy]) => labels[(cy + dy) * cols + cx + dx] === pond && cx + dx >= 0 && cx + dx < cols);
+    const d = ((cx + 0.5) * cell - px) ** 2 + ((cy + 0.5) * cell - py) ** 2 + (inner ? 0 : (cell * 1.5) ** 2);
+    if (d < bd) { bd = d; best = [cx, cy]; }
+  }
+  return best;
+}
