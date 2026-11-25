@@ -224,6 +224,9 @@ test('cards say just the gain, hint at combos, and Banish keeps perks out of the
   const { byId, baseStats, gainText, comboHints, rollUpgrades } = await load('upgrades');
   const { Rng } = await load('util');
   const s = baseStats();
+  // v1.16.2: the loss side pluralises too (Banned Book takes a third of your max hearts)
+  assert.ok(gainText(byId('bannedbook'), { ...s, maxHp: 6 }, { hp: 6 }).includes('−2 max hearts'));
+  assert.ok(gainText(byId('bannedbook'), { ...s, maxHp: 3 }, { hp: 3 }).includes('−1 max heart'));
   assert.deepEqual(gainText(byId('extendedloan'), s, { hp: 3 }), ['+1 max heart', 'heals 2']);
   assert.deepEqual(gainText(byId('extendedloan'), s, { hp: 5 }), ['+1 max heart']);
   assert.deepEqual(gainText(byId('hardcover'), s, { hp: 5 }), ['+50% damage']);

@@ -565,7 +565,7 @@ h3 .cap { display: inline; margin-left: .5em; }
 .renew { line-height: 1.15; }
 
 /* Guided first room: Skip button (top left, level with the pause button) and a pulse on the button being taught */
-#touchUI #btnGuideSkip { border-radius: 2em; width: auto; height: auto; padding: .35em .9em; font-size: .75em; left: calc(1em + env(safe-area-inset-left, 0px)); top: 4.6em; display: none; }
+#touchUI #btnGuideSkip { border-radius: 2em; width: auto; height: auto; padding: .35em .9em; font-size: .75em; left: calc(1em + env(safe-area-inset-left, 0px)); top: calc(8em + env(safe-area-inset-top, 0px)); display: none; }
 body.guiding #touchUI #btnGuideSkip { display: block; }
 #touchUI button.guide-hl { animation: guide-pulse 1s ease-in-out infinite; border-color: #ffd54a; z-index: 3; }
 @keyframes guide-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 213, 74, .8), 0 0 1.2em rgba(255, 213, 74, .6); transform: scale(1); } 50% { box-shadow: 0 0 0 .7em rgba(255, 213, 74, 0), 0 0 1.6em rgba(255, 213, 74, .9); transform: scale(1.12); } }

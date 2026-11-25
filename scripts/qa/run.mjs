@@ -1209,9 +1209,10 @@ async function newPlayerFlow(name, opts) {
     await tap('#btnEnterWing'); await page.waitForTimeout(400);
     await page.evaluate(() => __overdue.god());
     record(area, 'guided room starts on a fresh save', await page.evaluate(() => !!__overdue.guide && __overdue.game.state === 'playing' && __overdue.game.wave === 1));
-    record(area, 'Skip button is on screen and clear of the pause button', await (async () => {
+    record(area, 'Skip button is on screen and clear of the pause button and the hearts/fines HUD', await (async () => {
       const sk = await rect('#btnGuideSkip'), pa = await rect('#btnPause');
-      return sk.w > 0 && sk.l >= 0 && sk.r <= (await page.evaluate(() => innerWidth)) && !hit(sk, pa);
+      const cv = await rect('canvas'), hudTL = { l: cv.l, t: cv.t, r: cv.l + 0.2 * cv.w, b: cv.t + 0.105 * cv.h };   // hearts + fines block, top left
+      return sk.w > 0 && sk.l >= 0 && sk.r <= (await page.evaluate(() => innerWidth)) && !hit(sk, pa) && !hit(sk, hudTL);
     })());
     await beatReady(1);
     const b1 = await page.evaluate(() => ({ beat: __overdue.guide.beat, n: __overdue.enemies.length, slow: __overdue.enemies.every((e) => e.speed < 70) }));

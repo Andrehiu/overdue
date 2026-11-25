@@ -170,7 +170,7 @@ export function previewChange(u, stats, player) {
 // "Just the gain": one short line per change, in player words (option B on the perk card).
 const pct = (x) => `${Math.round(x * 100)}%`;
 const GAIN = [
-  ['maxHp', (a, b) => (b > a ? `+${b - a} max heart${b - a > 1 ? 's' : ''}` : `−${a - b} max heart`)],
+  ['maxHp', (a, b) => (b > a ? `+${b - a} max heart${b - a > 1 ? 's' : ''}` : `−${a - b} max heart${a - b > 1 ? 's' : ''}`)],
   ['damage', (a, b) => `${b > a ? '+' : '−'}${pct(Math.abs(b - a) / BASE.damage)} damage`],
   ['fireRate', (a, b) => `+${pct(b / a - 1)} throw speed`],
   ['projectiles', (a, b) => `+${b - a} book per throw`],
