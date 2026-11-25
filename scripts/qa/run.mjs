@@ -191,6 +191,21 @@ async function screensFlow(name, opts, full) {
     await tap('[data-act=play]');
     await page.evaluate(() => __overdue.god()); await page.waitForTimeout(2500);
     await shot(page, `${name}-2-play`);
+    // v1.15.4: SHHH and DASH sit diagonally apart: circle gap (centre distance minus radii) >= 1.5em, no overlap with each other,
+    // the pause button or the HUD, and fully on screen
+    {
+      const m = await page.evaluate(() => { const rc = (el) => { const r = el.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width, cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2 }; };
+        // the HUD is drawn on the canvas: its top-right block (score, combo bar) ends ~62 game px down, i.e. well inside the top 30%
+        const cv = document.querySelector('canvas').getBoundingClientRect();
+        const hud = [{ l: cv.right - 0.25 * cv.width, r: cv.right, t: cv.top, b: cv.top + 0.3 * cv.height }];
+        return { touch: document.body.classList.contains('touch'), d: rc(document.getElementById('btnDash')), s: rc(document.getElementById('btnShhh')), p: rc(document.getElementById('btnPause')), hud, vw: innerWidth, vh: innerHeight, fs: parseFloat(getComputedStyle(document.getElementById('btnDash')).fontSize) }; });
+      const dist = Math.hypot(m.d.cx - m.s.cx, m.d.cy - m.s.cy), gap = dist - (m.d.w + m.s.w) / 2, em = m.fs;
+      const hit = (a, b) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
+      const onScreen = (r) => r.l >= 0 && r.r <= m.vw && r.t >= 0 && r.b <= m.vh;
+      const clear = ![m.p, ...m.hud].some((o) => hit(m.d, o) || hit(m.s, o));
+      const ok = !m.touch || (gap >= 1.5 * em && onScreen(m.d) && onScreen(m.s) && clear);
+      record(area, 'v1.15.4: DASH/SHHH circles apart (gap >= 1.5em), clear of pause and the score/combo HUD, fully on screen', ok, `size ${Math.round(m.d.w)}px · circle gap ${Math.round(gap)}px (${(gap / em).toFixed(1)}em) · DASH [${Math.round(m.d.l)},${Math.round(m.d.t)}] SHHH [${Math.round(m.s.l)},${Math.round(m.s.t)}] · bottom margin ${Math.round(m.vh - m.d.b)}/${Math.round(m.vh - m.s.b)}px`);
+    }
     record(area, 'run starts', await page.evaluate(() => __overdue.game.state === 'playing'));
 
     // Perk screen: a combo hint and a Masterwork card, plain-language text only
@@ -571,18 +586,33 @@ async function screensFlow(name, opts, full) {
         return { throws: p.throws - t0, aimedFrames: p.autoAim.n, ok: p.autoAim.ok };`);
       record(area, 'auto-aim on: throws with no finger, at a visible enemy (or the nearest when none is visible)', auto.throws >= 1 && auto.aimedFrames >= 1 && auto.ok, JSON.stringify(auto));
       // v1.15.3: a far enemy in the open is chosen over a nearer one behind a shelf
-      const vis = await sim(`O.killAll(); const p = O.player; const clear = (a, d) => { for (let r = 10; r <= d; r += 8) if (O.isSolid(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r)) return false; return true; };
-        let aF = null; for (let i = 0; i < 16 && aF === null; i++) { const a = i * Math.PI / 8, b = a + Math.PI; if (clear(a, 260) && clear(b, 110)) aF = a; }
-        if (aF === null) return { skipped: true };
-        const aN = aF + Math.PI, wx = p.x + Math.cos(aN) * 60, wy = p.y + Math.sin(aN) * 60, was = O.isSolid(wx, wy); O.setSolid(wx, wy, true);
-        const far = O.makeEnemy('bunny', p.x + Math.cos(aF) * 250, p.y + Math.sin(aF) * 250), near = O.makeEnemy('bunny', p.x + Math.cos(aN) * 100, p.y + Math.sin(aN) * 100);
+      // The two bunnies must stand still: enemies get pushed out of walls/shelves they overlap, and a moving target shifts the 50% lead aim (that was
+      // the flake). So pick a direction where both discs are free of solid cells (also with the extra shelf cell in place), and report how far they moved.
+      const vis = await sim(`O.freeze(true); O.killAll(); O.stepN(1); O.killAll(); O.stepN(1); const p = O.player;   // killAll only marks enemies dead; a step removes them (a golem leaves coins: twice) p.x = O.W / 2; p.y = O.H / 2; p.vx = p.vy = 0;   // arena centre: a far point is then inside the room (line of sight is false outside the grid)
+        const inside = (x, y) => x > 30 && y > 30 && x < O.W - 30 && y < O.H - 30;
+        const freeDisc = (x, y, r) => inside(x, y) && [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r], [r * .7, r * .7], [-r * .7, r * .7], [r * .7, -r * .7], [-r * .7, -r * .7]].every(([dx, dy]) => !O.isSolid(x + dx, y + dy));
+        const clear = (a, d) => { for (let r = 10; r <= d; r += 8) if (O.isSolid(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r)) return false; return true; };
+        let pick = null;
+        for (let i = 0; i < 16 && !pick; i++) {
+          const aF = i * Math.PI / 8, aN = aF + Math.PI, wx = p.x + Math.cos(aN) * 60, wy = p.y + Math.sin(aN) * 60, was = O.isSolid(wx, wy);
+          if (!clear(aF, 260) || !clear(aN, 110) || was) continue;
+          O.setSolid(wx, wy, true);
+          const fx = p.x + Math.cos(aF) * 250, fy = p.y + Math.sin(aF) * 250, nx = p.x + Math.cos(aN) * 100, ny = p.y + Math.sin(aN) * 100;
+          if (freeDisc(fx, fy, 24) && freeDisc(nx, ny, 24)) pick = { aF, aN, wx, wy, was, fx, fy, nx, ny }; else O.setSolid(wx, wy, was);
+        }
+        if (!pick) { O.freeze(false); return { skipped: true }; }
+        const { aF, aN, wx, wy, was } = pick;
+        const far = O.makeEnemy('bunny', pick.fx, pick.fy), near = O.makeEnemy('bunny', pick.nx, pick.ny);
         for (const e of [far, near]) { e.hp = e.maxHp = 999; e.stun = 99; }
         O.setSetting('autoaim', true); O.touch.aimId = null; O.books.length = 0; p.throws = 0; O.stepN(4);
         const d = Math.abs(Math.atan2(Math.sin(p.aim - aF), Math.cos(p.aim - aF))), dn = Math.abs(Math.atan2(Math.sin(p.aim - aN), Math.cos(p.aim - aN)));
-        O.setSolid(wx, wy, was); return { skipped: false, toFar: +d.toFixed(2), toNear: +dn.toFixed(2), throws: p.throws };`);
+        const moved = [Math.hypot(far.x - pick.fx, far.y - pick.fy), Math.hypot(near.x - pick.nx, near.y - pick.ny)].map((v) => +v.toFixed(1)), others = O.enemies.length - 2;
+        O.setSolid(wx, wy, was); O.freeze(false); return { skipped: false, toFar: +d.toFixed(2), toNear: +dn.toFixed(2), throws: p.throws, moved, others, touchOn: O.touch.enabled, aimId: O.touch.aimId, state: O.game.state, autoaim: O.settings.autoaim };`);
       record(area, 'auto-aim: a far enemy in line of sight is chosen over a nearer one behind a shelf', vis.skipped === true || vis.toFar < 0.1, JSON.stringify(vis));
-      const over = await sim(`${angOff} const p = O.player; O.touch.aimId = 99; O.touch.ax0 = p.x + 300; O.touch.ay0 = p.y; O.touch.ax = O.touch.ax0 - 60; O.touch.ay = O.touch.ay0; const t0 = p.throws;
-        O.stepN(60); O.touch.aimId = null; return { throws: p.throws - t0, diff: dd(p.lastThrow, Math.PI) };`);
+      const over = await sim(`${angOff} const p = O.player;
+        if (O.game.state !== 'playing') { O.startWave(O.game.wave); O.god(); O.killAll(); }   // the room can already be cleared if the check above found no free spot
+        if (!O.enemies.length) { const b = O.makeEnemy('bunny', O.W / 2 + 260, 60); b.hp = b.maxHp = 999; b.stun = 99; } O.touch.aimId = 99; O.touch.ax0 = p.x + 300; O.touch.ay0 = p.y; O.touch.ax = O.touch.ax0 - 60; O.touch.ay = O.touch.ay0; const t0 = p.throws;
+        O.stepN(60); const st = { state: O.game.state, en: O.enemies.length, fireT: +p.fireT.toFixed(2), hp: p.hp, dash: p.dashT }; O.touch.aimId = null; return { throws: p.throws - t0, diff: dd(p.lastThrow, Math.PI), st };`);
       record(area, 'auto-aim on + deflected stick: throws follow the stick', over.throws >= 1 && over.diff < 0.15, JSON.stringify(over));
       const idleStick = await sim(`const p = O.player; O.touch.aimId = 99; O.touch.ax0 = O.touch.ax = p.x + 300; O.touch.ay0 = O.touch.ay = p.y; p.autoAim = { n: 0, nearest: true }; const t0 = p.throws;
         O.stepN(120); O.touch.aimId = null; return { throws: p.throws - t0, aimedFrames: p.autoAim.n };`);
@@ -1244,11 +1274,16 @@ async function newPerksFlow(name, opts) {
     { const { ctx, page, errors } = await mk(true);
       await page.goto(URL0); await page.evaluate(() => localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.15.0"]}')); await page.reload(); await page.waitForTimeout(900);
       await page.evaluate(() => { const O = __overdue; O.startRun('endless'); O.god(); O.grant('librarycat'); for (let i = 0; i < 3; i++) O.grant('margin'); O.grant('dewey'); });
-      await page.waitForFunction(() => __overdue.enemies.length >= 3, null, { timeout: 20000 }).catch(() => {});
-      // books in flight at one instant is a race with their lifetime: wait until 4+ Margin books are airborne and the cat has hit something
-      await page.waitForFunction(() => { const O = __overdue; return O.books.filter((b) => b.margin).length >= 4 && O.runCounters.dealt.cat > 0; }, null, { timeout: 15000, polling: 'raf' }).catch(() => {});
+      // Deterministic: hand-step the sim (real loop paused) until 4+ Margin books are airborne AND the cat has hit something, and take the
+      // numbers at that very step. (v1.15.4 fix: the old version waited in real time, then screenshotted, then re-read the books: under load
+      // the books had expired by then, or the 15 s real-time wait ran out at 20 fps.) Bounded at 90 s of game time.
+      const m = await page.evaluate(`(async () => { const O = __overdue; O.drive(true);
+        const snap = () => ({ cats: O.cats.length, side: O.books.filter((b) => b.margin).length, homingSide: O.books.filter((b) => b.margin && b.nohome).length,
+          rear: O.books.filter((b) => b.margin).some((b) => Math.cos(Math.atan2(b.vy, b.vx) - O.player.aim) < -0.9), catDmg: O.runCounters.dealt.cat });
+        let m = snap(), steps = 0;
+        try { for (; steps < 5400; steps++) { O.stepN(1); m = snap(); if (m.side >= 4 && m.catDmg > 0) break; } } finally { O.drive(false); }
+        return { ...m, steps }; })()`);
       await shot(page, `${name}-cat-and-margin`);
-      const m = await page.evaluate(() => { const O = __overdue; return { cats: O.cats.length, side: O.books.filter((b) => b.margin).length, homingSide: O.books.filter((b) => b.margin && b.nohome).length, rear: O.books.filter((b) => b.margin).some((b) => Math.cos(Math.atan2(b.vy, b.vx) - O.player.aim) < -0.9), catDmg: O.runCounters.dealt.cat }; });
       record(area, 'the cat is on screen and pounces (damage dealt by the cat)', m.cats === 1 && m.catDmg > 0, JSON.stringify(m));
       record(area, 'Margin Notes 3/3 throws side and rear books that never home', m.side >= 4 && m.side === m.homingSide, JSON.stringify(m));
       record(area, 'no page errors (cat/margin)', errors.length === 0, errors.join('; ').slice(0, 200));

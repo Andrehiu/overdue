@@ -17,7 +17,7 @@ export function chooseTarget(from, enemies, range, visible, sticky = null) {
   const d2 = (e) => (e.x - from.x) ** 2 + (e.y - from.y) ** 2;
   let nearest = null, nd = r2, nearVis = null, vd = r2, stickyIn = false;
   for (const e of enemies) {
-    if (e.under) continue;   // a submerged Ink Eel can't be hit, so it isn't a target
+    if (e.dead || e.under) continue;   // dead ones are removed at the end of the enemy update; a submerged eel can't be hit   // a submerged Ink Eel can't be hit, so it isn't a target
     const d = d2(e);
     if (d >= r2) continue;
     if (e === sticky) stickyIn = true;
