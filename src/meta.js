@@ -14,21 +14,26 @@ const list = (...costs) => (lvl) => costs[lvl];
 
 // `apply(stats, lvl)` changes in-run stats; `run` keys are read by the run setup instead.
 export const RENOVATIONS = [
-  { id: 'spines', icon: '📕', name: 'Reinforced Spines', gain: '+10% book damage', max: 10, cost: geo(25, 1.32),
+  { id: 'spines', icon: '📕', name: 'Reinforced Spines', gain: '+10% book damage', at: (n) => `+${10 * n}% book damage`, max: 10, cost: geo(25, 1.32),
     apply: (s, n) => { s.damage += 0.1 * n; } },
-  { id: 'armchair', icon: '🛋️', name: 'Comfy Armchair', gain: '+1 max heart', max: 3, cost: list(80, 220, 480),
+  { id: 'armchair', icon: '🛋️', name: 'Comfy Armchair', gain: '+1 max heart', at: (n) => `+${n} max heart${n > 1 ? 's' : ''}`, max: 3, cost: list(80, 220, 480),
     apply: (s, n) => { s.maxHp += n; } },
-  { id: 'chute', icon: '📮', name: 'Book Return Chute', gain: '+8% throw speed', max: 5, cost: geo(35, 1.45),
+  { id: 'chute', icon: '📮', name: 'Book Return Chute', gain: '+8% throw speed', at: (n) => `+${Math.round((Math.pow(1.08, n) - 1) * 100)}% throw speed`, max: 5, cost: geo(35, 1.45),
     apply: (s, n) => { s.fireRate *= Math.pow(1.08, n); } },
-  { id: 'shoes', icon: '👟', name: 'Quiet Shoes', gain: '+5% move speed', max: 5, cost: geo(30, 1.4),
+  { id: 'shoes', icon: '👟', name: 'Quiet Shoes', gain: '+5% move speed', at: (n) => `+${5 * n}% move speed`, max: 5, cost: geo(30, 1.4),
     apply: (s, n) => { s.speed *= 1 + 0.05 * n; } },
-  { id: 'catalogue', icon: '🗃️', name: 'Bigger Card Catalogue', gain: '4 perk choices instead of 3', max: 1, cost: list(300) },
-  { id: 'headstart', icon: '🎒', name: 'Head Start', gain: 'Start every run with +1 random perk', max: 2, cost: list(120, 360) },
-  { id: 'librarycard', icon: '🪪', name: 'Library Card', gain: '+1 Banish every run', max: 2, cost: list(60, 180) },
-  { id: 'renewals', icon: '🔄', name: 'Renewal Desk', gain: '+1 Renew every run', max: 2, cost: list(90, 260) },
-  { id: 'collector', icon: '🪙', name: 'Fine Collector', gain: '+20% fines earned', max: 5, cost: geo(50, 1.5) },
-  { id: 'secondwind', icon: '💫', name: 'Second Wind', gain: 'Once per run, get back up with 2 hearts', max: 1, cost: list(450) },
+  { id: 'catalogue', icon: '🗃️', name: 'Bigger Card Catalogue', gain: '4 perk choices instead of 3', at: () => '4 perk choices instead of 3', max: 1, cost: list(300) },
+  { id: 'headstart', icon: '🎒', name: 'Head Start', gain: 'Start every run with +1 random perk', at: (n) => `Start every run with +${n} random perk${n > 1 ? 's' : ''}`, max: 2, cost: list(120, 360) },
+  { id: 'librarycard', icon: '🪪', name: 'Library Card', gain: '+1 Banish every run', at: (n) => `+${n} Banish every run`, max: 2, cost: list(60, 180) },
+  { id: 'renewals', icon: '🔄', name: 'Renewal Desk', gain: '+1 Renew every run', at: (n) => `+${n} Renew every run`, max: 2, cost: list(90, 260) },
+  { id: 'collector', icon: '🪙', name: 'Fine Collector', gain: '+20% fines earned', at: (n) => `+${20 * n}% fines earned`, max: 5, cost: geo(50, 1.5) },
+  { id: 'secondwind', icon: '💫', name: 'Second Wind', gain: 'Once per run, get back up with 2 hearts', at: () => 'Once per run, get back up with 2 hearts', max: 1, cost: list(450) },
 ];
+/** Card text: what you get now and what the next level adds, in plain player words (no new saved data). */
+export function renoText(r, lvl) {
+  if (lvl >= r.max) return `Maxed: ${r.at(r.max)}`;
+  return `Now: ${lvl ? r.at(lvl) : 'none'} → Next: ${r.at(lvl + 1)}`;
+}
 export const renoById = (id) => RENOVATIONS.find((r) => r.id === id);
 
 const int = (v, lo, hi) => { const n = Math.floor(Number(v)); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : lo; };

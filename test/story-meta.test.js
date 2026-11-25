@@ -220,6 +220,24 @@ test('Renovation costs rise with level and every stat stays finite at max', asyn
   assert.deepEqual(runBonuses(maxed), { cards: 4, startPerks: 2, banishes: 3, renews: 2, revives: 1, fineMult: 2 });
 });
 
+test('Renovation cards show now -> next, "Now: none" at level 0 and "Maxed" at the top (v1.16.3)', async () => {
+  const { RENOVATIONS, renoById, renoText } = await load('meta');
+  for (const r of RENOVATIONS) {
+    const mid = Math.floor(r.max / 2);
+    assert.match(renoText(r, 0), /^Now: none → Next: .+/, `${r.id} level 0`);
+    assert.ok(renoText(r, 0).endsWith(r.at(1)), `${r.id} level 0 next is level 1`);
+    if (r.max > 1 && mid >= 1) assert.equal(renoText(r, mid), `Now: ${r.at(mid)} → Next: ${r.at(mid + 1)}`, `${r.id} mid level`);
+    assert.equal(renoText(r, r.max), `Maxed: ${r.at(r.max)}`, `${r.id} max`);
+    for (let n = 0; n <= r.max; n++) assert.ok(!/\d\s?(px|rad)\b|undefined|NaN/.test(renoText(r, n)), `${r.id} level ${n} is plain`);
+  }
+  assert.equal(renoText(renoById('spines'), 0), 'Now: none → Next: +10% book damage');
+  assert.equal(renoText(renoById('spines'), 4), 'Now: +40% book damage → Next: +50% book damage');
+  assert.equal(renoText(renoById('spines'), 10), 'Maxed: +100% book damage');
+  assert.equal(renoText(renoById('armchair'), 1), 'Now: +1 max heart → Next: +2 max hearts');
+  assert.equal(renoText(renoById('chute'), 2), 'Now: +17% throw speed → Next: +26% throw speed');
+  assert.equal(renoText(renoById('secondwind'), 1), 'Maxed: Once per run, get back up with 2 hearts');
+});
+
 test('buying spends fines, refuses when broke or maxed', async () => {
   const { normalizeProgress, buy, canBuy, nextCost, level } = await load('meta');
   let p = normalizeProgress({ fines: 100 });

@@ -20,7 +20,7 @@ import { actOf, WINGS_PER_ACT, WINGS, roomsIn, bossRoom, eliteRoom, SURVIVE_SECO
 import { DOORS, soleDoor, doorOffer, applyDoor, doorReward, mysteryPrize, rarePick } from './doors.js';
 import { GUIDE_FLAG, UNLOCK_FLAG, MENUS, unlockToast, hasPlayed, unlockedMenus, newUnlocks, shouldGuide, GUIDE_BEATS, guidePrompt, WHATS_NEW, whatsNewAction, whatsNewFlag, badgeFlag, badgedCards } from './newplayer.js';
 import { BACKUP_KEYS, encodeBackup, decodeBackup, describeBackup } from './backup.js';
-import { PROGRESS_KEY, RENOVATIONS, normalizeProgress, applyRenovations, runBonuses, recordRun, level, nextCost, canBuy, buy } from './meta.js';
+import { PROGRESS_KEY, RENOVATIONS, normalizeProgress, applyRenovations, runBonuses, recordRun, level, nextCost, canBuy, buy, renoText } from './meta.js';
 
 // ======================================================================
 // Setup, settings, content
@@ -1296,14 +1296,20 @@ function spawnBook(x, y, a, extra = {}) {
 let currentLook = bookLook({});
 const MARGIN_SIDE = [Math.PI / 8 * 0.7], MARGIN_WIDE = [Math.PI / 12 * 0.7, Math.PI / 6 * 0.7];   // Margin Notes angles: ±15.75°, then ±10.5° and ±21° (v1.15.3: 30% narrower)
 function marginBook(p, a) { spawnBook(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a, { bonus: true, nohome: true, margin: true, pierce: stats.pierce + 1 }); }
+const BOOK_GAP = 6; // px between side-by-side Trilogy books (about half a book's width)
 function fire() {
   const p = player, n = stats.projectiles;
   currentLook = bookLook(game.owned); // perks change how books look (cheap: a few flags per throw)
   p.throws++;
   if (DEBUG) p.lastThrow = { aim: p.aim }; // QA only
+  // Trilogy (v1.16.3): the books of one throw fly side by side, parallel to the aim, in a centred row
+  // (perpendicular offset), not fanned out. A book whose offset spot is inside a shelf starts on the centre line.
+  const px = -Math.sin(p.aim), py = Math.cos(p.aim);
   for (let i = 0; i < n; i++) {
-    const a = p.aim + (i - (n - 1) / 2) * stats.spread + (Math.random() - 0.5) * 0.04;
-    spawnBook(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a);
+    const a = p.aim + (Math.random() - 0.5) * 0.04, side = (i - (n - 1) / 2) * BOOK_GAP;
+    let x = p.x + Math.cos(a) * 14 + px * side, y = p.y + Math.sin(a) * 14 + py * side;
+    if (side && isSolidPx(arena.solid, x, y)) { x = p.x + Math.cos(a) * 14; y = p.y + Math.sin(a) * 14; }
+    spawnBook(x, y, a);
   }
   // Margin Notes (v1.15.0): books off at an angle. They never home and are skipped first at the book cap.
   if (stats.marginLvl) {
@@ -2951,7 +2957,7 @@ function renderShop() {
     const ic = document.createElement('span'); ic.className = 'icon'; ic.textContent = r.icon;
     const body = document.createElement('div');
     const name = document.createElement('strong'); name.textContent = r.name;
-    const gain = document.createElement('small'); gain.textContent = r.gain;
+    const gain = document.createElement('small'); gain.textContent = renoText(r, lvl);
     const lv = document.createElement('small'); lv.className = 'lvl'; lv.textContent = r.max > 1 ? `${pips(lvl, r.max)}  ${lvl}/${r.max}` : lvl ? 'Owned' : 'One-time';
     body.append(name, gain, lv);
     const b = document.createElement('button');

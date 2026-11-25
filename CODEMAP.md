@@ -39,8 +39,8 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/doors.js` | 88 | Story doors: after most rooms you pick the next room from 2 doors. Pure module (no DOM) so it is unit-tested. |
 | `src/enemy-art.js` | 469 | Enemy art (v1.12.0): every enemy except the boss is drawn here. Look "Blend": library characters (own face per type) |
 | `src/flowfield.js` | 109 | Dijkstra flow field: one search from the player gives every enemy a path around the shelves. |
-| `src/main.js` | 3434 | OVERDUE! — Night Shift at the Meme Library |
-| `src/meta.js` | 99 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
+| `src/main.js` | 3440 | OVERDUE! — Night Shift at the Meme Library |
+| `src/meta.js` | 104 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
 | `src/newplayer.js` | 95 | New-player help (v1.13.0): which menus a player has earned, and the scripted first room. Pure module (no DOM), unit-tested. |
 | `src/palette.js` | 60 | Projectile colours. Pure module (no DOM), unit-tested. |
 | `src/runlog.js` | 103 | Run log (v1.14.0): one compact record per finished run, kept on this phone, plus the "Share stats" code. |
@@ -66,7 +66,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/rooms.test.js` | 69 | Rooms +20% (v1.14.0): story grids are bigger, endless keeps the legacy grid, every shape stays valid at the new sizes. |
 | `test/runlog.test.js` | 70 | Run log (v1.14.0): record build, ring buffer, Share stats code. Pure rules, no DOM. |
 | `test/status.test.js` | 146 | Status effects (v1.15.0 part A): freeze rule, boss immunity, chain rule, proc scaling, ink/chill/zap maths. Pure, no DOM. |
-| `test/story-meta.test.js` | 335 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
+| `test/story-meta.test.js` | 353 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
 | `test/water-enemies.test.js` | 130 | Act II water enemies (v1.16.0 part B): eel surface/dive timer, boat drop cadence, spawn and movement only on water, endless/Act I untouched. Pure rules, no DOM. |
 | `scripts/qa/run.mjs` | 1698 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 50 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
@@ -122,15 +122,15 @@ NEIGH:4 · canStep:44 · computeFlowField:54 · lineOfSight:91 · wallRadius:108
 - **Run / wave flow** (291–937): keepAwake:295 · startRun:301 · clearWorld:329 · startWave:335 · bannerQueue:366 · banner:367 · isSurvive:373 · endSurvive:376 · waveCleared:387 · resolveMystery:417 · showUpgrades:426 · showCursedOffer:455 · resolveCursedOffer:476 · afterPick:490 · nextRoom:495 · currentDoors:506 · showDoors:507 · chooseDoor:535 · enterDoor:542 · KIND_LABEL:554 · saveTips:559 · tipSeen:560 · markTip:561 · codex:565 · saveCodex:566 · cardsArmed:570 · currentChoices:572 · rollOpts:573 · showPerkTip:576 · newIds:588 · badgeIds:589 · applyNew:590 · badgeShown:595 · renderCards:600 · banishCard:621 · cap:654 · buildCard:656 · freeQueue:727 · freeFresh:729 · queueFreePerk:730 · flushFreePerks:735 · hideFreePerk:736 · showNextFree:737 · hasFinishedRun:756 · updateFirstHint:759 · renderBuild:765 · pop:797 · closeBuildPop:798 · openBuildPop:802 · renderReach:852 · CREATURES:871 · renderCodex:875 · pause:910 · resume:920 · die:927
 - **Spawning** (938–1034): DEF:943 · hpScaleNow:956 · makeEnemy:957 · spawnPoint:978 · updateSpawning:988 · materialise:1008
 - **Effects helpers** (1035–1063): shake:1038 · addLight:1041 · floatText:1045 · particle:1048 · burst:1049 · pages:1057
-- **Update** (1064–1356): step:1067 · playerSaves:1106 · startGuideBeat:1110 · updateGuide:1117 · endGuide:1135 · moveInput:1145 · nearestEnemy:1160 · updatePlayer:1171 · walkGrid:1266 · wallRects:1267 · collideWorld:1268 · spawnBook:1281 · MARGIN_SIDE:1297 · marginBook:1298 · fire:1299 · abilityReady:1329 · inkBurst:1340
-- **Status effects (v1.15.0 part A: ink, chill, static, pops). The maths lives in src/status.js.** (1357–2212): zaps:1363 · hitsPerSec:1366 · zapArc:1368 · onBookHit:1380 · doZap:1392 · popAt:1407 · inkSplash:1434 · tickStatus:1447 · updateStatusFx:1459 · statusSprites:1464 · statusSprite:1466 · drawStatus:1485 · drawZaps:1498 · nextToShelf:1512 · doShhh:1520 · updateFlow:1557 · seek:1568 · waterHeading:1583 · boatDrop:1589 · ponds:1602 · huntDir:1603 · updateEnemies:1621 · bossAI:1759 · shootHazard:1820 · fan:1825 · radial:1826 · bossImmune:1829 · damageEnemy:1833 · killEnemy:1867 · buzz:1912 · hurtPlayer:1917 · lastChapterMult:1957 · shelfBurstAt:1967 · updateBooks:1979 · orbitRest:2062 · orbiterPositions:2063 · updateOrbiters:2072 · cats:2095 · updateCats:2096 · catLand:2123 · updateHazards:2140 · updateRings:2166 · updatePickups:2180 · updateParticles:2197
-- **Rendering** (2213–2861): buildBackground:2217 · drawFlagstones:2310 · drawWater:2327 · lampPositions:2345 · lightSprite:2357 · glowCache:2363 · glowSprite:2364 · renderLights:2373 · render:2413 · drawThrownBook:2466 · drawCat:2500 · drawBook:2515 · drawPlayer:2523 · rim:2566 · drawEnemy:2571 · drawBoss:2583 · drawTelegraph:2617 · drawPickup:2625 · hazardSprite:2638 · drawHazards:2646 · drawRing:2663 · drawParticles:2670 · heartPath:2683 · FONT:2693 · txt:2694 · drawHUD:2700 · drawSurviveTimer:2773 · drawGuidePrompt:2790 · cooldown:2803 · btnCache:2819 · setTouchButton:2820 · drawCrosshair:2832 · drawStick:2841 · drawAimStick:2849
-- **DOM screens, settings, leaderboard** (2862–3311): SCREENS:2865 · showScreen:2867 · pinnedObservers:2878 · fitPinnedRow:2879 · renderMenus:2904 · maybeWhatsNew:2918 · renderFineBadges:2938 · renderShop:2943 · defaultWing:2977 · wingStatus:2981 · setStoryAct:2990 · renderStory:2991 · logRun:3063 · bankRun:3075 · inRun:3083 · backupMsg:3088 · readAllKeys:3101 · setSetting:3149 · toast:3163 · toggleFullscreen:3201 · loadLeaderboard:3211 · isStandalone:3234 · maybeNudge:3235 · closeNudge:3241 · showGameOver:3245
-- **Main loop (fixed 120 Hz simulation, render every animation frame)** (3312–3434): frame:3317 · drawVersionLabels:3338 · checkForUpdate:3359 · applyUpdate:3379
+- **Update** (1064–1362): step:1067 · playerSaves:1106 · startGuideBeat:1110 · updateGuide:1117 · endGuide:1135 · moveInput:1145 · nearestEnemy:1160 · updatePlayer:1171 · walkGrid:1266 · wallRects:1267 · collideWorld:1268 · spawnBook:1281 · MARGIN_SIDE:1297 · marginBook:1298 · fire:1300 · abilityReady:1335 · inkBurst:1346
+- **Status effects (v1.15.0 part A: ink, chill, static, pops). The maths lives in src/status.js.** (1363–2218): zaps:1369 · hitsPerSec:1372 · zapArc:1374 · onBookHit:1386 · doZap:1398 · popAt:1413 · inkSplash:1440 · tickStatus:1453 · updateStatusFx:1465 · statusSprites:1470 · statusSprite:1472 · drawStatus:1491 · drawZaps:1504 · nextToShelf:1518 · doShhh:1526 · updateFlow:1563 · seek:1574 · waterHeading:1589 · boatDrop:1595 · ponds:1608 · huntDir:1609 · updateEnemies:1627 · bossAI:1765 · shootHazard:1826 · fan:1831 · radial:1832 · bossImmune:1835 · damageEnemy:1839 · killEnemy:1873 · buzz:1918 · hurtPlayer:1923 · lastChapterMult:1963 · shelfBurstAt:1973 · updateBooks:1985 · orbitRest:2068 · orbiterPositions:2069 · updateOrbiters:2078 · cats:2101 · updateCats:2102 · catLand:2129 · updateHazards:2146 · updateRings:2172 · updatePickups:2186 · updateParticles:2203
+- **Rendering** (2219–2867): buildBackground:2223 · drawFlagstones:2316 · drawWater:2333 · lampPositions:2351 · lightSprite:2363 · glowCache:2369 · glowSprite:2370 · renderLights:2379 · render:2419 · drawThrownBook:2472 · drawCat:2506 · drawBook:2521 · drawPlayer:2529 · rim:2572 · drawEnemy:2577 · drawBoss:2589 · drawTelegraph:2623 · drawPickup:2631 · hazardSprite:2644 · drawHazards:2652 · drawRing:2669 · drawParticles:2676 · heartPath:2689 · FONT:2699 · txt:2700 · drawHUD:2706 · drawSurviveTimer:2779 · drawGuidePrompt:2796 · cooldown:2809 · btnCache:2825 · setTouchButton:2826 · drawCrosshair:2838 · drawStick:2847 · drawAimStick:2855
+- **DOM screens, settings, leaderboard** (2868–3317): SCREENS:2871 · showScreen:2873 · pinnedObservers:2884 · fitPinnedRow:2885 · renderMenus:2910 · maybeWhatsNew:2924 · renderFineBadges:2944 · renderShop:2949 · defaultWing:2983 · wingStatus:2987 · setStoryAct:2996 · renderStory:2997 · logRun:3069 · bankRun:3081 · inRun:3089 · backupMsg:3094 · readAllKeys:3107 · setSetting:3155 · toast:3169 · toggleFullscreen:3207 · loadLeaderboard:3217 · isStandalone:3240 · maybeNudge:3241 · closeNudge:3247 · showGameOver:3251
+- **Main loop (fixed 120 Hz simulation, render every animation frame)** (3318–3440): frame:3323 · drawVersionLabels:3344 · checkForUpdate:3365 · applyUpdate:3385
 
 ## src/meta.js
 
-geo:12 · list:13 · RENOVATIONS:16 · renoById:32 · int:34 · normalizeProgress:37 · level:50 · nextCost:51 · canBuy:52 · buy:55 · applyRenovations:62 · runBonuses:68 · recordRun:83
+geo:12 · list:13 · RENOVATIONS:16 · renoText:33 · renoById:37 · int:39 · normalizeProgress:42 · level:55 · nextCost:56 · canBuy:57 · buy:60 · applyRenovations:67 · runBonuses:73 · recordRun:88
 
 ## src/newplayer.js
 
@@ -366,13 +366,14 @@ ENEMY_TYPES:3 · isBossWave:14 · baseBudget:17 · waveBudget:19 · composeWave:
 - 183: composeWave without story options is unchanged (endless runs stay reproducible)
 - 193: story layouts are fixed per room and every room is connected
 - 208: Renovation costs rise with level and every stat stays finite at max
-- 223: buying spends fines, refuses when broke or maxed
-- 235: runs bank fines, unlock the next wing once, and saves repair themselves
-- 261: a lost wing-1 run that dies in the room after the elite room still affords the cheapest Renovation
-- 270: every wing has room shapes; elite and boss rooms are open; shapes do not repeat back to back
-- 287: even the worst door route (cheapest door every time) still affords the cheapest Renovation by the room after the elite room
-- 312: every wing has an intro, taunt and cleared line, each 1-60 characters
-- 319: saves: an Act II best of 7 (the 1.16.0 boss) stays cleared with wing 12 unlocked; best clamps per wing (7 in Act I, 9 in Act II)
+- 223: Renovation cards show now -> next, "Now: none" at level 0 and "Maxed" at the top (v1.16.3)
+- 241: buying spends fines, refuses when broke or maxed
+- 253: runs bank fines, unlock the next wing once, and saves repair themselves
+- 279: a lost wing-1 run that dies in the room after the elite room still affords the cheapest Renovation
+- 288: every wing has room shapes; elite and boss rooms are open; shapes do not repeat back to back
+- 305: even the worst door route (cheapest door every time) still affords the cheapest Renovation by the room after the elite room
+- 330: every wing has an intro, taunt and cleared line, each 1-60 characters
+- 337: saves: an Act II best of 7 (the 1.16.0 boss) stays cleared with wing 12 unlocked; best clamps per wing (7 in Act I, 9 in Act II)
 
 ## test/water-enemies.test.js
 
