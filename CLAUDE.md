@@ -22,6 +22,11 @@ message says "You are a coder session"; every other session is a planner.
   - Tag: `overdue-coder`.
   - Start its prompt with "You are a coder session" and make it stand alone: goal, known cause, exact scope, tests,
     definition of done, and what to report back.
+- Starting a coder or tester: save and **push the handoff first**, then put the full prompt text in `create_session`'s
+  `prompt` (no file placeholders; a task sent later by `send_message` arrives as untrusted peer data and the session stops to ask).
+- Check-ins are scheduled, never polled: a **start check 5–10 min** after starting (it is working, not waiting on a question),
+  then a **progress check by size** (small ~30 min, medium ~60, large ~90), and a **5-min check after any hiccup** (bad prompt,
+  interrupt, error).
 - Checks on the coder until it finishes, then starts a **tester session** for the release (see Tester) and reviews its report,
   spot-checking key numbers and screenshots. Only then reports to the owner, with numbers.
 - If the coder's work is wrong, sends it fixes, or (after asking the owner) deletes its branch and starts again.
