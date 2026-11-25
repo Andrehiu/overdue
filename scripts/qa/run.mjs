@@ -414,6 +414,13 @@ async function screensFlow(name, opts, full) {
       record(area, 'v1.14.0: story room uses the +20% grid, endless the old one', m.story.grid === `${sc}x${sr}` && m.endless.grid === `${ec}x${er}` && sc > ec && sr > er, `story ${m.story.grid} · endless ${m.endless.grid}`);
       record(area, 'v1.14.0: DASH/SHHH buttons keep their size in the bigger story room', !m.story.touch || (Math.abs(m.story.btn[0] - m.endless.btn[0]) <= 1 && Math.abs(m.story.btn[1] - m.endless.btn[1]) <= 1), `story ${m.story.btn} · endless ${m.endless.btn}`);
     }
+    // v1.15.4: SHHH and DASH sit apart (gap >= 1.5em), don't overlap, and are fully on screen above the bottom edge
+    {
+      const m = await page.evaluate(() => { const rc = (id) => { const r = document.getElementById(id).getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width }; };
+        return { touch: document.body.classList.contains('touch'), d: rc('btnDash'), s: rc('btnShhh'), vw: innerWidth, vh: innerHeight, fs: parseFloat(getComputedStyle(document.getElementById('btnDash')).fontSize) }; });
+      const gap = m.d.l - m.s.r, em = m.fs, ok = !m.touch || (gap >= 1.5 * em && m.s.l >= 0 && m.d.r <= m.vw && m.d.b <= m.vh && m.s.b <= m.vh && m.d.t >= 0 && m.s.t >= 0);
+      record(area, 'v1.15.4: DASH/SHHH buttons apart (gap >= 1.5em), no overlap, fully on screen', ok, `size ${Math.round(m.d.w)}px · gap ${Math.round(gap)}px (${(gap / em).toFixed(1)}em) · bottom margin ${Math.round(m.vh - m.d.b)}px`);
+    }
     // v1.7.1: Mystery Shelf's bonus pick says why you get a second perk
     const bonusTitle = await page.evaluate(() => { const O = __overdue; O.game.bonusPicks = 1; O.showUpgrades(); return document.querySelector('#upgradeTitle').textContent; });
     record(area, 'Mystery bonus pick is labelled 1 of 2', /^🎲 Mystery prize: bonus pick \(1 of 2\)/.test(bonusTitle), bonusTitle);

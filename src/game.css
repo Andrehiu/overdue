@@ -106,9 +106,9 @@ body.touch .touch-hint, body.portrait .touch-hint { display: block; }
 .fs-only { display: none; }
 @media (pointer: coarse) { .fs-only { display: block; } .touch-hint { display: block; } }
 
-#touchUI button { width: 5.2em; height: 5.2em; font-size: .85em; font-weight: bold; }
-#btnDash { right: calc(1.2em + env(safe-area-inset-right, 0px)); bottom: calc(1.2em + env(safe-area-inset-bottom, 0px)); background: rgba(155,231,220,.22); border-color: var(--teal); }
-#btnShhh { right: calc(7.2em + env(safe-area-inset-right, 0px)); bottom: calc(1.2em + env(safe-area-inset-bottom, 0px)); background: rgba(180,140,255,.22); border-color: var(--violet); }
+#touchUI button { width: 5.9em; height: 5.9em; font-size: .85em; font-weight: bold; }
+#btnDash { right: calc(1.2em + env(safe-area-inset-right, 0px)); bottom: calc(2.8em + env(safe-area-inset-bottom, 0px)); background: rgba(155,231,220,.22); border-color: var(--teal); }
+#btnShhh { right: calc(8.9em + env(safe-area-inset-right, 0px)); bottom: calc(2.8em + env(safe-area-inset-bottom, 0px)); background: rgba(180,140,255,.22); border-color: var(--violet); }
 #touchUI button:active { transform: scale(.92); }
 
 /* Portrait arena: narrower overlays */
