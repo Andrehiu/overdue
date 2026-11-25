@@ -58,7 +58,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/balance.test.js` | 138 | Balance bot (v1.7.1 tooling): pure helpers only, no browser. See scripts/balance-lib.mjs. |
 | `test/doors.test.js` | 173 | Story doors (v1.7.0): pure rules, no DOM. |
 | `test/enemy-art.test.js` | 35 | Enemy art colours and the patron ripple (pure data from src/enemy-art.js; no canvas needed). |
-| `test/game-logic.test.js` | 614 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
+| `test/game-logic.test.js` | 617 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
 | `test/new-perks.test.js` | 90 | v1.15.0 part B: Margin Notes, Last Chapter, Library Cat, Crossfire, plus the "What's new" card and NEW badges. Pure rules, no DOM. |
 | `test/newplayer.test.js` | 87 | New-player help (v1.13.0): menu unlock rules from saves, the guided-room flag, the Survive room table. Pure rules, no DOM. |
 | `test/privacy-scan.test.js` | 39 |  |
@@ -68,7 +68,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/status.test.js` | 146 | Status effects (v1.15.0 part A): freeze rule, boss immunity, chain rule, proc scaling, ink/chill/zap maths. Pure, no DOM. |
 | `test/story-meta.test.js` | 335 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
 | `test/water-enemies.test.js` | 130 | Act II water enemies (v1.16.0 part B): eel surface/dive timer, boat drop cadence, spawn and movement only on water, endless/Act I untouched. Pure rules, no DOM. |
-| `scripts/qa/run.mjs` | 1682 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
+| `scripts/qa/run.mjs` | 1696 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 50 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
 | `scripts/codemap.mjs` | 113 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
@@ -260,25 +260,25 @@ ENEMY_TYPES:3 · isBossWave:14 · baseBudget:17 · waveBudget:19 · composeWave:
 - 186: every stackable perk tops out at 3/3 and leads to exactly one Masterwork
 - 207: perk cards preview changes in plain player terms
 - 223: cards say just the gain, hint at combos, and Banish keeps perks out of the pool
-- 239: home-screen app: manifest icons exist and the Pages deploy ships them
-- 252: arena shape fits the screen: phones, iPads, laptops, desktops
-- 271: version label shows version, commit and date; dev builds say so
-- 277: everything the player throws stays out of the red/pink reserved for enemies
-- 289: combo partners and combos in reach explain what pairs with what
-- 307: perk art: each perk adds one trait, they stack, and normal books stay plain
-- 326: aisles are at least 2 cells (60 px) wide in every room, on every screen shape, and never empty
-- 354: cornerAssist slides the player around a clipped shelf corner, but not off a head-on face
-- 395: cornerAssist + wall collision lets a circle walk past a corner it clips
-- 408: every perk has a short name for the build strip, and buildChips links combo partners
-- 427: scatter layouts are byte-identical to the pre-shapes generator (endless stays as it was)
-- 450: every room shape keeps the rules: connected, clear spawn, no passage under 2 cells, open edges, denser = more shelf
-- 484: reading rooms have four openings and bridge walls are continuous but for 2-3 gaps
-- 511: aimSource: auto-aim on/off × touch / gamepad / mouse (v1.10.0)
-- 526: aimStick: drag vector from where the finger landed, with a deadzone (v1.10.2)
-- 540: v1.11.0 special cards say why they are on offer (every Masterwork and combo)
-- 553: v1.11.0 level text: now -> after pips, Masterwork teased at 2/3, named at 3/3, never revealed early
-- 569: v1.11.0 tips: one at a time, in order, and a seen tip never fires again
-- 593: v1.11.2 touching collinear shelves merge into one rect: same cells as solid, nothing left to merge
+- 242: home-screen app: manifest icons exist and the Pages deploy ships them
+- 255: arena shape fits the screen: phones, iPads, laptops, desktops
+- 274: version label shows version, commit and date; dev builds say so
+- 280: everything the player throws stays out of the red/pink reserved for enemies
+- 292: combo partners and combos in reach explain what pairs with what
+- 310: perk art: each perk adds one trait, they stack, and normal books stay plain
+- 329: aisles are at least 2 cells (60 px) wide in every room, on every screen shape, and never empty
+- 357: cornerAssist slides the player around a clipped shelf corner, but not off a head-on face
+- 398: cornerAssist + wall collision lets a circle walk past a corner it clips
+- 411: every perk has a short name for the build strip, and buildChips links combo partners
+- 430: scatter layouts are byte-identical to the pre-shapes generator (endless stays as it was)
+- 453: every room shape keeps the rules: connected, clear spawn, no passage under 2 cells, open edges, denser = more shelf
+- 487: reading rooms have four openings and bridge walls are continuous but for 2-3 gaps
+- 514: aimSource: auto-aim on/off × touch / gamepad / mouse (v1.10.0)
+- 529: aimStick: drag vector from where the finger landed, with a deadzone (v1.10.2)
+- 543: v1.11.0 special cards say why they are on offer (every Masterwork and combo)
+- 556: v1.11.0 level text: now -> after pips, Masterwork teased at 2/3, named at 3/3, never revealed early
+- 572: v1.11.0 tips: one at a time, in order, and a seen tip never fires again
+- 596: v1.11.2 touching collinear shelves merge into one rect: same cells as solid, nothing left to merge
 
 ## test/new-perks.test.js
 
@@ -385,7 +385,7 @@ ENEMY_TYPES:3 · isBossWave:14 · baseBudget:17 · waveBudget:19 · composeWave:
 
 ## scripts/qa/run.mjs
 
-results:29 · record:30 · want:34 · recorder:36 · pool:38 · sh:41 · TYPES:57 · TARGETS:67 · FULL_TARGETS:79 · FILL_JS:82 · TITLE_FIT_JS:83 · shot:95 · PINNED_CHECK:103 · RETURNING_SAVE:137 · TITLE_MENUS_JS:143 · screensFlow:147 · menusFlow:634 · rotateOverlayFlow:740 · ROTATIONS:780 · rotationFlow:785 · shapesFlow:816 · act2Flow:845 · statusFlow:1064 · lookFeelFlow:1096 · newPlayerFlow:1174 · newPerksFlow:1268 · steadyContext:1341 · basicsFlow:1359 · perfSample:1561 · perfDetail:1567 · perfChecks:1573 · md:1669
+results:29 · record:30 · want:34 · recorder:36 · pool:38 · sh:41 · TYPES:57 · TARGETS:67 · FULL_TARGETS:80 · FILL_JS:83 · TITLE_FIT_JS:84 · shot:96 · PINNED_CHECK:104 · RETURNING_SAVE:138 · TITLE_MENUS_JS:144 · screensFlow:148 · menusFlow:647 · rotateOverlayFlow:753 · ROTATIONS:793 · rotationFlow:798 · shapesFlow:829 · act2Flow:858 · statusFlow:1077 · lookFeelFlow:1109 · newPlayerFlow:1187 · newPerksFlow:1282 · steadyContext:1355 · basicsFlow:1373 · perfSample:1575 · perfDetail:1581 · perfChecks:1587 · md:1683
 
 ## scripts/build.mjs
 
