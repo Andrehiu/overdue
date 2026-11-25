@@ -191,12 +191,20 @@ async function screensFlow(name, opts, full) {
     await tap('[data-act=play]');
     await page.evaluate(() => __overdue.god()); await page.waitForTimeout(2500);
     await shot(page, `${name}-2-play`);
-    // v1.15.4: SHHH and DASH sit apart (gap >= 1.5em), don't overlap, and are fully on screen above the bottom edge
+    // v1.15.4: SHHH and DASH sit diagonally apart: circle gap (centre distance minus radii) >= 1.5em, no overlap with each other,
+    // the pause button or the HUD, and fully on screen
     {
-      const m = await page.evaluate(() => { const rc = (id) => { const r = document.getElementById(id).getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width }; };
-        return { touch: document.body.classList.contains('touch'), d: rc('btnDash'), s: rc('btnShhh'), vw: innerWidth, vh: innerHeight, fs: parseFloat(getComputedStyle(document.getElementById('btnDash')).fontSize) }; });
-      const gap = m.d.l - m.s.r, em = m.fs, ok = !m.touch || (gap >= 1.5 * em && m.s.l >= 0 && m.d.r <= m.vw && m.d.b <= m.vh && m.s.b <= m.vh && m.d.t >= 0 && m.s.t >= 0);
-      record(area, 'v1.15.4: DASH/SHHH buttons apart (gap >= 1.5em), no overlap, fully on screen', ok, `size ${Math.round(m.d.w)}px · gap ${Math.round(gap)}px (${(gap / em).toFixed(1)}em) · bottom margin ${Math.round(m.vh - m.d.b)}px`);
+      const m = await page.evaluate(() => { const rc = (el) => { const r = el.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width, cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2 }; };
+        // the HUD is drawn on the canvas: its top-right block (score, combo bar) ends ~62 game px down, i.e. well inside the top 30%
+        const cv = document.querySelector('canvas').getBoundingClientRect();
+        const hud = [{ l: cv.right - 0.25 * cv.width, r: cv.right, t: cv.top, b: cv.top + 0.3 * cv.height }];
+        return { touch: document.body.classList.contains('touch'), d: rc(document.getElementById('btnDash')), s: rc(document.getElementById('btnShhh')), p: rc(document.getElementById('btnPause')), hud, vw: innerWidth, vh: innerHeight, fs: parseFloat(getComputedStyle(document.getElementById('btnDash')).fontSize) }; });
+      const dist = Math.hypot(m.d.cx - m.s.cx, m.d.cy - m.s.cy), gap = dist - (m.d.w + m.s.w) / 2, em = m.fs;
+      const hit = (a, b) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
+      const onScreen = (r) => r.l >= 0 && r.r <= m.vw && r.t >= 0 && r.b <= m.vh;
+      const clear = ![m.p, ...m.hud].some((o) => hit(m.d, o) || hit(m.s, o));
+      const ok = !m.touch || (gap >= 1.5 * em && onScreen(m.d) && onScreen(m.s) && clear);
+      record(area, 'v1.15.4: DASH/SHHH circles apart (gap >= 1.5em), clear of pause and the score/combo HUD, fully on screen', ok, `size ${Math.round(m.d.w)}px · circle gap ${Math.round(gap)}px (${(gap / em).toFixed(1)}em) · DASH [${Math.round(m.d.l)},${Math.round(m.d.t)}] SHHH [${Math.round(m.s.l)},${Math.round(m.s.t)}] · bottom margin ${Math.round(m.vh - m.d.b)}/${Math.round(m.vh - m.s.b)}px`);
     }
     record(area, 'run starts', await page.evaluate(() => __overdue.game.state === 'playing'));
 
