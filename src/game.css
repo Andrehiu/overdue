@@ -592,3 +592,11 @@ body.guiding #touchUI #btnGuideSkip { display: block; }
 .nudge-card p { margin: 0 0 .3em; }
 .nudge-card ol, .nudge-card ul { margin: 0 0 .5em; padding-left: 1.3em; }
 .nudge-card .menu.row { margin: 0; justify-content: center; gap: .5em; }
+
+/* Wing map act pages (v1.16.0): arrows + swipe between Act I and Act II */
+#story .act-nav { display: flex; align-items: center; justify-content: center; gap: .6em; }
+#story .act-nav h2 { margin: 0; }
+#story .act-nav button { min-width: 2.2em; padding: .15em .5em; font-size: 1.1em; line-height: 1.1; }
+#story .act-nav button:disabled { opacity: .3; }
+.wing-grid .wing.soon { opacity: .28; border-style: dashed; cursor: default; }
+.version-label .tester-tag { color: #ffd54a; font-weight: 700; letter-spacing: .08em; margin-left: .4em; }

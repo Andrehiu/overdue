@@ -23,14 +23,15 @@ import { cpus } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { EXTRA_POLICIES, aggregate, findings, renderReport, parseForce, POLICIES, WINGS_TESTED, RENO_PRESETS } from './balance-lib.mjs';
 import { RENOVATIONS, normalizeProgress } from '../src/meta.js';
-import { roomGoal, roomKind } from '../src/story.js';
+import { roomGoal, roomKind, WINGS as ALL_WINGS } from '../src/story.js';
+const WINGS_ALL = ALL_WINGS.length;
 
 const ROOT = resolve(new URL('..', import.meta.url).pathname);
 const arg = (name, dflt) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? dflt;
 const OUT = join(ROOT, arg('out', 'balance-report'));
 const SITE = join(OUT, 'site');
 const RUNS = Math.max(1, Number(arg('runs', 20)));
-const WINGS = arg('wings', WINGS_TESTED.join(',')).split(',').map(Number).filter((n) => n >= 1 && n <= 10);
+const WINGS = arg('wings', WINGS_TESTED.join(',')).split(',').map(Number).filter((n) => n >= 1 && n <= WINGS_ALL);
 const PICKED = arg('policies', POLICIES.join(',')).split(',').filter((p) => POLICIES.includes(p) || EXTRA_POLICIES.includes(p));
 const RENOS = arg('renos', 'both') === 'both' ? ['none', 'half'] : arg('renos', 'both').split(',').filter((r) => RENO_PRESETS.includes(r));
 const CURSED = arg('cursed', 'take');   // Mystery Shelf cursed book: take | walk
@@ -44,11 +45,11 @@ const JOBS = Math.max(1, Number(arg('jobs', Math.min(4, cpus().length))));
 
 // A mid-game save: about half of every multi-level Renovation (one-off expensive ones, like Second Wind, not yet bought).
 const saves = {
-  none: normalizeProgress({ unlocked: 10 }),
-  half: normalizeProgress({ unlocked: 10, reno: Object.fromEntries(RENOVATIONS.map((r) => [r.id, r.max <= 1 ? 0 : Math.round(r.max / 2)])) }),
+  none: normalizeProgress({ unlocked: WINGS_ALL }),
+  half: normalizeProgress({ unlocked: WINGS_ALL, reno: Object.fromEntries(RENOVATIONS.map((r) => [r.id, r.max <= 1 ? 0 : Math.round(r.max / 2)])) }),
   // The owner's playtest level (v1.15.2): 65% of every multi-level Renovation, one-off ones (Catalogue, Second Wind) not bought.
-  p65: normalizeProgress({ unlocked: 10, reno: Object.fromEntries(RENOVATIONS.map((r) => [r.id, r.max <= 1 ? 0 : Math.round(r.max * 0.65)])) }),
-  max: normalizeProgress({ unlocked: 10, reno: Object.fromEntries(RENOVATIONS.map((r) => [r.id, r.max])) }),   // every Renovation at its top tier
+  p65: normalizeProgress({ unlocked: WINGS_ALL, reno: Object.fromEntries(RENOVATIONS.map((r) => [r.id, r.max <= 1 ? 0 : Math.round(r.max * 0.65)])) }),
+  max: normalizeProgress({ unlocked: WINGS_ALL, reno: Object.fromEntries(RENOVATIONS.map((r) => [r.id, r.max])) }),   // every Renovation at its top tier
 };
 
 await rm(OUT, { recursive: true, force: true });

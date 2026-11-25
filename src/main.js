@@ -2,6 +2,7 @@
 // Engine: fixed-timestep loop, flow-field AI, dynamic lighting, procedural audio, roguelite perks.
 import { chooseTarget, leadPoint } from './autoaim.js';
 import { W, H, CELL, COLS, ROWS, SAFE, PORTRAIT, setGrid, gridForAspect, areaK, generateArena, isSolidPx, cellOf, edgeCells, idx } from './arena.js';
+import { themeOf, ACTS } from './themes.js';
 import { RUN_KEY, newCounters, addDealt, addTaken, bookEnded, sampleFlight, buildRecord, pushRun, normalizeRuns, encodeStats } from './runlog.js';
 import { createBackend } from './backend.js';
 import { BUILD, versionLabel, fetchLatestBuild } from './version.js';
@@ -14,7 +15,7 @@ import { PLAYER, bookLook } from './palette.js';
 import { isStatusSource, canProc, procChance, freeze, chillFactor, applyChill, applyInk, tickInk, shouldShatter, statusDamageMult, makeBurstBudget, deepFreezeHit, zapChain, makeMetrics, tickMetrics, ZAP_REACH, ZAP_POOL, ZAP_LIFE, DEEP_FREEZE_TIME, SUPER_FREEZE_TIME, SPLASH_RADIUS, SPLASH_STRENGTH, POP_CHAIN_HITS } from './status.js';
 import { BURST, shadowK, drawEnemy as drawArtEnemy, drawWorms } from './enemy-art.js';
 import { SoundEngine } from './audio.js';
-import { WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
+import { actOf, WINGS_PER_ACT, WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
 import { DOORS, soleDoor, doorOffer, applyDoor, doorReward, mysteryPrize, rarePick } from './doors.js';
 import { GUIDE_FLAG, UNLOCK_FLAG, MENUS, unlockToast, hasPlayed, unlockedMenus, newUnlocks, shouldGuide, GUIDE_BEATS, guidePrompt, WHATS_NEW, whatsNewAction, whatsNewFlag, badgeFlag, badgedCards } from './newplayer.js';
 import { BACKUP_KEYS, encodeBackup, decodeBackup, describeBackup } from './backup.js';
@@ -43,6 +44,11 @@ const content = CATALOGUE;
 // Late fees: permanent progression (fines + Renovations + story unlocks). Its own key; no old save is touched.
 let progress = normalizeProgress(loadJSON(PROGRESS_KEY));
 const saveProgress = () => saveJSON(PROGRESS_KEY, progress);
+// Hidden tester switch (v1.16.0): 7 taps on the title's version line. Its own additive key; progress is never touched.
+// In tester mode every wing is playable, but runs don't count for first-clear bonuses, best rooms or unlocks (fines still bank).
+const TESTER_KEY = 'overdue.tester.v1';
+let tester = { on: !!loadJSON(TESTER_KEY).on };
+const effUnlocked = () => (tester.on ? WINGS.length : progress.unlocked);
 const isStory = () => game.mode === 'story';
 const wingDef = () => WINGS[(game.wingN || 1) - 1];
 const backend = createBackend();
@@ -951,7 +957,7 @@ function makeEnemy(type, x, y, extra = {}) {
 }
 
 function spawnPoint() {
-  const cells = edgeCells(arena.solid);
+  const cells = edgeCells(walkGrid());
   for (let i = 0; i < 20; i++) {
     const [cx, cy] = cells[(Math.random() * cells.length) | 0];
     const x = cx * CELL + CELL / 2, y = cy * CELL + CELL / 2;
@@ -1215,7 +1221,7 @@ function updatePlayer(dt) {
   p.x += p.vx * dt; p.y += p.vy * dt;
   // Against shelves and walls the player is a little slimmer than against enemies (9 vs 11 px),
   // and slides around a shelf corner they only clip by a few px instead of snagging on it.
-  if (p.dashT <= 0) for (const rect of arena.rects) cornerAssist(p, { x: px, y: py }, PLAYER_WALL_R, rect, 8, 3);
+  if (p.dashT <= 0) for (const rect of wallRects()) cornerAssist(p, { x: px, y: py }, PLAYER_WALL_R, rect, 8, 3);
   collideWorld(p, PLAYER_WALL_R);
   p.walk += Math.hypot(p.vx, p.vy) * dt * 0.08;
   for (let i = p.trail.length - 1; i >= 0; i--) if ((p.trail[i].life -= dt) <= 0) p.trail.splice(i, 1);
@@ -1229,9 +1235,12 @@ function updatePlayer(dt) {
   if (firing && p.fireT <= 0) { p.fireT = 1 / rate; fire(); }
 }
 
+// Act II water: walkers treat deep water like a wall (arena.walk / wrects = shelves + water); books, pages and line of sight only see shelves (arena.solid / rects).
+const walkGrid = () => arena.walk || arena.solid;
+const wallRects = () => arena.wrects || arena.rects;
 function collideWorld(o, r) {
   let hit = null;
-  for (const rect of arena.rects) {
+  for (const rect of wallRects()) {
     const n = pushCircleOutOfRect(o, r, rect);
     if (n) hit = n;
   }
@@ -1523,7 +1532,7 @@ function updateFlow(dt) {
   const [cx, cy] = cellOf(player.x, player.y);
   const c = idx(cx, cy);
   if (c !== flowCell || flowT <= 0 || !flow) {
-    flow = computeFlowField(arena.solid, COLS, ROWS, cx, cy);
+    flow = computeFlowField(walkGrid(), COLS, ROWS, cx, cy);
     flowCell = c; flowT = 0.5;
   }
 }
@@ -2093,7 +2102,6 @@ function updateParticles(dt) {
 // ======================================================================
 // Rendering
 // ======================================================================
-const BOOK_PALETTE = ['#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400', '#16a085', '#f1c40f', '#7f8c8d', '#e84393', '#2c3e50', '#b33939', '#218c74'];
 
 function buildBackground() {
   bg = document.createElement('canvas');
@@ -2103,10 +2111,12 @@ function buildBackground() {
   const r = new Rng(hashString(`bg:${game.seed}:${game.wave}`));
   // Story wings each have their own floor colour and rug.
   const wing = game.mode === 'story' ? WINGS[game.wingN - 1] : null;
+  const theme = themeOf(wing ? wing.act : 1);
   const hue = wing ? wing.floorHue : 25, sat = wing && (wing.floorHue < 10 || wing.floorHue > 60) ? 18 : 35;
-  // Wooden floor planks
+  // Floor: Act I wooden planks (unchanged), Act II flagstones
   const ph = 18;
-  for (let y = 0; y < H; y += ph) {
+  if (theme.floor.kind === 'flagstone') drawFlagstones(g, r, theme);
+  else for (let y = 0; y < H; y += ph) {
     let x = -r.int(0, 120);
     while (x < W) {
       const len = r.int(90, 210);
@@ -2120,13 +2130,14 @@ function buildBackground() {
       x += len;
     }
   }
+  if (arena.waterRects && theme.floor.water) drawWater(g, theme);
   // Central rug
   const rx = SAFE.x0 * CELL + 6, ry = SAFE.y0 * CELL + 6, rw = (SAFE.x1 - SAFE.x0 + 1) * CELL - 12, rh = (SAFE.y1 - SAFE.y0 + 1) * CELL - 12;
   g.fillStyle = wing ? wing.rug : '#4a1622'; g.fillRect(rx, ry, rw, rh);
-  g.strokeStyle = '#c9a227'; g.lineWidth = 3; g.strokeRect(rx + 6, ry + 6, rw - 12, rh - 12);
+  g.strokeStyle = theme.floor.rugLine || '#c9a227'; g.lineWidth = 3; g.strokeRect(rx + 6, ry + 6, rw - 12, rh - 12);
   g.lineWidth = 1; g.strokeRect(rx + 12, ry + 12, rw - 24, rh - 24);
   g.save(); g.translate(rx + rw / 2, ry + rh / 2);
-  for (let i = 0; i < 8; i++) { g.rotate(TAU / 8); g.fillStyle = 'rgba(201,162,39,0.35)'; g.beginPath(); g.ellipse(26, 0, 18, 6, 0, 0, TAU); g.fill(); }
+  for (let i = 0; i < 8; i++) { g.rotate(TAU / 8); g.fillStyle = theme.floor.rugLine ? 'rgba(111,183,196,0.3)' : 'rgba(201,162,39,0.35)'; g.beginPath(); g.ellipse(26, 0, 18, 6, 0, 0, TAU); g.fill(); }
   g.restore();
   // Shelves: soft contact shadow, wooden case with a lit top edge and a dark front face,
   // then spines with the odd gap, leaning book and bookend.
@@ -2134,19 +2145,19 @@ function buildBackground() {
     const horiz = s.w >= s.h;
     g.save();
     g.shadowColor = 'rgba(0,0,0,0.75)'; g.shadowBlur = 16; g.shadowOffsetX = 5; g.shadowOffsetY = 9;
-    g.fillStyle = '#4a2f18'; g.fillRect(s.x, s.y, s.w, s.h);
+    g.fillStyle = theme.shelf.shadow; g.fillRect(s.x, s.y, s.w, s.h);
     g.restore();
     g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(s.x + 6, s.y + 6, s.w, s.h);  // contact shadow
-    g.fillStyle = '#5b3a1e'; g.fillRect(s.x, s.y, s.w, s.h);
-    g.fillStyle = '#86592f'; g.fillRect(s.x, s.y, s.w, 3);                 // lit top edge
-    g.fillStyle = '#1c1008'; g.fillRect(s.x, s.y + s.h - 7, s.w, 7);        // front face in shadow
-    g.fillStyle = 'rgba(255,220,170,0.12)'; g.fillRect(s.x, s.y + s.h - 7, s.w, 1);
-    g.fillStyle = '#140b05'; g.fillRect(s.x + 3, s.y + 3, s.w - 6, s.h - 10); // inside of the case
+    g.fillStyle = theme.shelf.body; g.fillRect(s.x, s.y, s.w, s.h);
+    g.fillStyle = theme.shelf.top; g.fillRect(s.x, s.y, s.w, 3);                 // lit top edge
+    g.fillStyle = theme.shelf.face; g.fillRect(s.x, s.y + s.h - 7, s.w, 7);        // front face in shadow
+    g.fillStyle = theme.shelf.faceLine; g.fillRect(s.x, s.y + s.h - 7, s.w, 1);
+    g.fillStyle = theme.shelf.inside; g.fillRect(s.x + 3, s.y + 3, s.w - 6, s.h - 10); // inside of the case
     let p = 4;
     const lenAxis = horiz ? s.w : s.h - 7;
     const across = horiz ? s.h - 10 : s.w - 6;
     // bookends at both ends
-    g.fillStyle = '#8a6a3a';
+    g.fillStyle = theme.shelf.end;
     if (horiz) { g.fillRect(s.x + 3, s.y + 3, 4, across); g.fillRect(s.x + s.w - 7, s.y + 3, 4, across); }
     else { g.fillRect(s.x + 3, s.y + 3, across, 4); g.fillRect(s.x + 3, s.y + lenAxis - 4, across, 4); }
     p += 4;
@@ -2154,7 +2165,7 @@ function buildBackground() {
       const thick = r.int(4, 8);
       if (r.chance(0.07)) { p += r.int(3, 6); continue; } // gap where a book is checked out
       const depth = across - r.int(0, 5);
-      const col = r.pick(BOOK_PALETTE);
+      const col = r.pick(theme.books);
       const lean = r.chance(0.07);
       g.save();
       if (horiz) {
@@ -2173,15 +2184,51 @@ function buildBackground() {
       g.restore();
       p += thick + (lean ? 3 : 0);
     }
-    g.strokeStyle = '#8a5a2b'; g.lineWidth = 1.5; g.strokeRect(s.x + 0.75, s.y + 0.75, s.w - 1.5, s.h - 1.5);
+    g.strokeStyle = theme.shelf.rim; g.lineWidth = 1.5; g.strokeRect(s.x + 0.75, s.y + 0.75, s.w - 1.5, s.h - 1.5);
   }
   // Reading lamps in the corners (also light sources)
   for (const [x, y] of LAMPS) {
-    g.fillStyle = '#2b1d10'; g.beginPath(); g.arc(x, y, 12, 0, TAU); g.fill();
-    g.fillStyle = '#ffd27a'; g.beginPath(); g.arc(x, y, 7, 0, TAU); g.fill();
+    g.fillStyle = theme.lamp.base; g.beginPath(); g.arc(x, y, 12, 0, TAU); g.fill();
+    g.fillStyle = theme.lamp.bulb; g.beginPath(); g.arc(x, y, 7, 0, TAU); g.fill();
   }
   // Walls
-  g.strokeStyle = '#120b06'; g.lineWidth = 10; g.strokeRect(0, 0, W, H);
+  g.strokeStyle = theme.wall; g.lineWidth = 10; g.strokeRect(0, 0, W, H);
+}
+
+/** Act II floor: dark flagstones with mortar lines and a few cracks. Own RNG calls only run for Act II, so Act I's background is untouched. */
+function drawFlagstones(g, r, theme) {
+  const [h, sat, l0, l1] = theme.floor.stone, th = 30;
+  for (let y = 0; y < H; y += th) {
+    let x = -r.int(0, 60);
+    while (x < W) {
+      const len = r.int(54, 96);
+      g.fillStyle = `hsl(${h + r.int(-4, 4)} ${sat}% ${r.int(l0, l1)}%)`;
+      g.fillRect(x, y, len, th);
+      g.strokeStyle = theme.floor.gap; g.lineWidth = 1.5; g.strokeRect(x + 0.5, y + 0.5, len, th);
+      g.fillStyle = 'rgba(190,225,240,0.04)'; g.fillRect(x + 2, y + 2, len - 4, 2);
+      if (r.chance(0.08)) { g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x + r.int(6, len - 6), y + 3); g.lineTo(x + r.int(6, len - 6), y + th - 3); g.stroke(); }
+      x += len;
+    }
+  }
+}
+
+/** Deep water, drawn once into the cached background: dark body, lighter middle, ripple arcs, a dark lip and a pale foam line on the stone side. */
+function drawWater(g, theme) {
+  const wt = theme.floor.water, wr = new Rng(hashString(`water:${game.seed}:${game.wave}`));
+  for (const w of arena.waterRects) {
+    g.fillStyle = wt.deep; g.fillRect(w.x, w.y, w.w, w.h);
+    g.fillStyle = wt.mid; g.fillRect(w.x + 5, w.y + 5, w.w - 10, w.h - 10);
+    g.save(); g.beginPath(); g.rect(w.x, w.y, w.w, w.h); g.clip();
+    g.strokeStyle = wt.ripple; g.lineWidth = 1.5;
+    for (let i = 0, n = Math.max(2, Math.round((w.w * w.h) / 1800)); i < n; i++) {
+      const x = w.x + wr.float(8, w.w - 8), y = w.y + wr.float(8, w.h - 8), rw = wr.float(10, 26);
+      g.beginPath(); g.ellipse(x, y, rw, rw * 0.32, 0, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+      g.beginPath(); g.ellipse(x + 3, y + 5, rw * 0.6, rw * 0.2, 0, 1.15 * Math.PI, 1.85 * Math.PI); g.stroke();
+    }
+    g.restore();
+    g.strokeStyle = wt.edge; g.lineWidth = 4; g.strokeRect(w.x + 2, w.y + 2, w.w - 4, w.h - 4);
+    g.strokeStyle = wt.foam; g.lineWidth = 1.5; g.strokeRect(w.x + 0.75, w.y + 0.75, w.w - 1.5, w.h - 1.5);
+  }
 }
 // Four wall lamps; story rooms (bigger than the legacy grid) add one on the top and bottom wall so the extra floor is not darker.
 function lampPositions() {
@@ -2239,7 +2286,8 @@ function renderLights() {
   // Coloured additive glows on top
   ctx.globalCompositeOperation = 'lighter';
   const G = (x, y, r, c, a) => { ctx.globalAlpha = a; ctx.drawImage(glowSprite(c), x - r, y - r, r * 2, r * 2); };
-  for (const [x, y] of LAMPS) G(x, y, 90, 'rgba(255,190,90,0.6)', 0.5);
+  const lampGlow = themeOf(game.mode === 'story' ? wingDef().act : 1).lamp.glow;
+  for (const [x, y] of LAMPS) G(x, y, 90, lampGlow, 0.5);
   const bookGlow = books.length > 24 ? 0.25 : 0.45;
   for (let i = 0; i < books.length && i < 24; i++) G(books[i].x, books[i].y, 22, books[i].color, bookGlow);
   for (const h of hazards) G(h.x, h.y, 18, 'rgba(255,80,80,1)', 0.6);
@@ -2809,22 +2857,32 @@ function renderShop() {
 let selectedWing = 1;
 /** The first unlocked wing you haven't cleared yet (or the last unlocked one). */
 function defaultWing() {
-  for (let w = 1; w <= progress.unlocked; w++) if (!progress.cleared.includes(w)) return w;
-  return progress.unlocked;
+  for (let w = 1; w <= effUnlocked(); w++) if (!progress.cleared.includes(w) && (!tester.on || w <= progress.unlocked)) return w;
+  return Math.min(effUnlocked(), progress.unlocked);
 }
 function wingStatus(w) {
-  if (w > progress.unlocked) return 'Locked';
+  if (w > effUnlocked()) return 'Locked';
   if (progress.cleared.includes(w)) return '✓ Cleared';
   const best = progress.best[w];
   return best ? `Best: room ${best}/${ROOMS_PER_WING}` : 'New';
 }
+// Wing map: one page per act (10 wings each). Swipe or the arrows move between pages; Act II shows locked until wing 10 is cleared.
+let storyAct = 1;
+const LAST_ACT = Math.max(...WINGS.map((w) => w.act || 1));
+function setStoryAct(a) { storyAct = clamp(a, 1, LAST_ACT); renderStory(); }
 function renderStory() {
   renderFineBadges();
-  if (selectedWing > progress.unlocked) selectedWing = progress.unlocked;
+  const unlocked = effUnlocked();
+  if (selectedWing > unlocked) selectedWing = unlocked;
+  if (actOf(selectedWing) !== storyAct) { const first = WINGS.findIndex((w) => (w.act || 1) === storyAct) + 1; selectedWing = Math.min(first, unlocked) || selectedWing; }
+  const th = ACTS.find((a) => a.act === storyAct);
+  $('#actTitle').textContent = `${th.short} · ${th.name}`;
+  $('#actPrev').disabled = storyAct <= 1; $('#actNext').disabled = storyAct >= LAST_ACT;
   const grid = $('#wingGrid');
   grid.textContent = '';
-  WINGS.forEach((def, i) => {
-    const w = i + 1, locked = w > progress.unlocked;
+  const onPage = WINGS.map((def, i) => ({ def, w: i + 1 })).filter((x) => (x.def.act || 1) === storyAct);
+  onPage.forEach(({ def, w }) => {
+    const locked = w > unlocked;
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'wing' + (locked ? ' locked' : '') + (progress.cleared.includes(w) ? ' cleared' : '') + (w === selectedWing ? ' selected' : '');
@@ -2838,8 +2896,20 @@ function renderStory() {
     b.addEventListener('click', () => { selectedWing = w; renderStory(); $('#btnEnterWing').focus(); });
     grid.appendChild(b);
   });
+  // Wings that are planned but not built yet: dim placeholders, so the page shows the act's full size.
+  for (let k = onPage.length; k < WINGS_PER_ACT && storyAct > 1; k++) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'wing locked soon'; b.disabled = true;
+    b.innerHTML = '<span class="icon">🔒</span><span class="num"></span><strong>Coming soon</strong><small>?</small>';
+    b.querySelector('.num').textContent = String((storyAct - 1) * WINGS_PER_ACT + k + 1);
+    grid.appendChild(b);
+  }
   const def = WINGS[selectedWing - 1];
-  if (progress.unlocked < WINGS.length) $('#wingLock').textContent = `🔒 Clear ${WINGS[progress.unlocked - 1].name} to unlock ${WINGS[progress.unlocked].name}.`;
+  const pageUnlocked = onPage.some(({ w }) => w <= unlocked);
+  const nextLocked = WINGS[unlocked];   // the wing that unlocks next (undefined once every built wing is open)
+  if (tester.on) $('#wingLock').textContent = 'TESTER mode: every wing is open. Runs here don’t unlock or clear anything.';
+  else if (nextLocked && (nextLocked.act || 1) === storyAct) $('#wingLock').textContent = `🔒 Clear ${WINGS[unlocked - 1].name} to unlock ${nextLocked.name}.`;
+  else if (!pageUnlocked) { const first = onPage[0].w; $('#wingLock').textContent = `🔒 Locked: clear ${WINGS[first - 2].name} (wing ${first - 1}) to open ${th.short}.`; }
   else $('#wingLock').textContent = '';
   $('#wingName').textContent = `${def.icon} Wing ${selectedWing}: ${def.name}`;
   $('#wingBlurb').textContent = def.blurb;
@@ -2848,6 +2918,18 @@ function renderStory() {
     ? `${ROOMS_PER_WING} rooms · room ${ELITE_ROOM} is elite · a Rogue Author waits in room ${BOSS_ROOM}`
     : `Enemies ×${d1.hpMult.toFixed(2)} tougher · ${Math.round(d1.eliteChance * 100)}% elites${d1.deathBurst ? ' · elites burst into pages' : ''}`;
   $('#btnEnterWing').textContent = `▶ Enter ${def.name}`;
+  $('#btnEnterWing').disabled = selectedWing > unlocked;
+}
+// Swipe left / right on the wing map to change act (the arrow buttons do the same).
+{
+  let sx = 0, sy = 0, on = false;
+  const st = $('#story');
+  st.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; sx = t.clientX; sy = t.clientY; on = true; }, { passive: true });
+  st.addEventListener('touchend', (e) => {
+    if (!on) return; on = false;
+    const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) > 60 && Math.abs(dy) < 50 && Math.abs(dx) > 1.5 * Math.abs(dy)) setStoryAct(storyAct + (dx < 0 ? 1 : -1));
+  }, { passive: true });
 }
 
 /** Run log (v1.14.0): append this run to `overdue.runs.v1` (newest 50). Never throws: a full or blocked store just skips it. */
@@ -2866,7 +2948,7 @@ function logRun(result) {
 function bankRun(result = 'q') {
   if (game.banked) return game.banked;
   logRun(result);
-  const res = recordRun(progress, { fines: game.fines, mode: game.mode, wing: game.wingN, room: game.wave, cleared: game.wingCleared });
+  const res = recordRun(progress, { fines: game.fines, mode: tester.on ? 'tester' : game.mode, wing: game.wingN, room: game.wave, cleared: game.wingCleared });
   progress = res.progress; saveProgress();
   game.banked = res;
   return res;
@@ -2967,7 +3049,9 @@ document.addEventListener('click', (e) => {
   if (act === 'play') startRun('endless');
   else if (act === 'again') startRun(game.mode, game.wingN);
   else if (act === 'guideskip') { if (game.guide && game.state === 'playing') endGuide(true); }
-  else if (act === 'story') { selectedWing = defaultWing(); renderStory(); showScreen('story'); }
+  else if (act === 'story') { selectedWing = defaultWing(); storyAct = actOf(selectedWing); renderStory(); showScreen('story'); }
+  else if (act === 'actprev') setStoryAct(storyAct - 1);
+  else if (act === 'actnext') setStoryAct(storyAct + 1);
   else if (act === 'enterwing') startRun('story', selectedWing);
   else if (act === 'nextwing') startRun('story', Math.min(WINGS.length, game.wingN + 1));
   else if (act === 'shop') { shopReturn = currentScreen || 'title'; renderShop(); showScreen('shop'); }
@@ -3124,7 +3208,26 @@ function frame(now) {
 
 applyLayout(true);
 // ---- Version label + "update available" ----
-document.querySelectorAll('.version-label').forEach((el) => { el.textContent = versionLabel(); });
+const drawVersionLabels = () => document.querySelectorAll('.version-label').forEach((el) => {
+  el.textContent = versionLabel();
+  if (tester.on) { const t = document.createElement('span'); t.className = 'tester-tag'; t.textContent = 'TESTER'; el.appendChild(t); }
+});
+drawVersionLabels();
+// Tester switch: 7 quick taps on the title's version line.
+{
+  let taps = 0, last = 0;
+  const el = document.querySelector('#title .version-label');
+  el.addEventListener('click', () => {
+    const now = performance.now();
+    taps = now - last < 1500 ? taps + 1 : 1; last = now;
+    if (taps < 7) return;
+    taps = 0;
+    tester = { on: !tester.on };
+    saveJSON(TESTER_KEY, tester);
+    drawVersionLabels();
+    toast(tester.on ? 'Tester mode on' : 'Tester mode off');
+  });
+}
 let updateOffered = false;
 async function checkForUpdate() {
   if (updateOffered || BUILD.commit === 'local') return;
@@ -3178,7 +3281,7 @@ requestAnimationFrame(frame);
 // Test hooks (only with ?debug) — used by the automated Playwright smoke test.
 if (DEBUG) {
   window.__overdue = {
-    game, get cats() { return cats; }, grid: () => `${COLS}x${ROWS}`, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, enemies, get content() { return content; },
+    game, get bg() { return bg; }, get arena() { return arena; }, get tester() { return tester; }, get cats() { return cats; }, grid: () => `${COLS}x${ROWS}`, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, enemies, get content() { return content; },
     fire, damageEnemy, orbiterPositions, consts: { STORY_ENEMY_SCALE, ORBIT_RADIUS, ORBIT_SCALE, BOSS_TRANS, MARGIN_SIDE, MARGIN_WIDE },   // QA only (v1.15.1 look & feel checks)
     makeEnemy, freeze: (on) => { debugFreeze = !!on; }, startRun: (m, w) => startRun(m, w, { noGuide: true }), startWave, get guide() { return game.guide; }, tipsSeen: () => tips.seen.slice(), setSurviveT: (t) => { game.surviveT = t; }, killAll: () => { for (const e of [...enemies]) killEnemy(e, 'cleanup'); spawnQueue.length = 0; telegraphs.length = 0; },
     get progress() { return progress; }, setFines: (n) => { progress = { ...progress, fines: n }; saveProgress(); renderFineBadges(); },

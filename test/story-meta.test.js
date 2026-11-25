@@ -66,7 +66,7 @@ test('roomGoal: never room 1, the elite or the boss room; capped per wing; deter
     assert.ok(n <= 1, `wing ${w} has ${n} Survive rooms`);
     if (n) wingsWith++;
   }
-  assert.ok(wingsWith >= 6 && wingsWith <= 8, `${wingsWith} of 10 wings have a Survive room`);
+  assert.ok(wingsWith >= 6 && wingsWith <= 10, `${wingsWith} of ${WINGS.length} wings have a Survive room`);
 });
 
 test('a Survive room is never easier than the same room played plain, and its spawns fill the whole timer', async () => {
@@ -221,10 +221,10 @@ test('a lost wing-1 run that dies in the room after the elite room still affords
 
 test('every wing has room shapes; elite and boss rooms are open; shapes do not repeat back to back', async () => {
   const { WINGS, ROOMS_PER_WING, ELITE_ROOM, BOSS_ROOM, roomShape } = await load('story');
-  const { SHAPES } = await load('arena');
+  const { SHAPES, WATER_SHAPES } = await load('arena');
   for (let w = 1; w <= WINGS.length; w++) {
     const list = WINGS[w - 1].shapes;
-    assert.ok(list.length >= 1 && list.length <= 3 && list.every((s) => SHAPES.includes(s)), `wing ${w} shapes`);
+    assert.ok(list.length >= 1 && list.length <= 3 && list.every((s) => SHAPES.includes(s) || WATER_SHAPES.includes(s)), `wing ${w} shapes`);
     const open = ['pillars', 'reading'].find((s) => list.includes(s)) || 'scatter';
     for (let r = 1; r <= ROOMS_PER_WING; r++) {
       const s = roomShape(w, r);

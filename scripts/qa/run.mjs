@@ -786,13 +786,13 @@ async function rotationFlow(label, port, land, kind) {
 async function shapesFlow() {
   const record = recorder();
   const { WINGS, ROOMS_PER_WING, roomShape } = await import(pathToFileURL(join(ROOT, 'src/story.js')).href);
-  const { SHAPES } = await import(pathToFileURL(join(ROOT, 'src/arena.js')).href);
+  const { SHAPES, WATER_SHAPES } = await import(pathToFileURL(join(ROOT, 'src/arena.js')).href);
   const ctx = await browser.newContext(devices['iPhone 13 landscape']);
   const page = await ctx.newPage();
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
   await page.goto(URL0); await page.waitForTimeout(500);
-  for (const shape of SHAPES) {
+  for (const shape of [...SHAPES, ...WATER_SHAPES]) {
     // Prefer a mid-to-late normal room so the shape is at a decent density.
     let pick = null;
     for (const r of [6, 5, 3, 2, 1, 4, 7]) for (let w = 1; w <= WINGS.length && !pick; w++) if (roomShape(w, r) === shape) pick = [w, r];
@@ -809,6 +809,113 @@ async function shapesFlow() {
   return record.list;
 }
 
+
+
+// ---------------------------------------------------------------- v1.16.0: Act II foundation (wing map pages, tester switch, water rooms, Act I look unchanged)
+async function act2Flow() {
+  const record = recorder();
+  const { WINGS, ROOMS_PER_WING, roomShape } = await import(pathToFileURL(join(ROOT, 'src/story.js')).href);
+  const { WATER_SHAPES } = await import(pathToFileURL(join(ROOT, 'src/arena.js')).href);
+  const ref = JSON.parse(readFileSync(join(ROOT, 'scripts/qa/act1-bg.json'), 'utf8'));
+  const ctx = await browser.newContext(devices['iPhone 13 landscape']);
+  const page = await ctx.newPage();
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  const dbg = URL0 + (URL0.includes('?') ? '&' : '?') + 'debug=1';
+  await page.goto(dbg); await page.waitForTimeout(600);
+  const progressKey = () => page.evaluate(() => localStorage.getItem('overdue.progress.v1'));
+  const swipe = (dx) => page.evaluate((d) => {
+    const el = document.querySelector('#story'), mk = (x) => new Touch({ identifier: 7, target: el, clientX: x, clientY: 200 });
+    const x0 = 400, a = mk(x0), b = mk(x0 + d);
+    el.dispatchEvent(new TouchEvent('touchstart', { touches: [a], changedTouches: [a], bubbles: true }));
+    el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [b], bubbles: true }));
+  }, dx);
+  const actTitle = () => page.evaluate(() => document.querySelector('#actTitle').textContent);
+
+  // 1. fresh save: wing map starts on Act I, swipe left shows Act II locked, swipe right comes back, arrows do the same
+  await page.click('#title [data-act="story"]'); await page.waitForTimeout(300);
+  const before = await progressKey();
+  record('act2', 'wing map opens on Act I', /^Act I · /.test(await actTitle()), await actTitle());
+  await swipe(-140); await page.waitForTimeout(200);
+  const t2 = await actTitle();
+  record('act2', 'swipe left shows "Act II · The Sunken Stacks"', t2 === 'Act II · The Sunken Stacks', t2);
+  const locked = await page.evaluate(() => { const t = [...document.querySelectorAll('#wingGrid .wing')]; return { n: t.length, w11: t[0]?.dataset.wing, off: t.every((b) => b.disabled), lock: document.querySelector('#wingLock').textContent, enter: document.querySelector('#btnEnterWing').disabled }; });
+  record('act2', 'Act II is visible but locked on a fresh save', locked.n === 10 && locked.w11 === '11' && locked.off && /Locked|🔒/.test(locked.lock), JSON.stringify(locked));
+  await shot(page, 'act2-wingmap-locked');
+  await swipe(140); await page.waitForTimeout(200);
+  record('act2', 'swipe right returns to Act I', /^Act I · /.test(await actTitle()));
+  await page.click('#actNext'); await page.waitForTimeout(150);
+  record('act2', 'arrow button moves to Act II', /^Act II · /.test(await actTitle()));
+  await page.click('#actPrev'); await page.waitForTimeout(150);
+  record('act2', 'arrow button moves back to Act I', /^Act I · /.test(await actTitle()));
+  record('act2', 'browsing the wing map never changes saved progress', (await progressKey()) === before);
+
+  // 2. hidden tester switch: 7 taps on the version line
+  await page.evaluate(() => document.querySelector('#story [data-act="back"]').click()); await page.waitForTimeout(250);
+  const preTester = await progressKey();
+  for (let i = 0; i < 6; i++) await page.click('#title .version-label');
+  record('act2', '6 taps do not switch tester mode on', await page.evaluate(() => localStorage.getItem('overdue.tester.v1')) === null);
+  await page.click('#title .version-label'); await page.waitForTimeout(200);
+  const tj = await page.evaluate(() => ({ key: localStorage.getItem('overdue.tester.v1'), toast: document.querySelector('#toast')?.textContent, tag: !!document.querySelector('#title .version-label .tester-tag') }));
+  record('act2', '7 taps: toast "Tester mode on", saved in overdue.tester.v1, TESTER tag on the title', tj.key === '{"on":true}' && /Tester mode on/.test(tj.toast || '') && tj.tag, JSON.stringify(tj));
+  record('act2', 'tester switch leaves overdue.progress.v1 untouched', (await progressKey()) === preTester);
+  await shot(page, 'title-tester');
+  await page.click('#title [data-act="story"]'); await page.waitForTimeout(250);
+  await page.click('#actNext'); await page.waitForTimeout(150);
+  const open = await page.evaluate(() => [...document.querySelectorAll('#wingGrid .wing:not(.soon)')].map((b) => !b.disabled));
+  record('act2', 'tester mode opens wings 11 and 12', open.length === 2 && open.every(Boolean), JSON.stringify(open));
+  // a tester run banks fines but never unlocks, clears or sets a best room
+  await page.evaluate(() => { const O = __overdue; O.startRun('story', 11); O.startWave(3); O.game.fines = 12; O.die(); });
+  await page.waitForTimeout(2500);
+  const pr = await page.evaluate(() => ({ ...__overdue.progress }));
+  record('act2', 'a tester run earns fines but sets no best room and unlocks nothing', pr.fines > 0 && Object.keys(pr.best).length === 0 && pr.unlocked === 1 && pr.cleared.length === 0, JSON.stringify({ fines: pr.fines, best: pr.best, unlocked: pr.unlocked }));
+  // switch off again (7 more taps from the title)
+  await page.evaluate(() => { __overdue.game.state = 'title'; document.querySelectorAll('.screen').forEach((e) => { e.hidden = e.id !== 'title'; }); });
+  await page.waitForTimeout(300);
+  for (let i = 0; i < 7; i++) await page.click('#title .version-label');
+  record('act2', '7 more taps switch tester mode off', await page.evaluate(() => localStorage.getItem('overdue.tester.v1')) === '{"on":false}');
+
+  // 3. an Act II water room: renders, the player can't step into water, books fly over it
+  const pick = (() => { for (const w of [11, 12]) for (let r = 1; r <= ROOMS_PER_WING; r++) if (WATER_SHAPES.includes(roomShape(w, r))) return [w, r]; return null; })();
+  await page.evaluate(([w, r]) => { const O = __overdue; O.unlockAll(); O.startRun('story', w); O.startWave(r); O.god(); O.killAll(); O.freeze(false); }, pick);
+  await page.waitForTimeout(1200);
+  await shot(page, 'act2-room');
+  const room = await page.evaluate(() => {
+    const O = __overdue, a = O.arena, C = 30, cols = Number(O.grid().split('x')[0]), rows = Number(O.grid().split('x')[1]);
+    const water = (x, y) => !!a.water && a.water[Math.floor(y / C) * cols + Math.floor(x / C)] === 1;
+    let n = 0; if (a.water) for (const v of a.water) n += v;
+    // a dry cell with water straight to its right, and water two cells further (a stretch we can throw across)
+    let shore = null;
+    for (let y = 1; y < rows - 1 && !shore; y++) for (let x = 1; x < cols - 4; x++) if (!a.walk[y * cols + x] && a.water[y * cols + x + 1] && a.water[y * cols + x + 2]) { shore = [x, y]; break; }
+    if (!shore) return { cells: n, shore: null };
+    const px = shore[0] * C + C / 2, py = shore[1] * C + C / 2;
+    O.player.x = px; O.player.y = py; O.player.vx = O.player.vy = 0;
+    O.drive(true); O.setBotInput({ x: 1, y: 0 });
+    let inWater = false;
+    for (let i = 0; i < 240; i++) { O.stepN(1); if (water(O.player.x, O.player.y)) inWater = true; }
+    O.setBotInput(null); O.drive(false);
+    // books: throw straight across the water from the shore
+    O.player.x = px; O.player.y = py; O.player.aim = 0; O.books.length = 0;
+    O.fire();
+    const born = O.books.length;
+    let overWater = false;
+    for (let i = 0; i < 8; i++) { O.stepN(1); if (O.books.some((b) => water(b.x, b.y))) overWater = true; }
+    return { cells: n, shore, inWater, born, overWater, stillFlying: O.books.length > 0, shape: a.shape };
+  });
+  record('act2', 'Act II room (wing %d room %d) renders with water and plays'.replace('%d', pick[0]).replace('%d', pick[1]), room.cells > 0 && errs.length === 0, `${room.cells} water cells, shape ${room.shape}`);
+  record('act2', 'the player cannot walk into water (240 steps pushing at it)', room.shore && room.inWater === false, JSON.stringify(room.shore));
+  record('act2', 'books fly over water', room.born > 0 && room.overWater && room.stillFlying, `born ${room.born}, over water ${room.overWater}`);
+
+  // 4. Act I look unchanged: the floor + shelf background of an Act I room matches the capture taken before the act layer existed
+  const grid = await page.evaluate(([w, r]) => { const O = __overdue; O.startRun('story', w); O.game.seed = 12345; O.startWave(r);
+    const s = document.createElement('canvas'); s.width = 48; s.height = 27; const g = s.getContext('2d'); g.drawImage(O.bg, 0, 0, 48, 27);
+    const d = g.getImageData(0, 0, 48, 27).data, out = []; for (let i = 0; i < 48 * 27; i++) out.push(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]); return { out, size: O.grid() }; }, [3, 2]);
+  let maxD = 0; ref.grid.forEach((v, i) => { maxD = Math.max(maxD, Math.abs(v - grid.out[i])); });
+  record('act2', 'Act I background unchanged (wing 3 room 2, largest colour difference <= 6 of 255)', grid.size === ref.size && maxD <= 6, `size ${grid.size}, max diff ${maxD}`);
+  record('act2', 'no script errors', errs.length === 0, errs.join('; ').slice(0, 200));
+  await ctx.close();
+  return record.list;
+}
 
 // ---------------------------------------------------------------- v1.15.0: status effects (ink, chill, static, pop) look right on a phone
 async function statusFlow() {
@@ -1260,6 +1367,7 @@ async function basicsFlow() {
   if (want('screens')) { tasks.push(() => rotateOverlayFlow()); for (const r of ROTATIONS) tasks.push(() => rotationFlow(...r)); }
   if (want('shapes')) tasks.push(() => shapesFlow());
   if (want('status')) tasks.push(() => statusFlow());
+  if (want('act2')) tasks.push(() => act2Flow());
   if (want('lookfeel')) tasks.push(() => lookFeelFlow());
   if (want('newplayer')) for (const [name, opts] of TARGETS) tasks.push(() => newPlayerFlow(name, opts));
   if (want('newperks')) tasks.push(() => newPerksFlow(...TARGETS[0]));

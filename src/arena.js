@@ -124,6 +124,11 @@ function overlapsSafe(x, y, w, h) {
  * Deterministic for a given (seed, wave). `shelvesPerHalf` overrides the density (story wings).
  */
 export function generateArena(seed, wave, shelvesPerHalf = null, shape = 'scatter') {
+  if (WATER_SHAPES.includes(shape)) {
+    const a = waterArena(seed, wave, shelvesPerHalf, shape);
+    if (a) return a;
+    shape = 'pillars';   // never happens in practice: fall back to a dry open room
+  }
   if (shape && shape !== 'scatter') {
     const a = shapedArena(seed, wave, shelvesPerHalf, shape);
     if (a) return a;
@@ -177,6 +182,8 @@ function scatterArena(seed, wave, shelvesPerHalf) {
 // zone clear and the floor connected. Taking the first N of a fixed list means a denser room always
 // contains every shelf of a sparser one (same shape, same seed).
 export const SHAPES = ['scatter', 'aisles', 'pillars', 'maze', 'reading', 'bridge'];
+/** Act II (v1.16.0): shapes with deep water. `arena.water` marks the cells, `arena.walk` = shelves + water (what walkers can't enter). */
+export const WATER_SHAPES = ['causeway', 'islands'];
 
 function shuffled(rng, list) {
   const a = list.slice();
@@ -386,7 +393,100 @@ function shapedArena(seed, wave, shelvesPerHalf, shape) {
   return { seed, wave, shape, shelves: merged, rects, solid };
 }
 
-/** Free cells on the outer ring, used as enemy entry points. */
+
+// ---- Water rooms (Act II). Deep water is not walkable for the player or walking enemies; books, pages and
+// line of sight fly over it (only shelves and walls block those). Stone walkways always connect every dry cell.
+// The result keeps `solid` = shelves only (LOS, books, pages) and adds `water`, `walk` (= solid | water, for
+// walkers and the flow field) and `wrects` (shelf + water rects, for wall collision). Layouts are mirrored left/right.
+const mirrorRect = (r) => ({ x: COLS - r.x - r.w, y: r.y, w: r.w, h: r.h });
+
+function waterMask(rng, shape) {
+  const half = COLS >> 1, cy = ROWS >> 1, water = new Uint8Array(COLS * ROWS);
+  const fill = (x, y, w, h, v = 1) => {
+    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) {
+      if (xx < 0 || yy < 0 || xx >= half || yy >= ROWS) continue;
+      water[idx(xx, yy)] = v; water[idx(COLS - 1 - xx, yy)] = v;
+    }
+  };
+  if (shape === 'causeway') {
+    // One long walkway across the middle; a pool above and below with a stone shore all round; peninsulas
+    // (side platforms) stick out from the walkway into the pools and piers cross them.
+    const top = 2, topH = cy - 3 - top, bot = cy + 3, botH = ROWS - 2 - bot;
+    fill(2, top, half - 2, topH); fill(2, bot, half - 2, botH);
+    const slots = [];
+    for (let x = 4; x <= half - 6; x += 5) slots.push(x);
+    const pick = shuffled(rng, slots);
+    pick.slice(0, Math.max(2, Math.ceil(slots.length * 0.6))).forEach((x) => {
+      const w = rng.int(3, 4), up = rng.int(2, Math.max(2, topH - 1)), dn = rng.int(2, Math.max(2, botH - 1));
+      if (rng.chance(0.5)) fill(x, cy - 3 - up, w, up, 0);
+      if (rng.chance(0.65)) fill(x, bot, w, dn, 0);
+    });
+    // One pier all the way across each pool, so the shore ring is reachable from the walkway too.
+    const px = rng.int(4, Math.max(4, half - 8));
+    fill(px, top, 3, topH, 0); fill(px, bot, 3, botH, 0);
+  } else {
+    // islands: shoreline columns left and right, a big centre island and one or two island pairs, joined by 2-wide bridges.
+    fill(2, 0, half - 2, ROWS);                                   // everything but the two shore columns is water...
+    const ix = SAFE.x0 - 3, iy = cy - 5;
+    fill(ix, iy, half - ix, 10, 0);                               // ...except the centre island (mirrors into one block)
+    const n = rng.chance(0.4) ? 2 : 1;
+    const ys = n === 1 ? [rng.chance(0.5) ? 3 : ROWS - 8] : [3, ROWS - 8];
+    for (const y of ys) {
+      const x = rng.int(5, Math.max(5, ix - 7)), w = rng.int(5, 6), h = 5;
+      fill(x, y, w, h, 0);
+      const bx = x + 1 + rng.int(0, w - 4);                       // bridge down/up from the island to the centre island
+      if (y < cy) fill(bx, y + h, 2, iy - (y + h), 0); else fill(bx, iy + 10, 2, y - (iy + 10), 0);
+      fill(2 - 2, y + 1, x, 2, 0);                                // bridge from the island to its shore
+    }
+    // the centre island always reaches the shore: one 2-wide causeway on the centre row
+    fill(0, cy - 1, ix, 2, 0);
+  }
+  return water;
+}
+
+function waterArena(seed, wave, shelvesPerHalf, shape) {
+  const rng = new Rng(hashString(`arena:${seed}:${wave}:${shape}`));
+  const water = waterMask(rng, shape);
+  const walk = new Uint8Array(COLS * ROWS);
+  walk.set(water);
+  const half = COLS >> 1, shelves = [];
+  // The mask must itself be valid (connected, no 1-wide notch); otherwise let the caller fall back.
+  if (!isConnected(walk) || !isWide(walk)) return null;
+  const solid = new Uint8Array(COLS * ROWS);
+  const perHalf = Math.max(1, Math.round((shelvesPerHalf ?? 4) * 0.6));
+  const cands = [];
+  for (let i = 0; i < 40; i++) {
+    const horiz = rng.chance(0.55), w = horiz ? rng.int(3, 5) : 1, h = horiz ? 1 : rng.int(2, 4);
+    cands.push({ x: rng.int(2, Math.max(2, half - 1 - w)), y: rng.int(2, ROWS - 2 - h), w, h });
+  }
+  let placed = 0;
+  for (const r of cands) {
+    if (placed >= perHalf) break;
+    if (r.x + r.w > half - 1 || overlapsSafe(r.x, r.y, r.w, r.h)) continue;
+    let ok = true;
+    // a shelf stands on dry stone only, with a 2-cell margin from other shelves; isWide(walk) below keeps every passage 2+ cells wide
+    for (let yy = Math.max(0, r.y - AISLE); yy < Math.min(ROWS, r.y + r.h + AISLE) && ok; yy++)
+      for (let xx = Math.max(0, r.x - AISLE); xx < Math.min(COLS, r.x + r.w + AISLE); xx++) {
+        const inside = yy >= r.y && yy < r.y + r.h && xx >= r.x && xx < r.x + r.w;
+        if (inside ? water[idx(xx, yy)] : solid[idx(xx, yy)]) { ok = false; break; }
+      }
+    if (!ok) continue;
+    for (const s of [r, mirrorRect(r)]) for (let yy = s.y; yy < s.y + s.h; yy++) for (let xx = s.x; xx < s.x + s.w; xx++) { solid[idx(xx, yy)] = 1; walk[idx(xx, yy)] = 1; }
+    if (!isConnected(walk) || !isWide(walk)) {
+      for (const s of [r, mirrorRect(r)]) for (let yy = s.y; yy < s.y + s.h; yy++) for (let xx = s.x; xx < s.x + s.w; xx++) { solid[idx(xx, yy)] = 0; walk[idx(xx, yy)] = water[idx(xx, yy)]; }
+      continue;
+    }
+    shelves.push(r, mirrorRect(r));
+    placed++;
+  }
+  const px = (list) => list.map((s) => ({ x: s.x * CELL, y: s.y * CELL, w: s.w * CELL, h: s.h * CELL }));
+  const merged = mergeRects(shelves);
+  const rects = px(merged);
+  const waterRects = px(rectsOf(Array.from(water.keys()).filter((i) => water[i])));
+  return { seed, wave, shape, shelves: merged, rects, solid, water, walk, waterRects, wrects: [...rects, ...waterRects] };
+}
+
+/** Free cells on the outer ring, used as enemy entry points (pass `arena.walk || arena.solid` so water cells are skipped). */
 export function edgeCells(solid) {
   const out = [];
   for (let x = 0; x < COLS; x++) for (const y of [0, ROWS - 1]) if (!solid[idx(x, y)]) out.push([x, y]);

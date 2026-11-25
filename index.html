@@ -167,8 +167,12 @@
     </section>
 
     <section id="story" class="screen" hidden>
-      <h2>Story: the library wings</h2>
-      <p class="muted small">Clear all 7 rooms of a wing to unlock the next. Each wing is tougher than the last. Perks reset every run; Renovations don’t.</p>
+      <div class="act-nav">
+        <button id="actPrev" data-act="actprev" type="button" aria-label="Previous act">‹</button>
+        <h2 id="actTitle">Act I · The Library</h2>
+        <button id="actNext" data-act="actnext" type="button" aria-label="Next act">›</button>
+      </div>
+      <p class="muted small">Clear all 7 rooms of a wing to unlock the next. Each wing is tougher than the last. Swipe to change act. Perks reset every run; Renovations don’t.</p>
       <div id="wingGrid" class="wing-grid"></div>
       <div class="wing-detail">
         <h3 id="wingName"></h3>
