@@ -600,3 +600,5 @@ body.guiding #touchUI #btnGuideSkip { display: block; }
 #story .act-nav button:disabled { opacity: .3; }
 .wing-grid .wing.soon { opacity: .28; border-style: dashed; cursor: default; }
 .version-label .tester-tag { color: #ffd54a; font-weight: 700; letter-spacing: .08em; margin-left: .4em; }
+/* v1.16.0: tile names wrap (up to 3 lines) instead of being cut off ("The Flooded Stacks", "Coming soon") */
+.wing-grid .wing strong { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-overflow: clip; word-break: break-word; font-size: .72em; padding-right: .5em; }

@@ -2915,7 +2915,7 @@ function renderStory() {
     const first = onPage[0].w;
     $('#wingName').textContent = `🔒 ${th.short} · ${th.name}`;
     $('#wingBlurb').textContent = th.blurb;
-    $('#wingInfo').textContent = `Clear wing ${first - 1} to open`;
+    $('#wingInfo').textContent = '';   // the lock line below already says what to clear
     $('#btnEnterWing').textContent = '🔒 Locked';
     $('#btnEnterWing').disabled = true;
     return;
