@@ -3,36 +3,35 @@
 The plan and the owner's decisions, kept current by the planner session. **Planners: read this after CLAUDE.md.**
 Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <topic>`; their prompts are saved in `docs/handoffs/`.
 
-## Current state (planning 5, 2026-11-25)
-- **Live:** v1.16.0 (46889c7): Pages run green first try (run 37, the first with the build → deploy split). CI for 46889c7 was still running at 08:33 UTC. = Act II
-  "The Sunken Stacks" wings 11–12 (water, stone walkways, Ink Eel, Paper Boat, act swipe on the wing map, hidden tester switch:
-  7 taps on the title version line, `overdue.tester.v1`) + deploy split (pages.yml build job → deploy job; first real test is this
-  push). Before: 1.15.0 new perks, 1.15.1 look & feel, 1.15.2 story HP −5%, 1.15.3 Margin 30% narrower + auto-aim (line of
-  sight, sticky, 50% lead), 1.15.4 diagonal see-through SHHH/DASH. **Running:** 1.16.1 coder `session_014kswNmJdTHfULWiYMAJkcn` (branch `claude/act2-longer`, handoff `docs/handoffs/1.16.1-act2-longer.md`), started 08:32 UTC; check-in at 09:49 UTC; tester after.
-- **Planner branch:** `claude/brave-galileo-jyg38o` (= main + docs). Review worktree used: scratchpad `rev`.
-- **Roles (CLAUDE.md):** planner plans; Sonnet coders code (max 2 at once); **one Sonnet tester per release** (tag `overdue-tester`,
-  template `docs/handoffs/tester-template.md`, doesn't count toward the 2). First tester (1.16.0) worked well: ~12 min, caught the
-  wing 10→11 step, What's-new card blocking the tester taps, old-save Act II unlock. Keep it.
-- **Owner habits:** short replies; ships only on "ship"; playtest mode = numbered log only; 3-option pages for visual choices;
-  to-scale phone pictures for UI tweaks (scratchpad/btn/shot*.cjs: serve a worktree on :5199 and screenshot iPhone 13);
-  08:00 SGT morning update when going to sleep. Usage limit was hit once (2026-11-25): keep coder tasks tight.
-- **Deploys:** if the Pages run fails, start a fresh run (workflow_dispatch); never "re-run failed jobs". Watch whether the
-  build/deploy split stops the hiccup (it failed first-try in 4 of 6 releases before).
-- **Next (owner-approved, not started):**
-  1. **1.16.1 Act II longer:** Act II wings 9 rooms (elite room 5, boss last) + ~15% more enemies per room; re-tune so wing 11
-     is clearly harder than wing 10 (tester bot: 10 50%, 11 52%, 12 43% at max Renovations; target steps ≤ 15–20 pts, wing 11
-     below wing 10). Fix What's-new card covering the version line (blocks tester taps). Act I + endless unchanged.
-  2. **Cat readability:** Library Cat mistaken for an enemy when it moves → teal outline like the player, trail to the player.
-  3. **Strong perks:** owner collects perk names + Share stats codes (in chat only) from testers; then bot measure, then tune.
-  4. **Act II wings 13–20** in batches, 2 new bosses (wings 15, 20), crab enemy; later Acts III (Overgrown Conservatory) and
-     IV (Clockwork Archive) from https://claude.ai/artifact/9wgzQWpVvdovMR5fiGdu95.
-  5. Book Bag (Renovations 2.0) and Player look after that.
-- **Owner to do:** phone checks for 1.15.3/1.15.4/1.16.0 (aim feel, buttons reach, swipe vs iOS back gesture, 7-tap switch,
-  eel/boat readability, water fps); add GitHub secret `QA_PRIVATE_TERMS`; enable secret scanning + push protection.
+## Current state (planning 5, 2026-11-25 13:35 UTC)
+- **Live:** v1.16.1 (6e23f80), Pages + CI green first try (2/2 since the build → deploy split). = Act II wings 9 rooms (elite 5,
+  survive 7 in wing 11, boss 9), +15% enemies (ACT2_BUDGET_MULT 1.15), wing 11 boost 1.25 / wing 12 boost 1.22 + elite 0.14 + gap 0.75;
+  **bug fix:** walkers used `arena.solid` for line of sight and stood at pond shores forever (now `walkGrid()`); What's-new card
+  blocks taps except the version line, text "New in 1.16", flag `whatsnew-1.16.0`. Bot (max Renos, 180/wing): 10 52%, 11 38%, 12 31%;
+  fresh save 0% in Act II. Before: 1.16.0 Act II wings 11–12 (live 08:30 UTC).
+- **Ready, not shipped:** v1.16.2 `claude/buttons-bannedbook` (27ecfef, being rebased on 1.16.1 by coder
+  `session_014kswNmfiiQKdCmUrzteg2D`): DASH right 1.35em/bottom 6.7em, SHHH 7em/1.6em, #touchUI fixed to the screen (likely cause of the
+  owner's bigger iPad gap), pause + guide Skip clear of iOS status/HUD, Banned Book +75% dmg / pierce 1 / lose ⅓ max hearts. Tester passed
+  except balance: take vs walk (60 runs, half Renos) wing 7 87/75, wing 10 50/33 (target ±5). **Needs owner: balance call + "ship".**
+- **Owner is playtesting** (log only; start nothing until "done testing"). Log so far:
+  1. bug: wing-cleared screen (iPad) — bottom buttons cover the "not ranked" line; rule: every screen fits without scrolling.
+  2. balance: Banned Book B (+75%, pierce, −⅓ hearts) — in 1.16.2.
+  3. feature: Renovation cards show the benefit now → next level.
+  4. fix: "+1 book" perk extra books fly side by side (parallel), not angled outward.
+- **Open decisions for after the playtest:** Banned Book still +12–17 pts over walking (A +50% dmg = planner pick, B drop pierce, C leave);
+  Act II is 0% on a fresh save (intended end-game, or soften?); optional heart refill after room 7 in Act II.
+- **Planner rules learned today (CLAUDE.md):** push the handoff before starting a session, full prompt in `create_session` (a task sent by
+  `send_message` is untrusted and the session stops to ask); start check 5–10 min, then progress by size, 5-min check after any hiccup.
+  A usage-limit stop kills coder turns: after a reset, message each coder "continue" and check 5 min later.
+- **Roles / habits / deploys:** unchanged (see CLAUDE.md). Planner branch `claude/brave-galileo-jyg38o`.
+- **Next (owner-approved, not started):** cat readability; strong perks (tester data); Act II wings 13–20 + 2 bosses + crab; later
+  Acts III/IV, Book Bag, Player look. Owner to do: phone checks (aim, buttons, swipe vs iOS back, 7-tap switch, eels/boats, water fps,
+  Act II islands rooms: no enemy stuck at a shore); GitHub secret `QA_PRIVATE_TERMS`; secret scanning + push protection.
 
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-25 | 1.16.2 (owner, playtest): DASH/SHHH between mockups A and B (closer to corner); Banned Book B: +75% dmg, keep pierce, lose ⅓ max hearts (min 1) | Owner |
 | 2026-11-25 | Longer levels: Act II wings get 9 rooms (was 7; elite room 5, boss room 9) + ~15% more enemies per room. Act I and endless unchanged (planner default, owner may extend). Keep max-Renovation steps ≤ ~15–20 pts. Planned as 1.16.1 after 1.16.0 ships | Owner: "A + a bit of B" |
 | 2026-11-25 | Future (owner, from testers): (1) Library Cat is mistaken for an enemy when it moves → make it read as friendly; (2) levels ~30% longer (rooms per wing vs room length: open); (3) some perks feel too strong: specifics to collect from the tester (perk names + Share stats codes in chat, never committed) | Owner |
 | 2026-11-25 | Tester role: one Sonnet tester session per release reviews the branch (QA, screens, try-to-break, bot) and reports; planner reads the report, spot-checks, then asks to ship. Testers don't count toward the 2-coder limit. CLAUDE.md + `docs/handoffs/tester-template.md` | Owner: go |
@@ -46,7 +45,8 @@ Older decisions (2026-11-21 to 23, all shipped): `docs/roadmap-archive.md`. Prod
 | Version | What | Status |
 |---|---|---|
 | 1.15.0–1.16.0 | New perks; look & feel; story −5%; Margin + auto-aim; diagonal buttons; Act II wings 11–12 + eels/boats + tester switch + deploy split | Shipped 2026-11-24/25 (details: `docs/roadmap-archive.md`) |
-| 1.16.1 | **Act II longer:** 9 rooms per Act II wing, +15% enemies, wing 11 clearly harder than 10; What's-new card vs version line | Coder running |
+| 1.16.1 | **Act II longer:** 9 rooms per Act II wing, +15% enemies, wing 11 clearly harder than 10; What's-new card vs version line; pond-shore stuck-enemy fix | Shipped 2026-11-25 (6e23f80) |
+| 1.16.2 | Buttons closer to the corner (screen-anchored), pause/Skip clear of iOS status, Banned Book +75% / −⅓ hearts | Ready; waiting on owner balance call + ship |
 | 1.16.x | Cat readability; strong-perk tuning (after tester data); Act II wings 13–20 in batches + 2 bosses + crab | Planned |
 | later | Acts III (Conservatory) and IV (Clockwork); Book Bag (Renovations 2.0); Player look | Planned |
 | — | **Bigger map (parked):** camera-follow map; revisit only if the cramped feeling returns | Parked |
