@@ -178,7 +178,7 @@ test('rebalance: no single core perk more than doubles output at level 1', async
   byId('hardcover').apply(s); assert.equal(s.damage, 1.5);
   byId('trilogy').apply(s); assert.equal(s.projectiles, 2);
   const c = baseStats();
-  byId('bannedbook').apply(c, { hp: 5 }); assert.equal(c.damage, 2); assert.equal(c.maxHp, 4); assert.equal(c.pierce, 1, 'v1.14.1: Banned Book also pierces 1');
+  byId('bannedbook').apply(c, { hp: 5 }); assert.equal(c.damage, 1.75); assert.equal(c.maxHp, 3, 'v1.16.2: lose a third of 5 hearts = 2'); assert.equal(c.pierce, 1, 'v1.14.1: Banned Book also pierces 1');
   const l = baseStats(); byId('lightsout').apply(l); assert.equal(l.fineMult, 1.5); assert.equal(l.scoreMult, 1.5); assert.equal(l.lanternScale, 0.5);
   const r = baseStats(); byId('loudreader').apply(r); assert.equal(r.shhhRadius, 210); assert.equal(r.shhhStun, 1.5);
 });

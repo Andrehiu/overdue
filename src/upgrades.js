@@ -77,7 +77,7 @@ export const UPGRADES = [
   perk({ id: 'popup', icon: '🎉', short: 'Pop-up Book', name: 'Pop-up Book', desc: 'Defeated enemies pop, hurting enemies nearby', max: 3, weight: 5, apply: (s) => { s.popLvl = Math.min(3, s.popLvl + 1); s.popRadius = POP_RADIUS[s.popLvl]; s.popMult = POP_MULT[s.popLvl]; } }),
 
   // ---- cursed books: big upside, real cost ----
-  cursed({ id: 'bannedbook', icon: '💀', short: 'Banned Book', name: 'Banned Book', desc: '+100% book damage, books pierce 1 enemy. −1 max heart.', apply: (s, p) => { s.damage += 1; s.pierce += 1; s.maxHp = Math.max(1, s.maxHp - 1); if (p) p.hp = Math.min(p.hp, s.maxHp); } }),
+  cursed({ id: 'bannedbook', icon: '💀', short: 'Banned Book', name: 'Banned Book', desc: '+75% book damage, books pierce 1 enemy. Lose a third of your max hearts.', apply: (s, p) => { s.damage += 0.75; s.pierce += 1; s.maxHp = Math.max(1, s.maxHp - Math.max(1, Math.round(s.maxHp / 3))); if (p) p.hp = Math.min(p.hp, s.maxHp); } }),
   cursed({ id: 'loudreader', icon: '📢', short: 'Loud Reader', name: 'Loud Reader', desc: 'SHHH! recharges 3× faster, is 50% bigger and stuns longer. Enemies move 15% faster.', apply: (s) => { s.shhhCd /= 3; s.shhhRadius *= 1.5; s.shhhStun *= 1.5; s.enemySpeedMult *= 1.15; } }),
   cursed({ id: 'lightsout', icon: '🕯️', short: 'Lights Out', name: 'Lights Out', desc: '+50% fines and score. Your lantern shrinks to half.', needsLights: true, apply: (s) => { s.scoreMult *= 1.5; s.fineMult *= 1.5; s.lanternScale *= 0.5; } }),
 

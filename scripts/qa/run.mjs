@@ -72,6 +72,7 @@ const TARGETS = [
   ['iphone-se-landscape', { ...devices['iPhone 13 landscape'], viewport: { width: 667, height: 331 }, screen: { width: 667, height: 375 } }],
   ['iphone-13-safari-landscape', { ...devices['iPhone 13 landscape'], viewport: { width: 750, height: 342 } }],
   ['iphone-15-pro-max-landscape', { ...devices['iPhone 13 landscape'], viewport: { width: 932, height: 430 }, screen: { width: 932, height: 430 } }],
+  ['ipad-13-landscape', { ...devices['iPad Pro 11 landscape'], viewport: { width: 1366, height: 1024 }, screen: { width: 1366, height: 1024 } }],
   ['ipad-safari-landscape', { ...devices['iPad Pro 11 landscape'], viewport: { width: 1180, height: 740 } }],
 ];
 // Tiers (v1.11.3 QA trim): the full gameplay flow runs on these three; every other size gets the fit-only pass
@@ -205,6 +206,18 @@ async function screensFlow(name, opts, full) {
       const clear = ![m.p, ...m.hud].some((o) => hit(m.d, o) || hit(m.s, o));
       const ok = !m.touch || (gap >= 1.5 * em && onScreen(m.d) && onScreen(m.s) && clear);
       record(area, 'v1.15.4: DASH/SHHH circles apart (gap >= 1.5em), clear of pause and the score/combo HUD, fully on screen', ok, `size ${Math.round(m.d.w)}px · circle gap ${Math.round(gap)}px (${(gap / em).toFixed(1)}em) · DASH [${Math.round(m.d.l)},${Math.round(m.d.t)}] SHHH [${Math.round(m.s.l)},${Math.round(m.s.t)}] · bottom margin ${Math.round(m.vh - m.d.b)}/${Math.round(m.vh - m.s.b)}px`);
+    }
+    // v1.16.2: DASH/SHHH hug the bottom-right corner (same share of the screen on every size, measured from the SCREEN edge, not
+    // the letterboxed stage); the pause button clears the iOS status area, the room title and the buttons
+    {
+      const m = await page.evaluate(() => { const rc = (id) => { const r = document.getElementById(id).getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2 }; };
+        return { touch: document.body.classList.contains('touch'), d: rc('btnDash'), s: rc('btnShhh'), p: rc('btnPause'), vw: innerWidth, vh: innerHeight }; });
+      const dx = (m.vw - m.d.cx) / m.vw, dy = (m.vh - m.d.cy) / m.vh;
+      const hit = (a, b) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
+      const inside = (r) => r.l >= 0 && r.r <= m.vw && r.t >= 0 && r.b <= m.vh;
+      const titleBox = { l: m.vw * 0.3, r: m.vw * 0.7, t: 0, b: m.vh * 0.2 };   // room title / wave banner (top centre)
+      const ok = !m.touch || (dx <= 0.08 && dy <= 0.30 && inside(m.d) && inside(m.s) && inside(m.p) && Math.hypot(m.d.cx - m.s.cx, m.d.cy - m.s.cy) >= (m.d.r - m.d.l + m.s.r - m.s.l) / 2 && !hit(m.p, m.d) && !hit(m.p, m.s) && !hit(m.p, titleBox) && m.p.t >= 40);
+      record(area, 'v1.16.2: DASH centre within 8% of the width / 30% of the height from the corner; DASH, SHHH, pause on screen, not overlapping, pause below the status area', ok, `DASH centre ${(dx * 100).toFixed(1)}% from right, ${(dy * 100).toFixed(1)}% from bottom · pause top ${Math.round(m.p.t)}px`);
     }
     record(area, 'run starts', await page.evaluate(() => __overdue.game.state === 'playing'));
 
@@ -459,7 +472,7 @@ async function screensFlow(name, opts, full) {
         await page.locator(`#cards .offer-btn.${path}`).click(); await page.waitForTimeout(500);
         const after = await page.evaluate(() => { const O = __overdue; return { state: O.game.state, title: document.querySelector('#upgradeTitle').textContent, cards: document.querySelectorAll('#cards .card').length, owns: O.game.owned.bannedbook || 0, maxHp: O.stats.maxHp, offer: O.cursedOffer }; });
         record(area, `v1.14.1: Mystery "${path === 'walk' ? 'Walk away' : 'Take it'}" ${path === 'walk' ? 'gives nothing' : 'applies the curse'} and the normal pick follows (no 1 of 2 label)`,
-          after.state === 'upgrade' && after.cards >= 3 && after.offer === null && !/\(1 of 2\)|\(2 of 2\)/.test(after.title) && (path === 'walk' ? after.owns === 0 && after.maxHp === snap.stats.maxHp : after.owns === 1 && after.maxHp === snap.stats.maxHp - 1), JSON.stringify(after));
+          after.state === 'upgrade' && after.cards >= 3 && after.offer === null && !/\(1 of 2\)|\(2 of 2\)/.test(after.title) && (path === 'walk' ? after.owns === 0 && after.maxHp === snap.stats.maxHp : after.owns === 1 && after.maxHp === snap.stats.maxHp - Math.max(1, Math.round(snap.stats.maxHp / 3))), JSON.stringify(after));
         await restore(snap);
       }
     }
