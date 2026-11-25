@@ -610,3 +610,35 @@ body.guiding #touchUI #btnGuideSkip { display: block; }
    The backdrop still blocks every other tap but stops above the version line (main.js sets --wn-clear to that line's height). */
 #whatsNew { bottom: var(--wn-clear, 0px); align-items: flex-start; padding-top: .5em; box-sizing: border-box; }
 #whatsNew .nudge-card { max-height: calc(100% - .5em); }
+
+
+/* v1.16.3: end screens fit without scrolling. Values stay on one line (the column is wider when there is no Hall of Fame beside it),
+   and on short screens rows, chips and gaps get tighter so nothing hides behind the pinned buttons. */
+#gameover .stats { grid-template-columns: auto auto; justify-content: center; column-gap: 1.2em; }
+#gameover .stats dd { white-space: nowrap; }
+#gameover .cols > div:first-child { max-width: 40em; }
+@media (max-height: 640px) {
+  #gameover { gap: .25em; }
+  #gameover #goSub { margin: 0; }
+  #gameover .stats { row-gap: .05em; margin: 0 0 .3em; line-height: 1.2; font-size: .92em; }
+  #gameover .build { gap: .2em .3em; margin: 0; }
+  #gameover .build-item { padding: .08em .4em; font-size: .82em; }
+  #gameover .build-label { font-size: .6em; }
+  #gameover #submitMsg { margin: .2em 0 0; font-size: .78em; line-height: 1.2; }
+  #gameover #scoreForm { margin: 0; }
+}
+/* v1.16.3: Settings fits without scrolling on short phones */
+@media (max-height: 640px) {
+  #settings .progress-tools { gap: .15em; margin-top: 0; }
+  #settings .progress-tools p { font-size: .7em; line-height: 1.15; }
+  #settings .toggles { gap: .08em; }
+  #settings .tool-row { margin-top: 0; padding: 0; }
+}
+/* v1.16.3: perk pick with a long build fits on short screens: compact build chips, no label, slimmer card padding */
+@media (max-height: 640px) {
+  #upgrade .build { gap: .12em .25em; margin: 0; padding-top: .15em; }
+  #upgrade .build-label { display: none; }
+  #upgrade .build-item { padding: .04em .35em; font-size: .72em; }
+  #upgrade .cards .card { padding-top: .6em; padding-bottom: .6em; gap: .3em; }
+  #upgrade .cards .card .icon { font-size: 1.6em; }
+}

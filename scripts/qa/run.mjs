@@ -133,6 +133,27 @@ const PINNED_CHECK = (id) => {
   return bad;
 };
 
+
+// v1.16.3: every menu / overlay screen fits WITHOUT scrolling, and no text box touches the pinned button row.
+// (A scroll container is allowed to scroll only if the content genuinely can't fit; QA treats any scroll as a failure, so shrink type/spacing instead.)
+const FIT_CHECK = (id) => {
+  const scr = document.getElementById(id), bad = [];
+  if (!scr || scr.hidden) return [`${id} not showing`];
+  if (scr.scrollHeight > scr.clientHeight + 1) bad.push(`scrolls: ${scr.scrollHeight} > ${scr.clientHeight}`);
+  const row = scr.querySelector(':scope > .menu.row:last-child');
+  if (row) {
+    const rr = row.getBoundingClientRect(), w = document.createTreeWalker(scr, NodeFilter.SHOW_TEXT);
+    for (let n; (n = w.nextNode());) {
+      if (!n.textContent.trim()) continue;
+      const el = n.parentElement;
+      if (row.contains(el) || !el.offsetParent || getComputedStyle(el).visibility === 'hidden') continue;
+      const rg = document.createRange(); rg.selectNodeContents(n);
+      for (const r of rg.getClientRects()) if (r.width >= 1 && r.height >= 1 && r.bottom > rr.top + 1 && r.top < rr.bottom - 1 && r.right > rr.left && r.left < rr.right) { bad.push(`"${n.textContent.trim().slice(0, 24)}" touches the row`); break; }
+    }
+  }
+  return bad;
+};
+
 // v1.13.0: menus appear as they're earned, so flows that tap Endless / Renovations / Hall of Fame / Codex start as a RETURNING player.
 // (A fresh save shows only Story / How to play / Settings: the new-player flow checks that separately.)
 const RETURNING_SAVE = () => {
@@ -628,7 +649,9 @@ async function screensFlow(name, opts, full) {
         if (!O.enemies.length) { const b = O.makeEnemy('bunny', O.W / 2 + 260, 60); b.hp = b.maxHp = 999; b.stun = 99; } O.touch.aimId = 99; O.touch.ax0 = p.x + 300; O.touch.ay0 = p.y; O.touch.ax = O.touch.ax0 - 60; O.touch.ay = O.touch.ay0; const t0 = p.throws;
         O.stepN(60); const st = { state: O.game.state, en: O.enemies.length, fireT: +p.fireT.toFixed(2), hp: p.hp, dash: p.dashT }; O.touch.aimId = null; return { throws: p.throws - t0, diff: dd(p.lastThrow, Math.PI), st };`);
       record(area, 'auto-aim on + deflected stick: throws follow the stick', over.throws >= 1 && over.diff < 0.15, JSON.stringify(over));
-      const idleStick = await sim(`const p = O.player; O.touch.aimId = 99; O.touch.ax0 = O.touch.ax = p.x + 300; O.touch.ay0 = O.touch.ay = p.y; p.autoAim = { n: 0, nearest: true }; const t0 = p.throws;
+      const idleStick = await sim(`const p = O.player;
+        if (O.game.state !== 'playing') { O.startWave(O.game.wave); O.god(); O.killAll(); }   // deterministic: a live room with a target to auto-aim at
+        if (!O.enemies.length) { const b = O.makeEnemy('bunny', O.W / 2 + 260, 60); b.hp = b.maxHp = 999; b.stun = 99; } O.touch.aimId = 99; O.touch.ax0 = O.touch.ax = p.x + 300; O.touch.ay0 = O.touch.ay = p.y; p.autoAim = { n: 0, nearest: true }; const t0 = p.throws;
         O.stepN(120); O.touch.aimId = null; return { throws: p.throws - t0, aimedFrames: p.autoAim.n };`);
       record(area, 'auto-aim on + stick inside deadzone: auto-aim keeps working', idleStick.throws >= 1 && idleStick.aimedFrames >= 1, JSON.stringify(idleStick));
       await page.evaluate(() => { __overdue.touch.enabled = false; __overdue.setSetting('autoaim', true); });
@@ -675,9 +698,16 @@ async function menusFlow(name, opts) {
       if (id === 'codex' || id === 'shop' || id === 'howto') await shot(page, `${name}-menu-${id}`);
       const bad = await check(id);
       record(area, `${id}: bottom buttons on screen`, !bad.length, bad.join(', '));
+      // The Codex is a catalogue of every perk and combo: it scrolls by nature (the pinned-row check above covers it). Everything else must fit.
+      const fitBad = id === 'codex' ? [] : await page.evaluate(`(${FIT_CHECK})('${id}')`);
+      record(area, `${id}: fits without scrolling (v1.16.3)${id === 'codex' ? ' (exempt: scrolling list)' : ''}`, !fitBad.length, fitBad.join('; '));
       if (['codex', 'shop', 'settings', 'howto'].includes(id)) {
         const ov = await page.evaluate(`(${PINNED_CHECK})('${id}')`);
         record(area, `${id}: pinned row covers nothing and fits the column`, !ov.length, ov.join('; '));
+      }
+      if (id === 'shop') {
+        const rt = await page.$$eval('#shopList .reno > div > small:not(.lvl)', (els) => els.map((e) => e.textContent));
+        record(area, 'shop: every card shows "Now: … → Next: …" (v1.16.3)', rt.length === 10 && rt.every((t) => /^(Now: .+ → Next: .+|Maxed: .+)$/.test(t)), rt[0]);
       }
       if (id === 'howto') {
         const txt = await page.textContent('#howto');
@@ -745,6 +775,36 @@ async function menusFlow(name, opts) {
       return ![...document.querySelectorAll('#gameover h2, #gameover h3')].filter((h) => h.offsetParent).some((h) => { const r = h.getBoundingClientRect(); return r.bottom > tr.top && r.top < tr.bottom && r.right > tr.left && r.left < tr.right; });
     });
     record(area, 'game over: no toast over the headings', toastOk);
+
+    // v1.16.3: end screens, perk pick, doors and pause with a LONG build (14 perks) fit without scrolling and hide nothing behind the pinned row
+    await page.evaluate(() => { localStorage.setItem('overdue.progress.v1', JSON.stringify({ v: 1, fines: 1234, lifetime: 5000, unlocked: 6, best: { 1: 7, 2: 7, 3: 7, 4: 7, 5: 7 }, cleared: [1, 2, 3, 4, 5], reno: {} })); });
+    await page.reload(); await page.waitForTimeout(500);
+    const LONG = ['trilogy', 'trilogy', 'dewey', 'speedreader', 'interlibrary', 'hardcover', 'hardcover', 'hardcover', 'extendedloan', 'footnotes', 'plottwist', 'marginnotes', 'bouncy', 'cat'];
+    for (const kind of ['story-cleared', 'story-lost', 'endless']) {
+      await page.evaluate(([kind, LONG]) => {
+        const O = __overdue; O.startRun(kind === 'endless' ? 'endless' : 'story', 6);
+        for (const id of LONG) { try { O.grant(id); } catch {} }
+        O.startWave(kind === 'endless' ? 9 : 7); O.god();
+        if (kind === 'story-cleared') { O.game.wingCleared = true; O.killAll(); } else { O.player.hp = 1; O.die(); }
+      }, [kind, LONG]);
+      await page.waitForFunction(() => __overdue.game.state === 'gameover', null, { timeout: 20000 }).catch(() => {});
+      await page.waitForTimeout(400);
+      await page.evaluate(() => { for (const i of ['nudge', 'whatsNew']) document.getElementById(i).hidden = true; });
+      if (kind === 'story-cleared' && /ipad-landscape|iphone-se|iphone-landscape/.test(name)) await shot(page, `${name}-end-long-build-cleared`);
+      const eb = await page.evaluate(`(${FIT_CHECK})('gameover')`);
+      record(area, `${kind} end screen with a 14-perk build${kind === 'story-cleared' ? ' + first clear + unlock' : ''}: fits, nothing under the row (v1.16.3)`, !eb.length, eb.join('; '));
+    }
+    await page.evaluate(() => { const O = __overdue; O.startRun('story', 6); for (const id of ['trilogy', 'dewey', 'speedreader', 'interlibrary', 'hardcover', 'extendedloan', 'footnotes', 'plottwist', 'marginnotes', 'bouncy', 'cat']) { try { O.grant(id); } catch {} } O.god(); O.game.cards = 3; O.showUpgrades(); });
+    await page.waitForTimeout(900);
+    const ub = await page.evaluate(`(${FIT_CHECK})('upgrade')`);
+    record(area, 'perk pick with a long build: fits without scrolling (v1.16.3)', !ub.length, ub.join('; '));
+    await page.evaluate(() => { __overdue.player.hp = 2; __overdue.showDoors(['rare', 'rest']); }); await page.waitForTimeout(700);
+    const dbad = await page.evaluate(`(${FIT_CHECK})('doors')`);
+    record(area, 'doors: fits without scrolling (v1.16.3)', !dbad.length, dbad.join('; '));
+    await page.evaluate(() => { const O = __overdue; O.startRun('story', 6); for (const id of ['trilogy', 'dewey', 'speedreader', 'interlibrary', 'hardcover', 'extendedloan', 'footnotes', 'plottwist', 'marginnotes', 'bouncy', 'cat']) { try { O.grant(id); } catch {} } O.god(); });
+    await page.waitForTimeout(600); await page.keyboard.press('Escape'); await page.waitForTimeout(500);
+    const pbad = await page.evaluate(`(${FIT_CHECK})('pause')`);
+    record(area, 'pause with a long build: fits without scrolling (v1.16.3)', !pbad.length, pbad.join('; '));
   } catch (e) { record(area, 'menus flow completed', false, e.message.split('\n')[0]); }
   await ctx.close();
   return record.list;
