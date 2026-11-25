@@ -3,36 +3,32 @@
 The plan and the owner's decisions, kept current by the planner session. **Planners: read this after CLAUDE.md.**
 Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <topic>`; their prompts are saved in `docs/handoffs/`.
 
-## Current state (planning 3 → planning 4, 2026-11-24)
-- **Live:** v1.14.1 (c36ac35, Pages run green 2026-11-24) = 1.14.0 (bigger story rooms, run log + Share stats, late-game
-  flattening, perk fixes) + 1.14.1 (Rare pick, softer Rare door, cursed upsides, Mystery take/walk away). No coder running.
-- **Planner branch:** `claude/brave-galileo-jyg38o` (= main + docs).
-- **Owner habits:** short replies (tables, a pick, the one word needed); ships only on "ship"; playtest mode = numbered log only;
-  3-option pages only for visual choices; 08:00 SGT morning update when going to sleep; max 2 coders (usage).
-- **Token rules:** keep this file short (move shipped rows to `docs/roadmap-archive.md` at each release); filter tool output
-  (failing lines, last result only); one roadmap commit per conversation; coders wait on background jobs, don't poll; review only
-  the changed screens (2–3 screenshots). The owner compacts the planner chat when they choose (no fresh planner per release),
-  so keep this section current: it must be enough to carry on after a compaction.
-- **Gotchas:** parallel coders conflict in `CODEMAP.md`, `package.json`, `src/main.js`, `src/game.css`, `scripts/qa/run.mjs`
-  (usually additive; after a merge run `node --check scripts/qa/run.mjs`). QA seeds a "returning player" save since 1.13.0.
-  Coders sometimes report the planner branch name by mistake: verify with `git log origin/<branch>`. Pages runs can sit in
-  "waiting" a minute. "Show tips again" also clears the 1.13.0 unlock flags (small follow-up if the owner notices).
-- **Live: v1.15.2** (390c875, Pages run 31 green 2026-11-24; story enemy+boss HP −5%, bot p65 + --human; bot can't reproduce owner's wing-2
-  difficulty, hearts lost mostly to ring shockwaves → next lever if still hard: ring readability/size/speed). Before that v1.15.1 (eb6e5de) = 1.15.0 new perks (2a173d3) + look & feel (bigger story enemies,
-  sprite ×1.2 / hit ×1.1; orbit books ×1.6, radius 56; Margin ±22.5°; Crossfire text; boss phase: small tag, 1 s immune transform)
-  + stronger privacy scan (owner to add `QA_PRIVATE_TERMS` repo secret). Coders for 1.15.0/1.15.1 archived.
-- **QA-reliable merged** to main (8f9a912, owner "ship"; CI green): perf checks fail on game update ≤ 4 ms/frame and speed
-  ≥ 0.85× (median of 5 samples); fps ≥ 50 hard only with a GPU, ⚠️ warning in software render. 3 UI flakes made deterministic.
-  No coders running (all archived).
-- **Next:** owner playtest of 1.15.2. If wing 2 still hard → ring shockwave readability/size/speed (main heart loss per bot).
-  Then 1.16.0 Book Bag → 1.17.0 player look. Parked: shelf-piercing late-boss attack.
-- **Owner phone checks (1.15.0 + 1.15.1):** What's new once; status icons readable; enemy size + hitbox fair; orbit books usable;
-  Margin spread; boss transformation; stacked boss smooth; cat visible; new icons distinct. Parked: shelf-piercing late-boss attack.
-- **Owner to do when convenient:** playtest wings 7–8 + an Orbit run on v1.14.1; phone checks: Take it / Walk away tap comfort,
-  5-card Rare hand readability, Surround dimmed-book cue, Settings captions fit. Optional: add the CI docs `paths-ignore` to
-  `.github/workflows/ci.yml` (auto-mode blocked coders from it; the owner can edit it on GitHub).
-- **Later (only if the playtest still finds issues):** 1.14.2 tuning: wing 8 room 5 maze, wings 7/9 easier than neighbours,
-  3→4 cliff, Orbit L3 too weak (6% of damage), Spine Breaker outlier. Then 1.16.0 Book Bag → 1.17.0 player look.
+## Current state (planning 4 → planning 5, 2026-11-25)
+- **Live:** v1.16.0 (46889c7, pushed 2026-11-25; planning 5 must confirm the Pages run is green before calling it live). = Act II
+  "The Sunken Stacks" wings 11–12 (water, stone walkways, Ink Eel, Paper Boat, act swipe on the wing map, hidden tester switch:
+  7 taps on the title version line, `overdue.tester.v1`) + deploy split (pages.yml build job → deploy job; first real test is this
+  push). Before: 1.15.0 new perks, 1.15.1 look & feel, 1.15.2 story HP −5%, 1.15.3 Margin 30% narrower + auto-aim (line of
+  sight, sticky, 50% lead), 1.15.4 diagonal see-through SHHH/DASH. No coder or tester running (all archived).
+- **Planner branch:** `claude/brave-galileo-jyg38o` (= main + docs). Review worktree used: scratchpad `rev`.
+- **Roles (CLAUDE.md):** planner plans; Sonnet coders code (max 2 at once); **one Sonnet tester per release** (tag `overdue-tester`,
+  template `docs/handoffs/tester-template.md`, doesn't count toward the 2). First tester (1.16.0) worked well: ~12 min, caught the
+  wing 10→11 step, What's-new card blocking the tester taps, old-save Act II unlock. Keep it.
+- **Owner habits:** short replies; ships only on "ship"; playtest mode = numbered log only; 3-option pages for visual choices;
+  to-scale phone pictures for UI tweaks (scratchpad/btn/shot*.cjs: serve a worktree on :5199 and screenshot iPhone 13);
+  08:00 SGT morning update when going to sleep. Usage limit was hit once (2026-11-25): keep coder tasks tight.
+- **Deploys:** if the Pages run fails, start a fresh run (workflow_dispatch); never "re-run failed jobs". Watch whether the
+  build/deploy split stops the hiccup (it failed first-try in 4 of 6 releases before).
+- **Next (owner-approved, not started):**
+  1. **1.16.1 Act II longer:** Act II wings 9 rooms (elite room 5, boss last) + ~15% more enemies per room; re-tune so wing 11
+     is clearly harder than wing 10 (tester bot: 10 50%, 11 52%, 12 43% at max Renovations; target steps ≤ 15–20 pts, wing 11
+     below wing 10). Fix What's-new card covering the version line (blocks tester taps). Act I + endless unchanged.
+  2. **Cat readability:** Library Cat mistaken for an enemy when it moves → teal outline like the player, trail to the player.
+  3. **Strong perks:** owner collects perk names + Share stats codes (in chat only) from testers; then bot measure, then tune.
+  4. **Act II wings 13–20** in batches, 2 new bosses (wings 15, 20), crab enemy; later Acts III (Overgrown Conservatory) and
+     IV (Clockwork Archive) from https://claude.ai/artifact/9wgzQWpVvdovMR5fiGdu95.
+  5. Book Bag (Renovations 2.0) and Player look after that.
+- **Owner to do:** phone checks for 1.15.3/1.15.4/1.16.0 (aim feel, buttons reach, swipe vs iOS back gesture, 7-tap switch,
+  eel/boat readability, water fps); add GitHub secret `QA_PRIVATE_TERMS`; enable secret scanning + push protection.
 
 ## Decisions (newest first)
 | Date | Decision | Why |
@@ -43,55 +39,17 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 | 2026-11-25 | Act II look A (Sunken Stacks) first; B and C later acts. Wing map: Act II visible but locked, unlocked sequentially (wing 11 after wing 10), swipe between acts. Hidden tester switch (7 taps on version line, `overdue.tester.v1`, never touches progress). Lighting system unchanged. Max-Renovation targets wing 11 ~25%, 12 ~20% | Owner |
 | 2026-11-25 | **Act II (10 new wings, 11–20)** chosen over 5 wings; must look completely different. Lighting system stays (CLAUDE.md rule), floor/shelves/lamp colour/enemies/bosses change. Looks page https://claude.ai/artifact/9wgzQWpVvdovMR5fiGdu95 (A Sunken Stacks = pick, B Overgrown Conservatory, C Clockwork Archive), waiting for letter. Act II becomes 1.16.x; Book Bag → after | Owner |
 | 2026-11-25 | More wings: owner wants them ("definitely"); also "a bit too easy with the right perks and maxed Renovations". 3-option page https://claude.ai/artifact/AUvSEnVqQyuEgX4kn5zRt6 (A Basement wings 11–15 = pick, B Act II 11–20, C 3 wings + Overtime), waiting for letter. Buttons 1.15.4: owner picked diagonal (DASH up right edge, SHHH lower-left), see-through .12 | Owner |
-| 2026-11-24 | Privacy: history audit clean (203 commits: no emails except Claude noreply, no owner name, no save/backup/stats codes, no big binaries). CLAUDE.md rule: tester exports never committed; no new network calls without OK. Queued after 1.15.0: stronger QA scan (`docs/handoffs/1.15.1-privacy-scan.md`); owner to enable GitHub secret scanning + push protection | Owner asked how to verify nothing from players leaks to the public repo |
-| 2026-11-24 | Status colours A: ink violet `#9a6bff`, chill cyan `#74e6ff`, static lime `#c8ff4d`; Pop-up Book ring teal + white (not gold); Annotated Edition card text drops "ink" | Owner picked A (planning 4) |
-| 2026-11-24 | Rare Books door softened (A): elite share +0.5 → +0.35, budget ×1.3 → ×1.15, from wing 4 elite HP +50% → +30% and fire 30% → 15% faster; ×2 fines and the new Rare pick stay. Rare ≈ safe door in wings 4–7 (bot); re-check after the 1.14.0 merge | Owner picked A (1.14.1) |
-| 2026-11-24 | "What's new" for players: a one-time card only for big releases (first use 1.15.0 new perks), plus NEW badges on new perk cards the first time each is offered (cleared once seen/tapped), reusing the 1.13.0 earned-menus pattern. No popup on small releases. Flags additive in `overdue.tips.v1` (last seen release + seen perk ids). Goes into the 1.15.0 handoff | Owner (from a side chat) |
-| 2026-11-24 | Old playtest list dropped; replaced by one focused playtest after 1.14.0 (wings 7–8 + an Orbit run) | Owner: 'drop it' (bot covers it) |
-| 2026-11-24 | New perks (1.15.0): bosses are immune to freeze and stun (they take +25% damage while chilled instead); elites and normal enemies get a 3 s cooldown after a freeze. Applies to Cold Storage/Deep Freeze, Superconductor, Static, Library Cat/Stray Colony, Orbit. Balance-review changes accepted (Margin Notes side books don't home, Last Chapter cap, Crossfire +50% radius capped, chains never start chains, Static L1 / Cat L2 buffs). Status colours: 3-option page before 1.15.0; static not gold (clashes with elite outline and crits) | Owner picked A |
-| 2026-11-24 | Bigger rooms (+20%) apply to story only; endless keeps today's grid (seeds and Hall of Fame stay comparable) | Owner picked A |
-| 2026-11-24 | Rooms 20% bigger (phone grid 34×16 → ~40×19): HUD/buttons keep their size, lamps and shelves scale with the room. First part of 1.14.0, before balance tuning. Bigger-map-with-camera stays parked | Owner (mock-ups of today / +20% / +40%) |
-| 2026-11-24 | New perks: owner wants the proposed mix (Leaky Pen, Cold Storage, Static Cling, Margin Notes, Last Chapter, Library Cat, Pop-up Book + Brittle Pages, Conductive Ink, Superconductor, Ink Bombs, Crossfire) for 1.15.0, adjusted by the independent balance review; Audiobook "blocks pages" questioned by owner (too strong) | Owner |
-| 2026-11-24 | Order: 1.14.0 late game + perk balance → 1.14.1 Rare Books + cursed → 1.15.0 new perks → 1.16.0 Book Bag (Renovations A, kits permanent) → 1.17.0 player look. Dewey + Interlibrary is dominant (never miss); Audiobook Orbit useless; new perks take inspiration from genre classics (mechanics only, original names) | Owner |
-| 2026-11-24 | Loud Patron shout ring reach −20% (196 → 157 px), story and endless; added to the 1.13.0 coder | Owner: still too big for the small rooms |
-| 2026-11-24 | Late-game reachability: NO free starting perks. Measure with a maxed-Renovations bot save (wings 6–10, ≥ 60 runs), then flatten the steepest per-wing dials (enemy HP +22%/wing compounding with budget) toward: maxed Renovations wing 8 ~40%, wing 10 ~20% clears (bot). Top item of 1.14.0 | Tester: wing 8 extremely hard even with all Renovations; planner math: wing 8 ≈ 6× the damage-per-second of wing 1 with the same starting power |
-| 2026-11-24 | More Renovation tiers: yes, but owner finds pure stat tiers one-dimensional; planner to propose Renovations that change how you play (sidegrades/unlocks), not just +numbers | Owner |
-| 2026-11-23 | Difficulty: gentle smoothing only. Soften the two cliffs (wing 3→4 and wing 7, tester feedback) so each wing is a steady step up; don't lower the overall difficulty; wings 9–10 stay the real challenge. Target, half Renovations: wing 1–2 ~85%, 3–4 ~65%, 5–6 ~50%, 7–8 ~35%, 9–10 ~20%; no wing > ~15 pts harder than the one before | Owner: 'slightly less difficult', keep it interesting. Bot: wing 3→4 72%→11%, wings 8/10 0% |
-| 2026-11-23 | Rare Books door gets an in-run reward, option A: after clearing, the perk pick shows +1 card and one card is guaranteed to complete a combo or advance a perk toward its Masterwork. Keeps ×2 fines. Target: rare clear rate ≈ safe door in wings 4–7 (bot) | Owner playtest; today the only reward is meta fines, so the door is a trap for winning the run |
-| 2026-11-22 | Off-centre title seen on the owner's "Duo" device: not fixed. Optimise for normal iPhones (iPad keeps filling the screen) | Owner: "it's fine, I'm on the Duo, optimise for normal iPhones". Title measured centred on iPhone 13 and on iPad sizes |
-| 2026-11-22 | Arena follows the phone's aspect up to ~2.2:1 so phones fill the screen; 16:9 and iPad grids unchanged | Owner saw black side bars on iPhone |
-| 2026-11-22 | Teach perks just-in-time (learn as you go), not a tutorial run | Owner: players don't understand perks |
-| 2026-11-22 | Second-finger aiming becomes a floating joystick (drag to aim), not aim-at-finger | Owner: pressing all over the screen to shoot left makes no sense |
-| 2026-11-22 | Mobile only (option A): desktop unsupported and dropped from QA, code kept; iPad + gamepad stay. How to play becomes a simple touch-first list (no WASD/mouse) | Owner: "stick with a mobile game moving forward" |
-| 2026-11-22 | Setting to turn off auto-aim; off = second finger aims and throws (twin-stick) | Owner |
-| 2026-11-22 | Wings shrink to 7 rooms (elite 4, boss 7); add Survive room goal (Rescue/Thief not now) | Owner: shorter runs, rooms that play differently |
-| 2026-11-22 | Door after the elite room: yes. Bosses keep random catalogue names (story + endless). Replace all real-person/trademarked catalogue authors with original parody names | Owner |
-| 2026-11-22 | Rare Books option C; SHHH resets each story room (endless unchanged) | Owner playtest: wing 4 cleared easily, elite door not scary; SHHH should be fresh per room |
-| 2026-11-21 | Story doors (v1.7.0) with the planner's default numbers; balance to be tuned after the owner plays | Owner: turn 10 fixed rooms into a route you plan |
-| 2026-11-21 | Story rooms get shapes per wing; endless keeps today's generator | Owner: "every room feels the same"; endless must stay comparable |
-| 2026-11-21 | Remove all meme book-title text (banner, kill pop-ups), keep author-named bosses | Owner |
-| 2026-11-21 | Remove the meme book-title line at the bottom of the screen | Owner: it no longer serves a purpose |
-| 2026-11-21 | Build strip shows names; combo partners are linked visually; chips open details | Owner: perk names are hard to remember |
-| 2026-11-21 | Loud Patron shout reaches 30% less far (280 → 196 px), story and endless; thickness and speed unchanged. Done by the planner as an owner-approved one-line exception | Owner playtest: the ring felt too big |
-| 2026-11-21 | After playing 1.3.1 the arena **no longer feels cramped**: the bigger map (1.5.0) is parked | Owner playtest |
-| 2026-11-21 | Wide shelf gaps (≥ 2 cells) apply to **story and endless**. Endless waves are unchanged, but endless room layouts changed in v1.3.1, so newer Hall of Fame scores come from slightly easier rooms | Getting stuck on shelves was a bug, not intended difficulty |
-| 2026-11-21 | Planner sessions plan; Sonnet coder sessions write the code (see CLAUDE.md "Session roles") | Planning keeps context; coding is delegated and reviewed |
-| 2026-11-21 | Story mode is the focus for now | Owner priority |
-| 2026-11-21 | Going **landscape-only** is agreed in principle (v1.4.0). It overrides the "portrait iPhone is the main target" rule in CLAUDE.md, which v1.4.0 must update | The game is only played in landscape; it makes the bigger map practical |
 
 Older decisions (2026-11-21 to 23, all shipped): `docs/roadmap-archive.md`. Product rules from them live in CLAUDE.md.
 
 ## Plan
 | Version | What | Status |
 |---|---|---|
-| 1.14.0 | **Rooms +20% (story) + late game reachable + perk fixes + run analytics:** story grid ~+20% per side (HUD same size), run log `overdue.runs.v1` + Share stats, bot tooling (max Renovations, damage by source, forced/banned perks); wing scaling flattened (HP/budget/boss HP/speed etc.), Orbit fair version, Dewey×Interlibrary first-trip homing, Speed Reader +1.2/lvl, Footnotes +15% | Shipped 2026-11-24 as v1.14.1 with 1.14.1 (planner review: 101/101 tests, QA 800 green, perf boss 0.94x/61 fps). Bot after: half wings 4–10 63/45/32/53/12/45/7%, max 8 53%, max 10 15%. Open (1.14.2, after owner playtest): wing 8 room 5 maze, wings 7/9 easier than neighbours, 3→4 cliff 27 pts, Orbit L3 6% of damage (target 15–30%), Spine Breaker 100% clears. CI docs paths-ignore not applied (auto-mode blocked; owner can edit ci.yml). Reports: `docs/balance/1.14.0-*.md` |
-| 1.14.1 | **Rare Books better pick + cursed books:** Rare pick +1 card with one guaranteed combo/Masterwork card, Rare door softened (owner A); cursed upsides (Lights Out +50% fines, Loud Reader bigger SHHH + stun, Banned Book +1 pierce); Mystery cursed prize = Take it / Walk away | Shipped 2026-11-24 (with 1.14.0). Post-merge bot (half, n=30): Rare vs safe wings 4–7 93/83, 67/80, 40/43, 50/70%. Nit: "Walk away" wraps to 2 lines |
-| 1.15.0 | **New perks (shipped 2026-11-24, 2a173d3):** 6–8 new perks + effect combos (genre-inspired: angles, status effects, on-kill, risk/reward, helpers), from a 3-option proposal | Proposal ready (2026-11-24), owner picked the mix (2026-11-24); independent balance review done: `docs/plans/perks-balance-review.md` (orbit no page-blocking before Surround Sound, bosses immune to stun/freeze, Margin Notes side books don't home, no chains from chain damage, Last Chapter capped). Page (private): https://claude.ai/artifact/BKrDdNKrMjbVQyxuBcDKRX · spec incl. 1.14.0 perk fixes: `docs/plans/perks-new-and-fixes.md`. Planner pick: mix (Leaky Pen, Cold Storage, Static Cling, Margin Notes, Last Chapter, Library Cat, Pop-up Book + 5 combos); effect colours must not read as book blue. Also: "What's new" card + NEW badges on new perk cards (see Decisions) |
-| 1.16.0 | **Book Bag (Renovations 2.0 A):** kits bought once, pack before a run, gain + cost; drop Forbidden Satchel and Fire Drill | Planned |
-| 1.17.0 | **Player look:** art agent → 3 looks → owner pick → final, layered for cosmetics | Planned (2 sessions) |
-| — | **Bigger map (parked):** ~40×24 cells (1.7× floor), camera follows the player with a dead zone; light layer screen-sized (same look; owner OK needed since CLAUDE.md says keep lighting); auto-aim only on screen; spawns just off-screen; edge arrows for off-screen enemies; perf budget must hold. Build behind `?bigmap=1` first | Parked: 1.3.1 fixed the cramped feeling. Revisit only if it comes back |
-
-Shipped releases 1.3.1–1.13.1 (with review numbers and handoff links): `docs/roadmap-archive.md`.
+| 1.15.0–1.16.0 | New perks; look & feel; story −5%; Margin + auto-aim; diagonal buttons; Act II wings 11–12 + eels/boats + tester switch + deploy split | Shipped 2026-11-24/25 (details: `docs/roadmap-archive.md`) |
+| 1.16.1 | **Act II longer:** 9 rooms per Act II wing, +15% enemies, wing 11 clearly harder than 10; What's-new card vs version line | Next |
+| 1.16.x | Cat readability; strong-perk tuning (after tester data); Act II wings 13–20 in batches + 2 bosses + crab | Planned |
+| later | Acts III (Conservatory) and IV (Clockwork); Book Bag (Renovations 2.0); Player look | Planned |
+| — | **Bigger map (parked):** camera-follow map; revisit only if the cramped feeling returns | Parked |
 
 ## Next ideas
 **Queued feature (owner, 2026-11-23): cursed books feel never worth taking.** Today (`src/upgrades.js` 60–62): Banned Book +100% damage / −1 max heart; Loud Reader SHHH 3× faster / enemies +15% speed everywhere; Lights Out +50% score / half lantern (score doesn't matter in story, so pure downside there). Planner proposal: (1) measure first with the bot (policy that always takes cursed vs never, wings 1/4/7); (2) Lights Out upside → +50% fines and score (useful in story); Loud Reader upside → also +50% SHHH size and stuns longer, cost stays; Banned Book keep but add +1 pierce; target: taking a cursed book ≈ same clear rate as a normal perk pick, with a bigger swing; (3) Mystery: show the cursed book and let the player take it or walk away (walk away = nothing).
