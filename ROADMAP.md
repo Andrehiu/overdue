@@ -37,6 +37,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-25 | Longer levels: Act II wings get 9 rooms (was 7; elite room 5, boss room 9) + ~15% more enemies per room. Act I and endless unchanged (planner default, owner may extend). Keep max-Renovation steps ≤ ~15–20 pts. Planned as 1.16.1 after 1.16.0 ships | Owner: "A + a bit of B" |
 | 2026-11-25 | Future (owner, from testers): (1) Library Cat is mistaken for an enemy when it moves → make it read as friendly; (2) levels ~30% longer (rooms per wing vs room length: open); (3) some perks feel too strong: specifics to collect from the tester (perk names + Share stats codes in chat, never committed) | Owner |
 | 2026-11-25 | Tester role: one Sonnet tester session per release reviews the branch (QA, screens, try-to-break, bot) and reports; planner reads the report, spot-checks, then asks to ship. Testers don't count toward the 2-coder limit. CLAUDE.md + `docs/handoffs/tester-template.md` | Owner: go |
 | 2026-11-25 | Act II look A (Sunken Stacks) first; B and C later acts. Wing map: Act II visible but locked, unlocked sequentially (wing 11 after wing 10), swipe between acts. Hidden tester switch (7 taps on version line, `overdue.tester.v1`, never touches progress). Lighting system unchanged. Max-Renovation targets wing 11 ~25%, 12 ~20% | Owner |
