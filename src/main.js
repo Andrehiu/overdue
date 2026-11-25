@@ -1567,7 +1567,9 @@ function updateFlow(dt) {
 /** Direction toward the player: straight line if visible, otherwise follow the flow field. */
 function seek(e) {
   const dx = player.x - e.x, dy = player.y - e.y, d = Math.hypot(dx, dy) || 1;
-  if (lineOfSight(arena.solid, COLS, ROWS, CELL, e.x, e.y, player.x, player.y)) return { x: dx / d, y: dy / d, d };
+  // v1.16.1: walkers only "see" the player across ground they can walk (water blocks them, shelves too); before, an enemy across a pond
+  // headed straight for the player, bumped into the water and stood at the shore forever (Act II islands rooms never cleared).
+  if (lineOfSight(walkGrid(), COLS, ROWS, CELL, e.x, e.y, player.x, player.y)) return { x: dx / d, y: dy / d, d };
   const [cx, cy] = cellOf(e.x, e.y);
   const i = idx(cx, cy);
   const fx = flow.dirX[i], fy = flow.dirY[i];
