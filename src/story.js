@@ -66,10 +66,10 @@ export const WINGS = [
   // `enemyTypes` is the hook for Act II's own enemies (Ink Eel, Paper Boat, part B): extra weights merged into `weights`.
   { act: 2, id: 'flooded', shapes: ['causeway', 'islands', 'pillars'], icon: '🌊', name: 'The Flooded Stacks', blurb: 'The basement took on water. Stay on the stone.',
     intro: "Mind the water. The shelves were here first.", taunt: "Sink or swim. Mostly sink.", cleared: "The Flooded Stacks drain slowly. Squelch.",
-    weights: { patron: 1.2, golem: 0.9 }, enemyTypes: {}, unlockShift: 5, eliteBonus: 0.07, gapMult: 0.85, floorHue: 196, rug: '#173a44' },
+    weights: { patron: 1.2, golem: 0.9 }, enemyTypes: {}, unlockShift: 5, eliteBonus: 0.07, budgetBoost: 1.17, gapMult: 0.85, floorHue: 196, rug: '#173a44' },
   { act: 2, id: 'cistern', shapes: ['islands', 'causeway', 'reading'], icon: '🕳️', name: 'The Cistern', blurb: 'Deep water, narrow stone, and something under the surface.',
     intro: "The cistern echoes. Something answers.", taunt: "Down here, overdue means drowned.", cleared: "The Cistern is quiet. The water is not.",
-    weights: { patron: 1.5, golem: 1.5, worm: 1.2 }, enemyTypes: {}, unlockShift: 6, eliteBonus: 0.1, budgetBoost: 1.1, gapMult: 0.85, floorHue: 190, rug: '#12343c' },
+    weights: { patron: 1.5, golem: 1.5, worm: 1.2 }, enemyTypes: {}, unlockShift: 6, eliteBonus: 0.1, budgetBoost: 1.14, gapMult: 0.85, floorHue: 190, rug: '#12343c' },
 ];
 
 /** Which act a wing belongs to (1 or 2; later acts add more). */

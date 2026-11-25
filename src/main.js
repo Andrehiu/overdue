@@ -3301,8 +3301,9 @@ if (DEBUG) {
     get statusMetrics() { return sm; }, zaps, statusSprite, get runCounters() { return rl; }, get lastRun() { return game.lastRun; }, ui: () => ({ uiK, viewScale, dpr, W, H, UW, UH }),
     showCards: (ids) => renderCards(ids.map(byId)),
     showFreePerk: (id, label) => { queueFreePerk(byId(id), label); flushFreePerks(); }, showUpgrades, showDoors, nextRoom, texts, get cursedOffer() { return game.cursedOffer; }, takeCursed: (take) => { cardsArmedAt = 0; resolveCursedOffer(take); }, get rareId() { return game.rareId; }, get door() { return game.door; },
+    // isSolid = what WALKERS can't enter (shelves + Act II water): bot steering and QA
     // ---- balance bot (scripts/balance.mjs): drives the sim headless, faster than real time ----
-    actions, hazards, STEP, books, touch, settings, setSetting, get W() { return W; }, get H() { return H; }, isSolid: (x, y) => isSolidPx(walkGrid(), x, y),   // bot steering + QA: what WALKERS can't enter (shelves + Act II water) setAimVariant: (v) => { aimVariant = v; autoTarget = null; }, setSolid: (x, y, v) => { const [cx, cy] = cellOf(x, y); arena.solid[cy * COLS + cx] = v ? 1 : 0; },
+    actions, hazards, STEP, books, touch, settings, setSetting, get W() { return W; }, get H() { return H; }, isSolid: (x, y) => isSolidPx(walkGrid(), x, y), setAimVariant: (v) => { aimVariant = v; autoTarget = null; }, setSolid: (x, y, v) => { const [cx, cy] = cellOf(x, y); arena.solid[cy * COLS + cx] = v ? 1 : 0; },
     get choices() { return currentChoices; }, get doors() { return currentDoors; },
     setBotInput: (mv) => { botInput = mv; }, drive: (on) => { botDrive = !!on; if (!on) botInput = null; },
     stepN: (n) => { for (let i = 0; i < n; i++) step(STEP); },
