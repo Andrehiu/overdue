@@ -63,9 +63,9 @@ export function guidePrompt(beat, { aimOff = false, used = false } = {}) {
 
 /** The one-time card for a big release. Add a new entry only for big releases; small ones never show a card. */
 export const WHATS_NEW = {
-  release: '1.15.0',
-  title: 'New in 1.15.0: 7 new perks and 5 new combos',
-  lines: ['Margin Notes, Last Chapter, Library Cat and more join the deck.', 'Look for the NEW badge on their cards.', 'Pair them up for new Collected Works.'],
+  release: '1.16.0',
+  title: 'New in 1.16: Act II, The Sunken Stacks',
+  lines: ['Clear The Restricted Section to open wings 11 and 12.', 'Flooded rooms: stay on the stone, mind the eels and paper boats.', 'Act II wings have 9 rooms, with a Rogue Author in room 9.'],
   button: 'Got it',
 };
 export const whatsNewFlag = (card = WHATS_NEW) => `whatsnew-${card.release}`;

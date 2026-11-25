@@ -39,7 +39,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/doors.js` | 88 | Story doors: after most rooms you pick the next room from 2 doors. Pure module (no DOM) so it is unit-tested. |
 | `src/enemy-art.js` | 469 | Enemy art (v1.12.0): every enemy except the boss is drawn here. Look "Blend": library characters (own face per type) |
 | `src/flowfield.js` | 102 | Dijkstra flow field: one search from the player gives every enemy a path around the shelves. |
-| `src/main.js` | 3415 | OVERDUE! — Night Shift at the Meme Library |
+| `src/main.js` | 3416 | OVERDUE! — Night Shift at the Meme Library |
 | `src/meta.js` | 99 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
 | `src/newplayer.js` | 95 | New-player help (v1.13.0): which menus a player has earned, and the scripted first room. Pure module (no DOM), unit-tested. |
 | `src/palette.js` | 60 | Projectile colours. Pure module (no DOM), unit-tested. |
@@ -68,7 +68,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/status.test.js` | 146 | Status effects (v1.15.0 part A): freeze rule, boss immunity, chain rule, proc scaling, ink/chill/zap maths. Pure, no DOM. |
 | `test/story-meta.test.js` | 335 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
 | `test/water-enemies.test.js` | 130 | Act II water enemies (v1.16.0 part B): eel surface/dive timer, boat drop cadence, spawn and movement only on water, endless/Act I untouched. Pure rules, no DOM. |
-| `scripts/qa/run.mjs` | 1661 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
+| `scripts/qa/run.mjs` | 1666 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 50 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
 | `scripts/codemap.mjs` | 113 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
@@ -125,8 +125,8 @@ NEIGH:4 · canStep:44 · computeFlowField:54 · lineOfSight:91
 - **Update** (1064–1356): step:1067 · playerSaves:1106 · startGuideBeat:1110 · updateGuide:1117 · endGuide:1135 · moveInput:1145 · nearestEnemy:1160 · updatePlayer:1171 · walkGrid:1266 · wallRects:1267 · collideWorld:1268 · spawnBook:1281 · MARGIN_SIDE:1297 · marginBook:1298 · fire:1299 · abilityReady:1329 · inkBurst:1340
 - **Status effects (v1.15.0 part A: ink, chill, static, pops). The maths lives in src/status.js.** (1357–2200): zaps:1363 · hitsPerSec:1366 · zapArc:1368 · onBookHit:1380 · doZap:1392 · popAt:1407 · inkSplash:1434 · tickStatus:1447 · updateStatusFx:1459 · statusSprites:1464 · statusSprite:1466 · drawStatus:1485 · drawZaps:1498 · nextToShelf:1512 · doShhh:1520 · updateFlow:1557 · seek:1568 · waterHeading:1581 · boatDrop:1587 · ponds:1600 · huntDir:1601 · updateEnemies:1619 · bossAI:1747 · shootHazard:1808 · fan:1813 · radial:1814 · bossImmune:1817 · damageEnemy:1821 · killEnemy:1855 · buzz:1900 · hurtPlayer:1905 · lastChapterMult:1945 · shelfBurstAt:1955 · updateBooks:1967 · orbitRest:2050 · orbiterPositions:2051 · updateOrbiters:2060 · cats:2083 · updateCats:2084 · catLand:2111 · updateHazards:2128 · updateRings:2154 · updatePickups:2168 · updateParticles:2185
 - **Rendering** (2201–2849): buildBackground:2205 · drawFlagstones:2298 · drawWater:2315 · lampPositions:2333 · lightSprite:2345 · glowCache:2351 · glowSprite:2352 · renderLights:2361 · render:2401 · drawThrownBook:2454 · drawCat:2488 · drawBook:2503 · drawPlayer:2511 · rim:2554 · drawEnemy:2559 · drawBoss:2571 · drawTelegraph:2605 · drawPickup:2613 · hazardSprite:2626 · drawHazards:2634 · drawRing:2651 · drawParticles:2658 · heartPath:2671 · FONT:2681 · txt:2682 · drawHUD:2688 · drawSurviveTimer:2761 · drawGuidePrompt:2778 · cooldown:2791 · btnCache:2807 · setTouchButton:2808 · drawCrosshair:2820 · drawStick:2829 · drawAimStick:2837
-- **DOM screens, settings, leaderboard** (2850–3292): SCREENS:2853 · showScreen:2855 · pinnedObservers:2865 · fitPinnedRow:2866 · renderMenus:2891 · maybeWhatsNew:2905 · renderFineBadges:2919 · renderShop:2924 · defaultWing:2958 · wingStatus:2962 · setStoryAct:2971 · renderStory:2972 · logRun:3044 · bankRun:3056 · inRun:3064 · backupMsg:3069 · readAllKeys:3082 · setSetting:3130 · toast:3144 · toggleFullscreen:3182 · loadLeaderboard:3192 · isStandalone:3215 · maybeNudge:3216 · closeNudge:3222 · showGameOver:3226
-- **Main loop (fixed 120 Hz simulation, render every animation frame)** (3293–3415): frame:3298 · drawVersionLabels:3319 · checkForUpdate:3340 · applyUpdate:3360
+- **DOM screens, settings, leaderboard** (2850–3293): SCREENS:2853 · showScreen:2855 · pinnedObservers:2866 · fitPinnedRow:2867 · renderMenus:2892 · maybeWhatsNew:2906 · renderFineBadges:2920 · renderShop:2925 · defaultWing:2959 · wingStatus:2963 · setStoryAct:2972 · renderStory:2973 · logRun:3045 · bankRun:3057 · inRun:3065 · backupMsg:3070 · readAllKeys:3083 · setSetting:3131 · toast:3145 · toggleFullscreen:3183 · loadLeaderboard:3193 · isStandalone:3216 · maybeNudge:3217 · closeNudge:3223 · showGameOver:3227
+- **Main loop (fixed 120 Hz simulation, render every animation frame)** (3294–3416): frame:3299 · drawVersionLabels:3320 · checkForUpdate:3341 · applyUpdate:3361
 
 ## src/meta.js
 
@@ -385,7 +385,7 @@ ENEMY_TYPES:3 · isBossWave:14 · baseBudget:17 · waveBudget:19 · composeWave:
 
 ## scripts/qa/run.mjs
 
-results:29 · record:30 · want:34 · recorder:36 · pool:38 · sh:41 · TYPES:57 · TARGETS:67 · FULL_TARGETS:79 · FILL_JS:82 · TITLE_FIT_JS:83 · shot:95 · PINNED_CHECK:103 · RETURNING_SAVE:137 · TITLE_MENUS_JS:143 · screensFlow:147 · menusFlow:634 · rotateOverlayFlow:740 · ROTATIONS:780 · rotationFlow:785 · shapesFlow:816 · act2Flow:845 · statusFlow:1048 · lookFeelFlow:1080 · newPlayerFlow:1158 · newPerksFlow:1252 · steadyContext:1320 · basicsFlow:1338 · perfSample:1540 · perfDetail:1546 · perfChecks:1552 · md:1648
+results:29 · record:30 · want:34 · recorder:36 · pool:38 · sh:41 · TYPES:57 · TARGETS:67 · FULL_TARGETS:79 · FILL_JS:82 · TITLE_FIT_JS:83 · shot:95 · PINNED_CHECK:103 · RETURNING_SAVE:137 · TITLE_MENUS_JS:143 · screensFlow:147 · menusFlow:634 · rotateOverlayFlow:740 · ROTATIONS:780 · rotationFlow:785 · shapesFlow:816 · act2Flow:845 · statusFlow:1048 · lookFeelFlow:1080 · newPlayerFlow:1158 · newPerksFlow:1252 · steadyContext:1325 · basicsFlow:1343 · perfSample:1545 · perfDetail:1551 · perfChecks:1557 · md:1653
 
 ## scripts/build.mjs
 

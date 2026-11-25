@@ -2854,6 +2854,7 @@ const SCREENS = ['title', 'howto', 'settings', 'leaderboard', 'upgrade', 'doors'
 let settingsReturn = 'title', shopReturn = 'title', currentScreen = 'title';
 function showScreen(id) {
   for (const s of SCREENS) $('#' + s).hidden = s !== id;
+  if (id !== currentScreen) $('#whatsNew').hidden = true;   // v1.16.1: no screen change leaves the What's-new card drawn on top
   currentScreen = id;
   closeBuildPop(); $('#nudge').hidden = true;
   document.body.classList.toggle('in-game', id === null);
@@ -2911,7 +2912,13 @@ function maybeWhatsNew() {
   $('#wnTitle').textContent = WHATS_NEW.title;
   $('#wnLines').replaceChildren(...WHATS_NEW.lines.map((t) => Object.assign(document.createElement('li'), { textContent: t })));
   $('#btnWnOk').textContent = WHATS_NEW.button;
-  setTimeout(() => { if (game.state === 'title') $('#whatsNew').hidden = false; }, 500);
+  setTimeout(() => {
+    if (game.state !== 'title') return;
+    // The backdrop stops above the title's version line so its 7-tap tester switch stays reachable.
+    $('#whatsNew').hidden = false;
+    const v = document.querySelector('#title .version-label').getBoundingClientRect(), host = $('#whatsNew').getBoundingClientRect();
+    $('#whatsNew').style.setProperty('--wn-clear', `${Math.max(0, Math.ceil(host.bottom - v.top) + 2)}px`);
+  }, 500);
 }
 $('#btnWnOk').addEventListener('click', () => { $('#whatsNew').hidden = true; sound.play('click'); });
 

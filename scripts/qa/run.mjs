@@ -1267,17 +1267,22 @@ async function newPerksFlow(name, opts) {
       await shot(page, `${name}-whatsnew-card`);
       // v1.16.1: the card must not cover the title's version line; 7 taps on it switch tester mode while the card is open
       const hit = await page.evaluate(() => { const l = document.querySelector('#title .version-label').getBoundingClientRect(); const t = document.elementFromPoint(l.x + l.width / 2, l.y + l.height / 2); return !!t && t.classList.contains('version-label'); });
+      // the backdrop still blocks every other tap: Settings (and Story / Endless) do nothing while the card is open
+      const settingsBtn = await page.evaluate(() => { const b = document.querySelector('#title [data-act="settings"]'); if (!b) return null; const r = b.getBoundingClientRect(); const t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return { blocked: !b.contains(t), inView: r.bottom <= innerHeight }; });
+      if (settingsBtn && settingsBtn.inView) { await page.mouse.click(await page.evaluate(() => { const r = document.querySelector('#title [data-act="settings"]').getBoundingClientRect(); return r.x + r.width / 2; }), await page.evaluate(() => { const r = document.querySelector('#title [data-act="settings"]').getBoundingClientRect(); return r.y + r.height / 2; })); await page.waitForTimeout(250); }
+      const stillTitle = await page.evaluate(() => !document.getElementById('settings').hidden === false && !document.getElementById('whatsNew').hidden);
+      record(area, "a tap on Settings does nothing while the What's-new card is open", settingsBtn && settingsBtn.blocked && stillTitle, JSON.stringify({ settingsBtn, stillTitle }));
       for (let i = 0; i < 7; i++) await page.click('#title .version-label');
       const tester = await page.evaluate(() => localStorage.getItem('overdue.tester.v1'));
       record(area, "version line stays visible and tappable with the What's-new card open (7 taps = tester mode)", hit && tester === '{"on":true}', JSON.stringify({ hit, tester }));
       for (let i = 0; i < 7; i++) await page.click('#title .version-label');
-      record(area, "What's new card shows for a returning 1.14 save, on screen, 2-3 lines", !vis.hidden && /New in 1\.15\.0: 7 new perks and 5 new combos/.test(vis.text) && vis.inView && vis.items >= 2 && vis.items <= 3, JSON.stringify({ ...vis, text: vis.text.slice(0, 60) }));
+      record(area, "What's new card shows for a returning save, on screen, 2-3 lines", !vis.hidden && /New in 1\.16: Act II, The Sunken Stacks/.test(vis.text) && vis.inView && vis.items >= 2 && vis.items <= 3, JSON.stringify({ ...vis, text: vis.text.slice(0, 60) }));
       await page.click('#btnWnOk'); await page.waitForTimeout(200);
       record(area, "What's new card closes with its one button", await page.evaluate(() => document.getElementById('whatsNew').hidden));
       await page.reload(); await page.waitForTimeout(1100);
-      record(area, "What's new card never shows twice", await page.evaluate(() => document.getElementById('whatsNew').hidden && __overdue.tipsSeen().includes('whatsnew-1.15.0')));
+      record(area, "What's new card never shows twice", await page.evaluate(() => document.getElementById('whatsNew').hidden && __overdue.tipsSeen().includes('whatsnew-1.16.0')));
       // NEW badges on the first offer; this player has not been stamped as fresh, so the badges are still pending
-      await page.evaluate(() => { localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.15.0","perk-stack"]}'); }); await page.reload(); await page.waitForTimeout(700);
+      await page.evaluate(() => { localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.16.0","perk-stack"]}'); }); await page.reload(); await page.waitForTimeout(700);
       await page.evaluate(() => { __overdue.startRun('endless'); __overdue.game.banished.add('margin'); __overdue.game.banished.add('librarycat'); __overdue.showUpgrades(); __overdue.showCards(['margin', 'hardcover', 'librarycat']); }); await page.waitForTimeout(900);
       const cls = () => page.evaluate(() => [...document.querySelectorAll('#cards .card')].map((c) => c.classList.contains('new')));
       const first = await cls(); await shot(page, `${name}-perk-new-badge`);
@@ -1291,13 +1296,13 @@ async function newPerksFlow(name, opts) {
     // fresh install: nothing shown, everything stamped
     { const { ctx, page, errors } = await mk(false);
       await page.goto(URL0); await page.waitForTimeout(1100);
-      record(area, "What's new card never shows on a fresh install", await page.evaluate(() => document.getElementById('whatsNew').hidden && __overdue.tipsSeen().includes('whatsnew-1.15.0') && __overdue.tipsSeen().includes('badge-margin')));
+      record(area, "What's new card never shows on a fresh install", await page.evaluate(() => document.getElementById('whatsNew').hidden && __overdue.tipsSeen().includes('whatsnew-1.16.0') && __overdue.tipsSeen().includes('badge-margin')));
       await page.evaluate(() => { __overdue.startRun('endless'); __overdue.showCards(['margin', 'hardcover', 'librarycat']); }); await page.waitForTimeout(500);
       record(area, 'a brand-new player sees no NEW badge on new perks', await page.evaluate(() => document.querySelectorAll('#cards .card').length === 3 && !document.querySelector('#cards .card.new')));
       await ctx.close(); }
     // the cat and Margin Notes books in a room
     { const { ctx, page, errors } = await mk(true);
-      await page.goto(URL0); await page.evaluate(() => localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.15.0"]}')); await page.reload(); await page.waitForTimeout(900);
+      await page.goto(URL0); await page.evaluate(() => localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.16.0"]}')); await page.reload(); await page.waitForTimeout(900);
       await page.evaluate(() => { const O = __overdue; O.startRun('endless'); O.god(); O.grant('librarycat'); for (let i = 0; i < 3; i++) O.grant('margin'); O.grant('dewey'); });
       // Deterministic: hand-step the sim (real loop paused) until 4+ Margin books are airborne AND the cat has hit something, and take the
       // numbers at that very step. (v1.15.4 fix: the old version waited in real time, then screenshotted, then re-read the books: under load
