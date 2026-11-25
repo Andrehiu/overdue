@@ -908,6 +908,26 @@ async function act2Flow() {
   for (let i = 0; i < 7; i++) await page.click('#title .version-label');
   record('act2', '7 more taps switch tester mode off', await page.evaluate(() => localStorage.getItem('overdue.tester.v1')) === '{"on":false}');
 
+  // v1.16.1: Act II wings are 9 rooms: "room 1/9", elite at 5, boss at 9, a door before each room but none after the boss; Act I stays 7
+  const len = await page.evaluate(() => {
+    const O = __overdue; O.unlockAll(); O.startRun('story', 11);
+    const first = O.game.banner; const kinds = [];
+    for (let r = 1; r <= 9; r++) { O.startWave(r); kinds.push(O.game.diff.kind[0]); }
+    const last = O.game.banner; O.startRun('story', 1); const a1 = O.game.banner;
+    return { first, last, kinds: kinds.join(''), a1 };
+  });
+  record('act2', 'an Act II run says "ROOM 1/9", the last room "ROOM 9/9"; Act I still says /7', len.first === 'ROOM 1/9' && len.last === 'ROOM 9/9' && len.a1 === 'ROOM 1/7', JSON.stringify(len));
+  record('act2', 'Act II: elite room is 5, boss room is 9', len.kinds[4] === 'e' && len.kinds[8] === 'b' && len.kinds.replace(/[eb]/g, '').length === 7, len.kinds);
+  await page.evaluate(() => { const O = __overdue; O.startRun('story', 11); O.startWave(5); O.god(); O.freeze(false); }); await page.waitForTimeout(900);
+  await shot(page, 'act2-hud-room5of9');
+  // game over after an Act II run (die in room 5)
+  await page.evaluate(() => { const O = __overdue; O.game.wave = 5; O.player.hp = 0; O.stats.maxHp = 3; O.player.hp = 0; O.drive(true); O.stepN(240); });
+  await page.waitForTimeout(1500);
+  const goText = await page.evaluate(() => document.getElementById('goStats')?.textContent || '');
+  await shot(page, 'act2-gameover');
+  record('act2', 'game over after an Act II run shows room x/9', /\/9/.test(goText), goText.slice(0, 80));
+  await page.evaluate(() => { __overdue.drive(false); __overdue.game.state = 'title'; document.querySelectorAll('.screen').forEach((e) => { e.hidden = e.id !== 'title'; }); });
+
   // 3. an Act II water room: renders, the player can't step into water, books fly over it
   const pick = (() => { for (const w of [11, 12]) for (let r = 1; r <= roomsIn(w); r++) if (WATER_SHAPES.includes(roomShape(w, r))) return [w, r]; return null; })();
   await page.evaluate(([w, r]) => { const O = __overdue; O.unlockAll(); O.startRun('story', w); O.startWave(r); O.god(); O.killAll(); O.freeze(false); }, pick);
@@ -1246,6 +1266,12 @@ async function newPerksFlow(name, opts) {
       await page.goto(URL0); await page.waitForTimeout(1100);
       const vis = await page.evaluate(() => { const c = document.getElementById('whatsNew'), r = document.querySelector('#whatsNew .nudge-card').getBoundingClientRect(); return { hidden: c.hidden, text: c.textContent, inView: r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth, items: document.querySelectorAll('#wnLines li').length }; });
       await shot(page, `${name}-whatsnew-card`);
+      // v1.16.1: the card must not cover the title's version line; 7 taps on it switch tester mode while the card is open
+      const hit = await page.evaluate(() => { const l = document.querySelector('#title .version-label').getBoundingClientRect(); const t = document.elementFromPoint(l.x + l.width / 2, l.y + l.height / 2); return !!t && t.classList.contains('version-label'); });
+      for (let i = 0; i < 7; i++) await page.click('#title .version-label');
+      const tester = await page.evaluate(() => localStorage.getItem('overdue.tester.v1'));
+      record(area, "version line stays visible and tappable with the What's-new card open (7 taps = tester mode)", hit && tester === '{"on":true}', JSON.stringify({ hit, tester }));
+      for (let i = 0; i < 7; i++) await page.click('#title .version-label');
       record(area, "What's new card shows for a returning 1.14 save, on screen, 2-3 lines", !vis.hidden && /New in 1\.15\.0: 7 new perks and 5 new combos/.test(vis.text) && vis.inView && vis.items >= 2 && vis.items <= 3, JSON.stringify({ ...vis, text: vis.text.slice(0, 60) }));
       await page.click('#btnWnOk'); await page.waitForTimeout(200);
       record(area, "What's new card closes with its one button", await page.evaluate(() => document.getElementById('whatsNew').hidden));
