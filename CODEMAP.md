@@ -56,7 +56,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/autoaim.test.js` | 46 |  |
 | `test/backup.test.js` | 63 | Save backup code (v1.13.1): pure encode / decode / validate rules, no DOM. |
 | `test/balance.test.js` | 138 | Balance bot (v1.7.1 tooling): pure helpers only, no browser. See scripts/balance-lib.mjs. |
-| `test/doors.test.js` | 172 | Story doors (v1.7.0): pure rules, no DOM. |
+| `test/doors.test.js` | 173 | Story doors (v1.7.0): pure rules, no DOM. |
 | `test/enemy-art.test.js` | 35 | Enemy art colours and the patron ripple (pure data from src/enemy-art.js; no canvas needed). |
 | `test/game-logic.test.js` | 614 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
 | `test/new-perks.test.js` | 90 | v1.15.0 part B: Margin Notes, Last Chapter, Library Cat, Crossfire, plus the "What's new" card and NEW badges. Pure rules, no DOM. |
@@ -68,7 +68,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/status.test.js` | 146 | Status effects (v1.15.0 part A): freeze rule, boss immunity, chain rule, proc scaling, ink/chill/zap maths. Pure, no DOM. |
 | `test/story-meta.test.js` | 335 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
 | `test/water-enemies.test.js` | 130 | Act II water enemies (v1.16.0 part B): eel surface/dive timer, boat drop cadence, spawn and movement only on water, endless/Act I untouched. Pure rules, no DOM. |
-| `scripts/qa/run.mjs` | 1636 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
+| `scripts/qa/run.mjs` | 1662 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 50 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
 | `scripts/codemap.mjs` | 113 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
@@ -385,7 +385,7 @@ ENEMY_TYPES:3 · isBossWave:14 · baseBudget:17 · waveBudget:19 · composeWave:
 
 ## scripts/qa/run.mjs
 
-results:29 · record:30 · want:34 · recorder:36 · pool:38 · sh:41 · TYPES:57 · TARGETS:67 · FULL_TARGETS:79 · FILL_JS:82 · TITLE_FIT_JS:83 · shot:95 · PINNED_CHECK:103 · RETURNING_SAVE:137 · TITLE_MENUS_JS:143 · screensFlow:147 · menusFlow:634 · rotateOverlayFlow:740 · ROTATIONS:780 · rotationFlow:785 · shapesFlow:816 · act2Flow:845 · statusFlow:1029 · lookFeelFlow:1061 · newPlayerFlow:1139 · newPerksFlow:1233 · steadyContext:1295 · basicsFlow:1313 · perfSample:1515 · perfDetail:1521 · perfChecks:1527 · md:1623
+results:29 · record:30 · want:34 · recorder:36 · pool:38 · sh:41 · TYPES:57 · TARGETS:67 · FULL_TARGETS:79 · FILL_JS:82 · TITLE_FIT_JS:83 · shot:95 · PINNED_CHECK:103 · RETURNING_SAVE:137 · TITLE_MENUS_JS:143 · screensFlow:147 · menusFlow:634 · rotateOverlayFlow:740 · ROTATIONS:780 · rotationFlow:785 · shapesFlow:816 · act2Flow:845 · statusFlow:1049 · lookFeelFlow:1081 · newPlayerFlow:1159 · newPerksFlow:1253 · steadyContext:1321 · basicsFlow:1339 · perfSample:1541 · perfDetail:1547 · perfChecks:1553 · md:1649
 
 ## scripts/build.mjs
 

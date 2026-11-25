@@ -921,11 +921,10 @@ async function act2Flow() {
   await page.evaluate(() => { const O = __overdue; O.startRun('story', 11); O.startWave(5); O.god(); O.freeze(false); }); await page.waitForTimeout(900);
   await shot(page, 'act2-hud-room5of9');
   // game over after an Act II run (die in room 5)
-  await page.evaluate(() => { const O = __overdue; O.game.wave = 5; O.player.hp = 0; O.stats.maxHp = 3; O.player.hp = 0; O.drive(true); O.stepN(240); });
-  await page.waitForTimeout(1500);
-  const goText = await page.evaluate(() => document.getElementById('goStats')?.textContent || '');
+  await page.evaluate(() => { const O = __overdue; O.stats.maxHp = 5; O.player.hp = 1; O.player.inv = 0; O.die(); }); await page.waitForTimeout(2700);
+  const goText = await page.evaluate(() => document.getElementById('gameover').innerText || '');
   await shot(page, 'act2-gameover');
-  record('act2', 'game over after an Act II run shows room x/9', /\/9/.test(goText), goText.slice(0, 80));
+  record('act2', 'game over after an Act II run shows room x/9', /Room reached\s*5\/9/i.test(goText), goText.replace(/\s+/g, ' ').slice(0, 120));
   await page.evaluate(() => { __overdue.drive(false); __overdue.game.state = 'title'; document.querySelectorAll('.screen').forEach((e) => { e.hidden = e.id !== 'title'; }); });
 
   // 3. an Act II water room: renders, the player can't step into water, books fly over it
