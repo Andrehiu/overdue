@@ -70,15 +70,15 @@ test('wings 11-12: Act II, harder than wing 10 at every room, water rooms, open 
   const S = await load('story'), A = await load('arena');
   assert.ok(S.WINGS.length >= 12);
   assert.equal(S.actOf(10), 1); assert.equal(S.actOf(11), 2); assert.equal(S.actOf(12), 2);
-  for (let r = 1; r <= S.ROOMS_PER_WING; r++) for (const w of [11, 12]) {
-    const a = S.difficulty(w - 1, r), b = S.difficulty(w, r);
-    assert.ok(S.threat(b) > S.threat(a), `wing ${w} room ${r} is harder than wing ${w - 1}`);
+  for (let r = 1; r <= 9; r++) {   // wing 12 vs 11 (both 9 rooms); wing 11 vs 10 is checked by position in story-meta.test.js
+    const a = S.difficulty(11, r), b = S.difficulty(12, r);
+    assert.ok(S.threat(b) > S.threat(a), `wing 12 room ${r} is harder than wing 11`);
   }
   for (const w of [11, 12]) {
-    const shapes = new Set(Array.from({ length: 7 }, (_, i) => S.roomShape(w, i + 1)));
+    const shapes = new Set(Array.from({ length: 9 }, (_, i) => S.roomShape(w, i + 1)));
     assert.ok([...shapes].some((x) => A.WATER_SHAPES.includes(x)), `wing ${w} has water rooms`);
     assert.ok([...shapes].some((x) => !A.WATER_SHAPES.includes(x)), `wing ${w} also has dry rooms`);
-    for (const r of [S.ELITE_ROOM, S.BOSS_ROOM]) assert.ok(!A.WATER_SHAPES.includes(S.roomShape(w, r)), `wing ${w} room ${r} is open ground`);
+    for (const r of [S.eliteRoom(w), S.bossRoom(w)]) assert.ok(!A.WATER_SHAPES.includes(S.roomShape(w, r)), `wing ${w} room ${r} is open ground`);
     assert.ok(S.WINGS[w - 1].enemyTypes, `wing ${w} has the enemyTypes hook for part B`);
   }
 });

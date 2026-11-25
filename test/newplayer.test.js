@@ -78,9 +78,9 @@ test('guided room beats: slow bunnies, one charger, a small crowd; prompts match
 });
 
 test('Survive rooms: at most one per wing, never room 1 / elite / boss, later room kept for wings 3, 5, 7, 10', async () => {
-  const { roomGoal, WINGS, ROOMS_PER_WING } = await story();
+  const { roomGoal, WINGS, roomsIn } = await story();
   const table = {};
-  for (let w = 1; w <= WINGS.length; w++) table[w] = Array.from({ length: ROOMS_PER_WING }, (_, i) => i + 1).filter((r) => roomGoal(w, r) === 'survive');
+  for (let w = 1; w <= WINGS.length; w++) table[w] = Array.from({ length: roomsIn(w) }, (_, i) => i + 1).filter((r) => roomGoal(w, r) === 'survive');
   for (const [w, rooms] of Object.entries(table)) assert.ok(rooms.length <= 1, `wing ${w}: ${rooms}`);
-  assert.deepEqual(table, { 1: [3], 2: [], 3: [5], 4: [6], 5: [6], 6: [], 7: [5], 8: [3], 9: [], 10: [6], 11: [5], 12: [3] });
+  assert.deepEqual(table, { 1: [3], 2: [], 3: [5], 4: [6], 5: [6], 6: [], 7: [5], 8: [3], 9: [], 10: [6], 11: [7], 12: [3] });
 });

@@ -16,7 +16,7 @@ import { PLAYER, bookLook } from './palette.js';
 import { isStatusSource, canProc, procChance, freeze, chillFactor, applyChill, applyInk, tickInk, shouldShatter, statusDamageMult, makeBurstBudget, deepFreezeHit, zapChain, makeMetrics, tickMetrics, ZAP_REACH, ZAP_POOL, ZAP_LIFE, DEEP_FREEZE_TIME, SUPER_FREEZE_TIME, SPLASH_RADIUS, SPLASH_STRENGTH, POP_CHAIN_HITS } from './status.js';
 import { BURST, shadowK, drawEnemy as drawArtEnemy, drawWorms } from './enemy-art.js';
 import { SoundEngine } from './audio.js';
-import { actOf, WINGS_PER_ACT, WINGS, ROOMS_PER_WING, BOSS_ROOM, ELITE_ROOM, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
+import { actOf, WINGS_PER_ACT, WINGS, roomsIn, bossRoom, eliteRoom, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
 import { DOORS, soleDoor, doorOffer, applyDoor, doorReward, mysteryPrize, rarePick } from './doors.js';
 import { GUIDE_FLAG, UNLOCK_FLAG, MENUS, unlockToast, hasPlayed, unlockedMenus, newUnlocks, shouldGuide, GUIDE_BEATS, guidePrompt, WHATS_NEW, whatsNewAction, whatsNewFlag, badgeFlag, badgedCards } from './newplayer.js';
 import { BACKUP_KEYS, encodeBackup, decodeBackup, describeBackup } from './backup.js';
@@ -352,7 +352,7 @@ function startWave(n) {
     const kind = game.diff.kind;
     const door = DOORS[game.door]?.banner;
     const sub = game.guide ? 'Quick training: you can skip it' : kind === 'boss' ? 'A rogue author approaches…' : kind === 'elite' ? '★ Elite room: they fight back' : n === 1 ? wingDef().intro : door || wingDef().name;
-    banner(`ROOM ${n}/${ROOMS_PER_WING}`, isSurvive() ? `SURVIVE ${SURVIVE_SECONDS} s: stay alive, no need to clear the room${door && kind === 'normal' && n > 1 ? ' · ' + door.replace(/:.*/, '') : ''}` : sub);
+    banner(`ROOM ${n}/${roomsIn(game.wingN)}`, isSurvive() ? `SURVIVE ${SURVIVE_SECONDS} s: stay alive, no need to clear the room${door && kind === 'normal' && n > 1 ? ' · ' + door.replace(/:.*/, '') : ''}` : sub);
     if (isSurvive() && !tipSeen('survive-room')) { markTip('survive-room'); setTimeout(() => { if (game.state === 'playing' && isSurvive()) toast('⏱️ Survive rooms: the timer ends the room. Dodge, throw, stay alive.', 3600, true); }, 1800); }
   } else banner(`WAVE ${n}`, n % 5 === 0 ? 'A rogue author approaches…' : '');
   sound.setIntensity(1); sound.setMuffled(false);
@@ -390,14 +390,14 @@ function waveCleared() {
   // Fines for the clear: story rooms pay by room type; endless pays more every 5 waves and for bosses.
   const fine = isStory() ? Math.round(doorReward(game.wingN, game.wave, game.door) * stats.fineMult) : 1 + Math.floor(game.wave / 5) + (game.wave % 5 === 0 ? 15 : 0);
   game.fines += fine;
-  const wingDone = isStory() && game.wave >= BOSS_ROOM;
+  const wingDone = isStory() && game.wave >= bossRoom(game.wingN);
   banner(wingDone ? 'WING CLEARED!' : 'SHELF CLEARED!', `${isStory() ? '' : `+${bonus.toLocaleString()} · `}+${fine} 🪙 fines${game.noHitWave ? ' · flawless!' : ''}`);
   if (stats.regenPerWave && player.hp < stats.maxHp) {
     player.hp = Math.min(stats.maxHp, player.hp + stats.regenPerWave);
     floatText(player.x, player.y - 24, '+1 ♥ Lifetime Membership', '#ff6b81', 13, 1.4);
   }
   // Reading break after the elite room: a heart back before the second half of the wing.
-  if (isStory() && game.wave === ELITE_ROOM && player.hp < stats.maxHp) {
+  if (isStory() && game.wave === eliteRoom(game.wingN) && player.hp < stats.maxHp) {
     player.hp = Math.min(stats.maxHp, player.hp + 1);
     floatText(player.x, player.y - 40, '+1 ♥ Reading break', '#ff6b81', 13, 1.4);
   }
@@ -444,7 +444,7 @@ function showUpgrades() {
   } else choices = rollUpgrades(rng, game.owned, game.cards || 3, rollOpts());
   if (!choices.length) return bonus ? showUpgrades() : nextRoom();
   const title = $('#upgradeTitle');
-  title.textContent = rare ? `Room ${game.wave}/${ROOMS_PER_WING} cleared — 💰 Rare pick: one extra card` : bonus ? '🎲 Mystery prize: bonus pick (1 of 2)' : second ? `Room ${game.wave} cleared — your normal pick (2 of 2)` : isStory() ? `Room ${game.wave}/${ROOMS_PER_WING} cleared — choose a perk` : `Wave ${game.wave} cleared — choose a perk`;
+  title.textContent = rare ? `Room ${game.wave}/${roomsIn(game.wingN)} cleared — 💰 Rare pick: one extra card` : bonus ? '🎲 Mystery prize: bonus pick (1 of 2)' : second ? `Room ${game.wave} cleared — your normal pick (2 of 2)` : isStory() ? `Room ${game.wave}/${roomsIn(game.wingN)} cleared — choose a perk` : `Wave ${game.wave} cleared — choose a perk`;
   if (bonus || second) { const p = document.createElement('span'); p.className = 'pick-pips'; p.textContent = bonus ? '●○' : '●●'; p.setAttribute('aria-hidden', 'true'); title.appendChild(p); }
   renderCards(choices);
   showScreen('upgrade');
@@ -514,7 +514,7 @@ function showDoors(offer) {
   box.classList.toggle('single', offer.length === 1);
   cardsArmedAt = performance.now() + 550;
   box.classList.remove('dealing'); void box.offsetWidth; box.classList.add('dealing');
-  $('#doorsTitle').textContent = `Room ${game.wave}/${ROOMS_PER_WING} cleared — ${offer.length > 1 ? 'pick your next door' : 'the next door'}`;
+  $('#doorsTitle').textContent = `Room ${game.wave}/${roomsIn(game.wingN)} cleared — ${offer.length > 1 ? 'pick your next door' : 'the next door'}`;
   offer.forEach((id, i) => {
     const d = DOORS[id];
     const b = document.createElement('button');
@@ -1009,7 +1009,7 @@ function materialise(type, x, y, elite = false, fromBoat = false) {
   if (type !== 'boss' && !isWaterType(type)) { x += (Math.random() - 0.5) * 8; y += (Math.random() - 0.5) * 8; }
   burst(x, y, 14, elite ? ['#ffd54a', '#fff'] : ['#b48cff', '#fff'], 120, 0.5);
   if (type === 'worm') {
-    const headHp = game.diff ? 4 * (1 + curveRoom(game.wave) * 0.08) * (1 + 0.22 * (game.wingN - 1)) : 4 * (1 + game.wave * 0.08);
+    const headHp = game.diff ? 4 * (1 + curveRoom(game.wave, game.wingN) * 0.08) * (1 + 0.22 * (game.wingN - 1)) : 4 * (1 + game.wave * 0.08);
     let prev = makeEnemy('worm', x, y, { hp: Math.round(headHp), head: true });
     prev.maxHp = prev.hp;
     for (let i = 0; i < 6; i++) prev = makeEnemy('worm', x, y, { leader: prev });
@@ -1654,7 +1654,7 @@ function updateEnemies(dt) {
         mx = (s.x * dir - s.y * strafe * 0.6) * e.speed; my = (s.y * dir + s.x * strafe * 0.6) * e.speed;
         e.atkT -= dt;
         if (e.atkT <= 0) {
-          e.atkT = Math.max(1.6, 3 - (game.diff ? curveRoom(game.wave) : game.wave) * 0.06);
+          e.atkT = Math.max(1.6, 3 - (game.diff ? curveRoom(game.wave, game.wingN) : game.wave) * 0.06);
           rings.push({ x: e.x, y: e.y, r: e.r, max: 157, speed: 140, width: 12, life: 1 });
           sound.play('ring');
         }
@@ -2710,7 +2710,7 @@ function drawHUD() {
   // Wave info
   const left = enemies.length + telegraphs.length + spawnQueue.length;
   if (isStory()) {
-    txt(`ROOM ${game.wave}/${ROOMS_PER_WING}`, UW / 2, 26, 18, game.diff && game.diff.kind !== 'normal' ? '#ffd54a' : '#e8d9b0', 'center');
+    txt(`ROOM ${game.wave}/${roomsIn(game.wingN)}`, UW / 2, 26, 18, game.diff && game.diff.kind !== 'normal' ? '#ffd54a' : '#e8d9b0', 'center');
     if (game.state === 'playing' && isSurvive()) drawSurviveTimer();
     else if (game.state === 'playing' && !game.boss) txt(`${short(wingDef().name, 18)} · ${left} left`, UW / 2, 44, 11, 'rgba(232,217,176,0.8)', 'center');
   } else {
@@ -2963,7 +2963,7 @@ function wingStatus(w) {
   if (w > effUnlocked()) return 'Locked';
   if (progress.cleared.includes(w)) return '✓ Cleared';
   const best = progress.best[w];
-  return best ? `Best: room ${best}/${ROOMS_PER_WING}` : 'New';
+  return best ? `Best: room ${best}/${roomsIn(w)}` : 'New';
 }
 // Wing map: one page per act (10 wings each). Swipe or the arrows move between pages; Act II shows locked until wing 10 is cleared.
 let storyAct = 1;
@@ -3023,8 +3023,8 @@ function renderStory() {
   $('#wingBlurb').textContent = def.blurb;
   const d1 = difficulty(selectedWing, 1);
   $('#wingInfo').textContent = selectedWing === 1
-    ? `${ROOMS_PER_WING} rooms · room ${ELITE_ROOM} is elite · a Rogue Author waits in room ${BOSS_ROOM}`
-    : `Enemies ×${d1.hpMult.toFixed(2)} tougher · ${Math.round(d1.eliteChance * 100)}% elites${d1.deathBurst ? ' · elites burst into pages' : ''}`;
+    ? `${roomsIn(1)} rooms · room ${eliteRoom(1)} is elite · a Rogue Author waits in room ${bossRoom(1)}`
+    : `${roomsIn(selectedWing) !== roomsIn(1) ? `${roomsIn(selectedWing)} rooms · ` : ''}Enemies ×${d1.hpMult.toFixed(2)} tougher · ${Math.round(d1.eliteChance * 100)}% elites${d1.deathBurst ? ' · elites burst into pages' : ''}`;
   $('#btnEnterWing').textContent = `▶ Enter ${def.name}`;
   $('#btnEnterWing').disabled = selectedWing > unlocked;
 }
@@ -3240,7 +3240,7 @@ function showGameOver() {
   $('#goStats').innerHTML = '';
   const fineLine = `+${res.banked.toLocaleString()} 🪙${res.firstClear ? ' (first clear!)' : ''}`;
   const rows = [
-    ...(story ? [['Wing', `${game.wingN} · ${wingDef().name}`], ['Room reached', won ? `${ROOMS_PER_WING}/${ROOMS_PER_WING} ✓` : `${game.wave}/${ROOMS_PER_WING}`]] : []),
+    ...(story ? [['Wing', `${game.wingN} · ${wingDef().name}`], ['Room reached', won ? `${roomsIn(game.wingN)}/${roomsIn(game.wingN)} ✓` : `${game.wave}/${roomsIn(game.wingN)}`]] : []),
     ['Fines banked', fineLine], ['Fines to spend', `${progress.fines.toLocaleString()} 🪙`],
     ...(res.unlockedWing ? [['Unlocked', `🔓 Wing ${res.unlockedWing}: ${WINGS[res.unlockedWing - 1].name}`]] : []),
     ...(story ? [] : [['Score', score.toLocaleString() + (isBest ? ' ★ new personal best' : '')]]),

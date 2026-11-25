@@ -92,11 +92,11 @@ test('water enemies are opt-in: endless, Act I and wings without them never roll
     const spawns = composeWave(wave, new Rng(seed)).spawns;
     assert.ok(spawns.every((s) => !W.isWaterType(s.type)), 'endless has no water enemies');
   }
-  for (let w = 1; w <= 10; w++) for (let r = 1; r <= S.ROOMS_PER_WING; r++) for (let seed = 1; seed <= 6; seed++)
+  for (let w = 1; w <= 10; w++) for (let r = 1; r <= S.roomsIn(w); r++) for (let seed = 1; seed <= 6; seed++)
     assert.ok(S.composeRoom(w, r, new Rng(seed)).spawns.every((s) => !W.isWaterType(s.type)), `Act I wing ${w} room ${r}`);
   for (const w of [11, 12]) {
     let eel = 0, boat = 0;
-    for (let r = 1; r <= S.ROOMS_PER_WING; r++) for (let seed = 1; seed <= 30; seed++) for (const s of S.composeRoom(w, r, new Rng(seed)).spawns) { if (s.type === 'eel') eel++; if (s.type === 'boat') boat++; }
+    for (let r = 1; r <= S.roomsIn(w); r++) for (let seed = 1; seed <= 30; seed++) for (const s of S.composeRoom(w, r, new Rng(seed)).spawns) { if (s.type === 'eel') eel++; if (s.type === 'boat') boat++; }
     assert.ok(eel > 0 && boat > 0, `wing ${w} rolls eels (${eel}) and boats (${boat})`);
   }
 });

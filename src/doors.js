@@ -3,7 +3,7 @@
 // A door may make the next room harder (more elites) or change its reward, never easier.
 // Offers come from their own seeded RNG (run seed + wing + room), so Renew / Banish / perk rolls never change them.
 import { Rng, hashString } from './util.js';
-import { ROOMS_PER_WING, ELITE_ROOM, roomReward } from './story.js';
+import { roomsIn, eliteRoom, roomReward } from './story.js';
 import { UPGRADES, comboHints, masterworkFor } from './upgrades.js';
 
 // id · icon · name · line (plain words, shown on the card) · banner (room banner subtitle)
@@ -19,12 +19,12 @@ export const DOORS = {
 };
 
 export const POOL = ['rare', 'rest', 'mystery'];     // Break Room becomes The Stacks at full health
-const FIXED_AFTER = { [ELITE_ROOM - 1]: 'elite', [ROOMS_PER_WING - 1]: 'author' };
 
 /** Door ids offered after clearing `clearedRoom` (1–2 ids; [] when there is no door screen). */
 export function doorOffer(seed, wing, clearedRoom, { atFullHp = false } = {}) {
-  if (clearedRoom >= ROOMS_PER_WING || clearedRoom < 1) return [];
-  if (FIXED_AFTER[clearedRoom]) return [FIXED_AFTER[clearedRoom]];
+  if (clearedRoom >= roomsIn(wing) || clearedRoom < 1) return [];
+  if (clearedRoom === eliteRoom(wing) - 1) return ['elite'];     // fixed doors in front of the elite room and the Rogue Author
+  if (clearedRoom === roomsIn(wing) - 1) return ['author'];
   const rng = new Rng(hashString(`door:${seed}:${wing}:${clearedRoom}`));
   const picks = POOL.slice();
   picks.splice(rng.int(0, picks.length - 1), 1);   // drop one type, keep two different ones

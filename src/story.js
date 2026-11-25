@@ -1,4 +1,4 @@
-// Story mode: ten handmade library wings (7 rooms each), unlocked in order. Pure module (no DOM) so it is unit-tested.
+// Story mode: handmade library wings (7 rooms each in Act I, 9 in Act II), unlocked in order. Pure module (no DOM) so it is unit-tested.
 //
 // Structure (Archero-style): one run = one wing = 7 rooms. You pick a perk after every room.
 // Room 4 is an elite room, room 7 a Rogue Author. Perks reset each run; Renovations (meta.js) don't.
@@ -9,14 +9,26 @@
 import { baseBudget, composeWave } from './waves.js';
 import { hashString } from './util.js';
 
+// Act I wings are 7 rooms (elite 4, boss 7). Act II wings (11+) are 9 rooms (elite 5, boss 9), v1.16.1.
+// ROOMS_PER_WING / ELITE_ROOM / BOSS_ROOM are the Act I values; use roomsIn / eliteRoom / bossRoom(wing) for anything per wing.
 export const ROOMS_PER_WING = 7;
 export const ELITE_ROOM = 4;
 export const BOSS_ROOM = 7;
+export const ACT2_ROOMS = 9;
+export const ACT2_ELITE_ROOM = 5;
+export const ACT2_BOSS_ROOM = 9;
+export const roomsIn = (wing) => (actOf(wing) === 2 ? ACT2_ROOMS : ROOMS_PER_WING);
+export const eliteRoom = (wing) => (actOf(wing) === 2 ? ACT2_ELITE_ROOM : ELITE_ROOM);
+export const bossRoom = (wing) => roomsIn(wing);
+/** v1.16.1: Act II spawn budget +15% (longer wings, more to fight in every room), on top of each wing's own budgetBoost. */
+export const ACT2_BUDGET_MULT = 1.15;
 
 // Wings used to be 10 rooms. The new rooms sit on the old difficulty curve at these positions, so the
 // opening and the boss are exactly as hard as before and only the middle is compressed.
 export const CURVE = [1, 2, 4, 5, 7, 8, 10];
-export const curveRoom = (room) => CURVE[Math.min(CURVE.length, Math.max(1, room)) - 1];
+// Act II's 9 rooms: elite (room 5) sits at the old elite position 5, the boss (room 9) at 10.
+export const CURVE_ACT2 = [1, 2, 3, 4, 5, 6, 8, 9, 10];
+export const curveRoom = (room, wing = 1) => { const c = actOf(wing) === 2 ? CURVE_ACT2 : CURVE; return c[Math.min(c.length, Math.max(1, room)) - 1]; };
 
 // Survive rooms: 30 s on the clock while enemies keep coming. Handmade per wing, never room 1, the elite
 // room or the boss room; at most one per wing (v1.13.0, plain early rooms for new players). Fines are the plain room's.
@@ -25,7 +37,7 @@ export const SURVIVE_BUDGET_MULT = 1.05;   // total spawn budget vs the plain ro
 export const SURVIVE_END = SURVIVE_SECONDS - 10;     // no spawn after this, so the last enemies still have time to be fought
 // Budget shares and the time slice of the 30 s each chunk fills (thin start, heavy finish).
 export const SURVIVE_CHUNKS = [{ share: 0.2, from: 0.8, to: 6 }, { share: 0.3, from: 6.5, to: 12 }, { share: 0.5, from: 12.5, to: SURVIVE_END }];
-const SURVIVE_ROOMS = { 1: [3], 2: [], 3: [5], 4: [6], 5: [6], 6: [], 7: [5], 8: [3], 9: [], 10: [6], 11: [5], 12: [3] };
+const SURVIVE_ROOMS = { 1: [3], 2: [], 3: [5], 4: [6], 5: [6], 6: [], 7: [5], 8: [3], 9: [], 10: [6], 11: [7], 12: [3] };
 /** 'clear' (kill everything) or 'survive' (stay alive SURVIVE_SECONDS). Deterministic per wing + room. */
 export const roomGoal = (wing, room) => ((SURVIVE_ROOMS[wing] || []).includes(room) ? 'survive' : 'clear');
 
@@ -76,7 +88,7 @@ export const WINGS = [
 export const actOf = (wing) => (WINGS[wing - 1] || WINGS[0]).act || 1;
 export const WINGS_PER_ACT = 10;
 
-export const roomKind = (room) => (room === BOSS_ROOM ? 'boss' : room === ELITE_ROOM ? 'elite' : 'normal');
+export const roomKind = (wing, room) => (room === bossRoom(wing) ? 'boss' : room === eliteRoom(wing) ? 'elite' : 'normal');
 
 /**
  * Every number that makes a room hard. Endless mode uses the same base curve for `room`, so wing 1
@@ -93,12 +105,12 @@ export const BOSS_BUDGET_STEP = 0.08;
 export const STORY_HP_MULT = 0.95;
 
 export function difficulty(wing, room) {
-  const w = wing - 1, r = curveRoom(room);   // r: position on the old 10-room curve
+  const w = wing - 1, r = curveRoom(room, wing);   // r: position on the old 10-room curve
   const def = WINGS[w] || WINGS[WINGS.length - 1];
-  const kind = roomKind(room);
+  const kind = roomKind(wing, room);
   const goal = roomGoal(wing, room);
   const base = baseBudget(r);
-  const budgetMult = wingBudget(w) * (def.budgetBoost || 1);   // per-wing tuning dial (Act II): never below 1, so wings only get harder
+  const budgetMult = wingBudget(w) * (def.budgetBoost || 1) * (def.act === 2 ? ACT2_BUDGET_MULT : 1);   // per-wing tuning dial (Act II): never below 1, so wings only get harder
   const budget = base * budgetMult * (kind === 'boss' ? 0.35 : kind === 'elite' ? 0.75 : 1) * (goal === 'survive' ? SURVIVE_BUDGET_MULT : 1);
   return {
     wing, room, kind, goal, pos: r,
@@ -129,7 +141,7 @@ export function threat(d) {
 export function composeRoom(wing, room, rng, d = difficulty(wing, room)) {
   const def = WINGS[wing - 1];
   const opts = { boss: d.kind === 'boss', weights: { ...def.weights, ...def.enemyTypes }, unlockShift: def.unlockShift || 0, gapMult: d.gapMult, eliteChance: d.eliteChance };
-  const pos = curveRoom(room);
+  const pos = curveRoom(room, wing);
   if (d.goal !== 'survive') return composeWave(pos, rng, { ...opts, budget: d.budget });
   // Survive: a rising siege. The total budget is split into three chunks weighted toward the end (20% / 30% / 50%),
   // and each chunk's spawn times are fitted into its own slice of the timer, so the same enemies arrive in a
@@ -150,7 +162,7 @@ export function composeRoom(wing, room, rng, d = difficulty(wing, room)) {
 /** Seed for a room's shelf layout: the same every time you play it, like a handmade level. */
 export const layoutSeed = (wing, room) => 7919 * wing + 104729 * room;
 
-const forcedRoom = (room) => room === ELITE_ROOM || room === BOSS_ROOM;
+const forcedRoom = (wing, room) => room === eliteRoom(wing) || room === bossRoom(wing);
 
 /**
  * Which layout shape a story room uses. Fixed per wing + room. Elite and boss rooms take the wing's
@@ -158,10 +170,10 @@ const forcedRoom = (room) => room === ELITE_ROOM || room === BOSS_ROOM;
  */
 export function roomShape(wing, room) {
   const list = (WINGS[wing - 1] || WINGS[0]).shapes;
-  if (forcedRoom(room)) return ['pillars', 'reading'].find((x) => list.includes(x)) || 'scatter';   // Act II elite / boss rooms: the most open shape too (never water-heavy)
+  if (forcedRoom(wing, room)) return ['pillars', 'reading'].find((x) => list.includes(x)) || 'scatter';   // Act II elite / boss rooms: the most open shape too (never water-heavy)
   const start = hashString(`shape:${layoutSeed(wing, room)}`) % list.length;
   const prev = room > 1 ? roomShape(wing, room - 1) : null;
-  const next = forcedRoom(room + 1) ? roomShape(wing, room + 1) : null;
+  const next = forcedRoom(wing, room + 1) ? roomShape(wing, room + 1) : null;
   const order = list.map((_, i) => list[(start + i) % list.length]);
   return order.find((x) => x !== prev && x !== next) || order.find((x) => x !== prev) || order[0];
 }
@@ -169,7 +181,7 @@ export function roomShape(wing, room) {
 /** Fines (🪙) for clearing a room. First clears of a wing pay a one-time bonus on top. */
 export function roomReward(wing, room) {
   // Seven rooms pay about what ten did: normal rooms x1.6, elite x1.25, boss x0.9 (a wing's total stays within 10% of the old one).
-  const kind = roomKind(room);
+  const kind = roomKind(wing, room);
   return kind === 'boss' ? Math.round(0.9 * (25 + wing * 8)) : kind === 'elite' ? Math.round(1.25 * (10 + wing * 3)) : Math.round(1.6 * (3 + wing));
 }
 export const firstClearBonus = (wing) => 30 + 10 * wing;

@@ -128,6 +128,6 @@ server.close();
 const rows = aggregate(results);
 const meta = { date: new Date().toISOString().slice(0, 10), runsPerCell: RUNS, version: BUILD.version, force: FORCE.map(([i, n]) => `${i}:${n}`).join(',') || 'none', rooms: ROOMS_FLAG ? 'old (pre-1.14.0)' : 'new', viewport: `${VW}x${VH}`, wings: WINGS, policies: PICKED, renos: RENOS, seconds: Math.round((Date.now() - started) / 1000) };
 const errs = results.filter((r) => r.outcome === 'error');
-await writeFile(join(OUT, 'report.md'), renderReport(rows, { ...meta, roomInfo: (room, wing) => ({ goal: roomGoal(wing, room), kind: roomKind(room) }) }) + (errs.length ? `\n## Errors\n\n${errs.length} run(s) failed to play and are excluded above:\n\n${[...new Set(errs.flatMap((r) => r.errors || []))].slice(0, 10).map((e) => `- ${e}`).join('\n')}\n` : ''));
+await writeFile(join(OUT, 'report.md'), renderReport(rows, { ...meta, roomInfo: (room, wing) => ({ goal: roomGoal(wing, room), kind: roomKind(wing, room) }) }) + (errs.length ? `\n## Errors\n\n${errs.length} run(s) failed to play and are excluded above:\n\n${[...new Set(errs.flatMap((r) => r.errors || []))].slice(0, 10).map((e) => `- ${e}`).join('\n')}\n` : ''));
 await writeFile(join(OUT, 'report.json'), JSON.stringify({ meta, rows, findings: findings(rows), results }, null, 1));
 console.log(`\nWrote ${OUT}/report.md and report.json in ${meta.seconds}s (${results.length} runs, ${errs.length} errors).`);

@@ -5,7 +5,7 @@
 // Renovations: permanent upgrades that apply to every run, story and endless.
 //
 // Saved under its own key (PROGRESS_KEY) so no existing save is touched.
-import { ROOMS_PER_WING, WINGS, firstClearBonus } from './story.js';
+import { roomsIn, WINGS, firstClearBonus } from './story.js';
 
 export const PROGRESS_KEY = 'overdue.progress.v1';
 
@@ -40,7 +40,7 @@ export function normalizeProgress(raw) {
   for (const r of RENOVATIONS) { const n = int(p.reno?.[r.id], 0, r.max); if (n) reno[r.id] = n; }
   const best = {}, cleared = [];
   for (let w = 1; w <= WINGS.length; w++) {
-    const b = int(p.best?.[w], 0, ROOMS_PER_WING); if (b) best[w] = b;
+    const b = int(p.best?.[w], 0, roomsIn(w)); if (b) best[w] = b;
     if (Array.isArray(p.cleared) && p.cleared.includes(w)) cleared.push(w);
   }
   const unlocked = Math.max(1, int(p.unlocked, 1, WINGS.length), Math.min(WINGS.length, (cleared.length ? Math.max(...cleared) : 0) + 1));
@@ -85,7 +85,7 @@ export function recordRun(progress, run) {
   let banked = Math.max(0, Math.round((run.fines || 0) * runBonuses(progress).fineMult));
   let firstClear = false, unlockedWing = null;
   if (run.mode === 'story' && run.wing >= 1 && run.wing <= WINGS.length) {
-    p.best[run.wing] = Math.max(p.best[run.wing] || 0, Math.min(ROOMS_PER_WING, run.room || 0));
+    p.best[run.wing] = Math.max(p.best[run.wing] || 0, Math.min(roomsIn(run.wing), run.room || 0));
     if (run.cleared && !p.cleared.includes(run.wing)) {
       firstClear = true;
       banked += firstClearBonus(run.wing);

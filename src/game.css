@@ -603,3 +603,8 @@ body.guiding #touchUI #btnGuideSkip { display: block; }
 .version-label .tester-tag { color: #ffd54a; font-weight: 700; letter-spacing: .08em; margin-left: .4em; }
 /* v1.16.0: tile names wrap (up to 3 lines) instead of being cut off ("The Flooded Stacks", "Coming soon") */
 .wing-grid .wing strong { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-overflow: clip; word-break: break-word; font-size: .72em; padding-right: .5em; }
+/* v1.16.1: the What's-new card never covers the title's version line (7 taps there switch tester mode).
+   The card sits at the top, the dim backdrop stops short of the bottom strip and lets taps through to the title. */
+#whatsNew { pointer-events: none; align-items: flex-start; padding-top: .5em; box-sizing: border-box; background: linear-gradient(rgba(5, 3, 12, .7) calc(100% - 3em), transparent 0); }
+#whatsNew .nudge-card { pointer-events: auto; max-height: calc(100% - 4em); }
+#title .version-label { position: relative; z-index: 31; padding: .5em 1.2em; }

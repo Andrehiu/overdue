@@ -45,7 +45,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/palette.js` | 60 | Projectile colours. Pure module (no DOM), unit-tested. |
 | `src/runlog.js` | 103 | Run log (v1.14.0): one compact record per finished run, kept on this phone, plus the "Share stats" code. |
 | `src/status.js` | 139 | Status effects (v1.15.0 part A): ink, chill, static + Pop-up Book maths. Pure module (no DOM), unit-tested. |
-| `src/story.js` | 176 | Story mode: ten handmade library wings (7 rooms each), unlocked in order. Pure module (no DOM) so it is unit-tested. |
+| `src/story.js` | 188 | Story mode: handmade library wings (7 rooms each in Act I, 9 in Act II), unlocked in order. Pure module (no DOM) so it is unit-tested. |
 | `src/themes.js` | 36 | Act themes (v1.16.0): one object per act, read by buildBackground() and the lamp glow in main.js. |
 | `src/upgrades.js` | 359 | Perks offered between waves. Pure data + a seeded roller (no DOM), so it is unit-tested. |
 | `src/util.js` | 132 | Small, dependency-free helpers shared by the game and its unit tests. |
@@ -55,8 +55,8 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/act2.test.js` | 104 | Act II foundation (v1.16.0): water layouts, themes, wings 11-12, tester-safe progress. Pure rules, no DOM. |
 | `test/autoaim.test.js` | 46 |  |
 | `test/backup.test.js` | 63 | Save backup code (v1.13.1): pure encode / decode / validate rules, no DOM. |
-| `test/balance.test.js` | 137 | Balance bot (v1.7.1 tooling): pure helpers only, no browser. See scripts/balance-lib.mjs. |
-| `test/doors.test.js` | 156 | Story doors (v1.7.0): pure rules, no DOM. |
+| `test/balance.test.js` | 138 | Balance bot (v1.7.1 tooling): pure helpers only, no browser. See scripts/balance-lib.mjs. |
+| `test/doors.test.js` | 172 | Story doors (v1.7.0): pure rules, no DOM. |
 | `test/enemy-art.test.js` | 35 | Enemy art colours and the patron ripple (pure data from src/enemy-art.js; no canvas needed). |
 | `test/game-logic.test.js` | 614 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
 | `test/new-perks.test.js` | 90 | v1.15.0 part B: Margin Notes, Last Chapter, Library Cat, Crossfire, plus the "What's new" card and NEW badges. Pure rules, no DOM. |
@@ -66,7 +66,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/rooms.test.js` | 69 | Rooms +20% (v1.14.0): story grids are bigger, endless keeps the legacy grid, every shape stays valid at the new sizes. |
 | `test/runlog.test.js` | 70 | Run log (v1.14.0): record build, ring buffer, Share stats code. Pure rules, no DOM. |
 | `test/status.test.js` | 146 | Status effects (v1.15.0 part A): freeze rule, boss immunity, chain rule, proc scaling, ink/chill/zap maths. Pure, no DOM. |
-| `test/story-meta.test.js` | 270 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
+| `test/story-meta.test.js` | 335 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
 | `test/water-enemies.test.js` | 130 | Act II water enemies (v1.16.0 part B): eel surface/dive timer, boat drop cadence, spawn and movement only on water, endless/Act I untouched. Pure rules, no DOM. |
 | `scripts/qa/run.mjs` | 1636 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 50 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
@@ -103,7 +103,7 @@ CATALOGUE:3
 
 ## src/doors.js
 
-DOORS:11 · POOL:21 · FIXED_AFTER:22 · doorOffer:25 · soleDoor:36 · applyDoor:39 · doorReward:51 · mysteryPrize:62 · rarePick:76
+DOORS:11 · POOL:21 · doorOffer:24 · soleDoor:36 · applyDoor:39 · doorReward:51 · mysteryPrize:62 · rarePick:76
 
 ## src/enemy-art.js
 
@@ -150,7 +150,7 @@ STATUS_SOURCES:25 · isStatusSource:26 · PROC_SOURCES:28 · canProc:29 · clamp
 
 ## src/story.js
 
-CURVE:18 · curveRoom:19 · SURVIVE_CHUNKS:27 · SURVIVE_ROOMS:28 · roomGoal:30 · WINGS:34 · actOf:76 · roomKind:79 · wingBudget:89 · wingHp:90 · difficulty:95 · threat:124 · composeRoom:129 · layoutSeed:151 · forcedRoom:153 · roomShape:159 · roomReward:170 · firstClearBonus:175
+roomsIn:20 · eliteRoom:21 · bossRoom:22 · CURVE:28 · CURVE_ACT2:30 · curveRoom:31 · SURVIVE_CHUNKS:39 · SURVIVE_ROOMS:40 · roomGoal:42 · WINGS:46 · actOf:88 · roomKind:91 · wingBudget:101 · wingHp:102 · difficulty:107 · threat:136 · composeRoom:141 · layoutSeed:163 · forcedRoom:165 · roomShape:171 · roomReward:182 · firstClearBonus:187
 
 ## src/themes.js
 
@@ -217,10 +217,10 @@ ENEMY_TYPES:3 · isBossWave:14 · baseBudget:17 · waveBudget:19 · composeWave:
 - 47: aggregation: clear rate, death rooms, hearts, fines, time, timeouts; errors are left out
 - 64: what-stands-out: biggest wing drop, best policy, death pile-up; report renders
 - 82: the balance bot knows the wing length
-- 88: per-room stats: reached counts, death share and reach-conditional death rate
-- 100: survive check: compares with the clear rooms around it, verdict easy / fine / hard
-- 110: report shows goal and kind per room
-- 117: v1.14.0 tooling: force-perks parsing, histogram percentiles, pooled run-log metrics, report section
+- 89: per-room stats: reached counts, death share and reach-conditional death rate
+- 101: survive check: compares with the clear rooms around it, verdict easy / fine / hard
+- 111: report shows goal and kind per room
+- 118: v1.14.0 tooling: force-perks parsing, histogram percentiles, pooled run-log metrics, report section
 
 ## test/doors.test.js
 
@@ -233,6 +233,7 @@ ENEMY_TYPES:3 · isBossWave:14 · baseBudget:17 · waveBudget:19 · composeWave:
 - 109: Rare Books (v1.7.1): strictly harder in every wing and room; the bite starts at wing 4
 - 126: v1.12.2: fixed Elite / Author doors are walked through without a screen; real choices are not
 - 139: Rare pick (v1.14.1): completes a combo first, else advances a Masterwork perk, else any owned perk, else nothing
+- 157: Act II doors: rooms 1-8 of a 9-room wing get offers, elite door before room 5, author door before room 9, none after the boss
 
 ## test/enemy-art.test.js
 
@@ -352,22 +353,25 @@ ENEMY_TYPES:3 · isBossWave:14 · baseBudget:17 · waveBudget:19 · composeWave:
 ## test/story-meta.test.js
 
 - 7: every room is harder than the one before it, in every wing
-- 17: every wing is harder than the previous wing, room for room
-- 32: wing 1 plays like the opening of endless (mapped onto the old curve); room 4 is elite and room 7 a boss
-- 55: roomGoal: never room 1, the elite or the boss room; capped per wing; deterministic; most wings have one
-- 72: a Survive room is never easier than the same room played plain, and its spawns fill the whole timer
-- 95: Survive rooms build up: every spawn lands well before the buzzer and the budget arrives in a rising crescendo
-- 118: fines: a full 7-room wing pays within 10% of the old 10-room wing, elite and boss stay the biggest
-- 128: an old 10-room save loads safely: best clamps to 7, wing 1 stays cleared, wing 2 stays unlocked
-- 135: composeWave without story options is unchanged (endless runs stay reproducible)
-- 145: story layouts are fixed per room and every room is connected
-- 160: Renovation costs rise with level and every stat stays finite at max
-- 175: buying spends fines, refuses when broke or maxed
-- 187: runs bank fines, unlock the next wing once, and saves repair themselves
-- 213: a lost wing-1 run that dies in the room after the elite room still affords the cheapest Renovation
-- 222: every wing has room shapes; elite and boss rooms are open; shapes do not repeat back to back
-- 239: even the worst door route (cheapest door every time) still affords the cheapest Renovation by the room after the elite room
-- 264: every wing has an intro, taunt and cleared line, each 1-60 characters
+- 27: every wing is harder than the previous wing, room for room (Act II compares at the same position on the old curve)
+- 43: Act II: 9 rooms, elite at 5, boss at 9; wing 11 beats wing 10 at every position, rooms 8-9 beat wing 10\
+- 69: wing 1 plays like the opening of endless (mapped onto the old curve); room 4 is elite and room 7 a boss
+- 92: roomGoal: never room 1, the elite or the boss room; capped per wing; deterministic; most wings have one
+- 109: a Survive room is never easier than the same room played plain, and its spawns fill the whole timer
+- 132: Survive rooms build up: every spawn lands well before the buzzer and the budget arrives in a rising crescendo
+- 155: fines: a full 7-room wing pays within 10% of the old 10-room wing, elite and boss stay the biggest
+- 165: fines: an Act II wing keeps Act II\
+- 176: an old 10-room save loads safely: best clamps to 7, wing 1 stays cleared, wing 2 stays unlocked
+- 183: composeWave without story options is unchanged (endless runs stay reproducible)
+- 193: story layouts are fixed per room and every room is connected
+- 208: Renovation costs rise with level and every stat stays finite at max
+- 223: buying spends fines, refuses when broke or maxed
+- 235: runs bank fines, unlock the next wing once, and saves repair themselves
+- 261: a lost wing-1 run that dies in the room after the elite room still affords the cheapest Renovation
+- 270: every wing has room shapes; elite and boss rooms are open; shapes do not repeat back to back
+- 287: even the worst door route (cheapest door every time) still affords the cheapest Renovation by the room after the elite room
+- 312: every wing has an intro, taunt and cleared line, each 1-60 characters
+- 319: saves: an Act II best of 7 (the 1.16.0 boss) stays cleared with wing 12 unlocked; best clamps per wing (7 in Act I, 9 in Act II)
 
 ## test/water-enemies.test.js
 

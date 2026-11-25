@@ -1,7 +1,7 @@
 // Balance bot (v1.7.1 tooling): pure helpers only, no browser. See scripts/balance-lib.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-const { chooseDoor, pickPerk, chooseMove, aggregate, findings, renderReport, roomStats, surviveChecks } = await import('../scripts/balance-lib.mjs');
+const { chooseDoor, pickPerk, chooseMove, aggregate, findings, renderReport, roomStats, surviveChecks, ACT2_ROOMS, roomsFor } = await import('../scripts/balance-lib.mjs');
 
 test('door policies: rare, rest, mixed; Mystery Shelf only as a last resort; fixed doors are taken', () => {
   assert.equal(chooseDoor('rare', ['rest', 'rare'], 5), 'rare');
@@ -81,8 +81,9 @@ test('what-stands-out: biggest wing drop, best policy, death pile-up; report ren
 
 test('the balance bot knows the wing length', async () => {
   const { ROOMS } = await import('../scripts/balance-lib.mjs');
-  const { ROOMS_PER_WING } = await import('../src/story.js');
-  assert.equal(ROOMS, ROOMS_PER_WING);
+  const { ROOMS_PER_WING, ACT2_ROOMS: A2, roomsIn } = await import('../src/story.js');
+  assert.equal(ROOMS, ROOMS_PER_WING); assert.equal(ACT2_ROOMS, A2);
+  for (let w = 1; w <= 12; w++) assert.equal(roomsFor(w), roomsIn(w));
 });
 
 test('per-room stats: reached counts, death share and reach-conditional death rate', () => {

@@ -815,7 +815,7 @@ async function rotationFlow(label, port, land, kind) {
 // ---------------------------------------------------------------- 4b. one story room per layout shape (iphone-landscape)
 async function shapesFlow() {
   const record = recorder();
-  const { WINGS, ROOMS_PER_WING, roomShape } = await import(pathToFileURL(join(ROOT, 'src/story.js')).href);
+  const { WINGS, roomsIn, roomShape } = await import(pathToFileURL(join(ROOT, 'src/story.js')).href);
   const { SHAPES, WATER_SHAPES } = await import(pathToFileURL(join(ROOT, 'src/arena.js')).href);
   const ctx = await browser.newContext(devices['iPhone 13 landscape']);
   const page = await ctx.newPage();
@@ -825,7 +825,7 @@ async function shapesFlow() {
   for (const shape of [...SHAPES, ...WATER_SHAPES]) {
     // Prefer a mid-to-late normal room so the shape is at a decent density.
     let pick = null;
-    for (const r of [6, 5, 3, 2, 1, 4, 7]) for (let w = 1; w <= WINGS.length && !pick; w++) if (roomShape(w, r) === shape) pick = [w, r];
+    for (const r of [6, 5, 3, 2, 1, 4, 7, 8, 9]) for (let w = 1; w <= WINGS.length && !pick; w++) if (roomShape(w, r) === shape) pick = [w, r];
     if (!pick) { record('shapes', `${shape}: a story room uses it`, shape === 'scatter' ? true : false, 'no wing/room found'); continue; }
     await page.evaluate(([w, r]) => { const O = __overdue; O.unlockAll(); O.startRun('story', w); O.startWave(r); O.god(); }, pick);
     await page.waitForTimeout(1500);
@@ -844,7 +844,7 @@ async function shapesFlow() {
 // ---------------------------------------------------------------- v1.16.0: Act II foundation (wing map pages, tester switch, water rooms, Act I look unchanged)
 async function act2Flow() {
   const record = recorder();
-  const { WINGS, ROOMS_PER_WING, roomShape } = await import(pathToFileURL(join(ROOT, 'src/story.js')).href);
+  const { WINGS, roomsIn, roomShape } = await import(pathToFileURL(join(ROOT, 'src/story.js')).href);
   const { WATER_SHAPES } = await import(pathToFileURL(join(ROOT, 'src/arena.js')).href);
   const ref = JSON.parse(readFileSync(join(ROOT, 'scripts/qa/act1-bg.json'), 'utf8'));
   const ctx = await browser.newContext(devices['iPhone 13 landscape']);
@@ -909,7 +909,7 @@ async function act2Flow() {
   record('act2', '7 more taps switch tester mode off', await page.evaluate(() => localStorage.getItem('overdue.tester.v1')) === '{"on":false}');
 
   // 3. an Act II water room: renders, the player can't step into water, books fly over it
-  const pick = (() => { for (const w of [11, 12]) for (let r = 1; r <= ROOMS_PER_WING; r++) if (WATER_SHAPES.includes(roomShape(w, r))) return [w, r]; return null; })();
+  const pick = (() => { for (const w of [11, 12]) for (let r = 1; r <= roomsIn(w); r++) if (WATER_SHAPES.includes(roomShape(w, r))) return [w, r]; return null; })();
   await page.evaluate(([w, r]) => { const O = __overdue; O.unlockAll(); O.startRun('story', w); O.startWave(r); O.god(); O.killAll(); O.freeze(false); }, pick);
   await page.waitForTimeout(1200);
   await shot(page, 'act2-room');

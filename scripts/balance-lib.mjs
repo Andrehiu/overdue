@@ -7,6 +7,9 @@ export const WINGS_TESTED = [1, 4, 7, 10];
 export const DEALT_SOURCES = ['throw', 'crit', 'dash', 'orbit', 'cat', 'burst', 'splash', 'shhh', 'other'];   // = src/runlog.js (this file runs in the game page too, so it imports nothing)
 export const RENO_PRESETS = ['none', 'half', 'p65', 'max'];
 export const ROOMS = 7;   // = ROOMS_PER_WING in src/story.js (a unit test keeps them equal; this file also runs inside the game page, so it imports nothing)
+export const ACT2_ROOMS = 9;   // = ACT2_ROOMS in src/story.js (same unit test); Act II wings (11+) have 9 rooms
+export const MAX_ROOMS = 9;
+export const roomsFor = (wing) => (wing >= 11 ? ACT2_ROOMS : ROOMS);   // until Act III: wings 11-20 are Act II
 
 /** Door preference per policy, best first. Mystery Shelf is always last: only taken when nothing else is offered. */
 const ORDER = {
@@ -148,17 +151,18 @@ export function aggregate(results) {
   for (const g of rows.values()) {
     const ok = g.runs.filter((r) => r.outcome !== 'error');
     const clears = ok.filter((r) => r.outcome === 'clear');
-    const deathRooms = Array(ROOMS).fill(0);
-    for (const r of ok) if (r.outcome === 'death' && r.room >= 1 && r.room <= ROOMS) deathRooms[r.room - 1]++;
+    const rooms = roomsFor(g.wing);
+    const deathRooms = Array(MAX_ROOMS).fill(0);
+    for (const r of ok) if (r.outcome === 'death' && r.room >= 1 && r.room <= rooms) deathRooms[r.room - 1]++;
     // Runs that reached room r: clears reached all rooms; a death or timeout in room d reached rooms 1..d.
-    const reached = Array(ROOMS).fill(0);
-    for (const r of ok) { const top = r.outcome === 'clear' ? ROOMS : Math.min(ROOMS, Math.max(0, r.room)); for (let i = 0; i < top; i++) reached[i]++; }
+    const reached = Array(MAX_ROOMS).fill(0);
+    for (const r of ok) { const top = r.outcome === 'clear' ? rooms : Math.min(rooms, Math.max(0, r.room)); for (let i = 0; i < top; i++) reached[i]++; }
     out.push({
-      renos: g.renos, wing: g.wing, policy: g.policy, reached,
+      renos: g.renos, wing: g.wing, policy: g.policy, reached: reached.slice(0, rooms),
       runs: ok.length, errors: g.runs.length - ok.length,
       clears: clears.length, timeouts: ok.filter((r) => r.outcome === 'timeout').length,
       clearRate: ok.length ? clears.length / ok.length : null,
-      deathRooms,
+      deathRooms: deathRooms.slice(0, rooms),
       heartsLeft: round(avg(clears.map((r) => r.hearts))),
       fines: round(avg(ok.map((r) => r.fines))),
       time: round(avg(ok.map((r) => r.time)), 0),
@@ -173,8 +177,8 @@ export function aggregate(results) {
  * -> [{ room, reached, deaths, share (deaths / all deaths), rate (deaths / reached) }]
  */
 export function roomStats(rows) {
-  const deaths = Array(ROOMS).fill(0), reached = Array(ROOMS).fill(0);
-  for (const r of rows) for (let i = 0; i < ROOMS; i++) { deaths[i] += r.deathRooms?.[i] || 0; reached[i] += r.reached?.[i] || 0; }
+  const deaths = Array(MAX_ROOMS).fill(0), reached = Array(MAX_ROOMS).fill(0);
+  for (const r of rows) for (let i = 0; i < MAX_ROOMS; i++) { deaths[i] += r.deathRooms?.[i] || 0; reached[i] += r.reached?.[i] || 0; }
   const total = deaths.reduce((a, b) => a + b, 0);
   return deaths.map((d, i) => ({ room: i + 1, reached: reached[i], deaths: d, share: total ? d / total : null, rate: reached[i] ? d / reached[i] : null }));
 }
@@ -227,7 +231,7 @@ export function findings(rows) {
       // Where do the deaths pile up?
       const total = cells.reduce((a, r) => a + r.deathRooms.reduce((x, y) => x + y, 0), 0);
       if (total >= 5) {
-        const sum = Array(ROOMS).fill(0);
+        const sum = Array(MAX_ROOMS).fill(0);
         for (const r of cells) r.deathRooms.forEach((n, i) => { sum[i] += n; });
         const top = sum.indexOf(Math.max(...sum));
         if (sum[top] / total >= 0.3) out.push(`Wing ${w}${tag}: ${Math.round((sum[top] / total) * 100)}% of deaths happen in room ${top + 1}.`);
@@ -286,10 +290,10 @@ export function renderReport(rows, meta = {}) {
   L.push(...(f.length ? f.map((x) => `- ${x}`) : ['- Nothing stands out.']), '');
   for (const renos of [...new Set(rows.map((r) => r.renos))]) {
     L.push(`## ${renos === 'none' ? 'Fresh save (no Renovations)' : 'Mid-game save (about half of every Renovation)'}`, '');
-    L.push(`| Wing | Policy | Runs | Clear | Hearts left (clears) | Fines/run | Run time | Timeouts | Deaths by room 1–${ROOMS} |`);
+    L.push(`| Wing | Policy | Runs | Clear | Hearts left (clears) | Fines/run | Run time | Timeouts | Deaths by room (7 in Act I, 9 in Act II) |`);
     L.push('|---|---|---|---|---|---|---|---|---|');
     for (const r of rows.filter((x) => x.renos === renos)) {
-      L.push(`| ${r.wing} | ${r.policy} | ${r.runs}${r.errors ? ` (+${r.errors} err)` : ''} | ${pct(r.clearRate)} (${r.clears}/${r.runs}) | ${r.heartsLeft ?? '–'} | ${r.fines ?? '–'} | ${mmss(r.time)} | ${r.timeouts} | ${r.deathRooms.join(' ')} |`);
+      L.push(`| ${r.wing} | ${r.policy} | ${r.runs}${r.errors ? ` (+${r.errors} err)` : ''} | ${pct(r.clearRate)} (${r.clears}/${r.runs}) | ${r.heartsLeft ?? '–'} | ${r.fines ?? '–'} | ${mmss(r.time)} | ${r.timeouts} | ${r.deathRooms.join(" ")} |`);
     }
     L.push('');
     const info = meta.roomInfo || (() => ({ goal: 'clear', kind: 'normal' }));
@@ -303,7 +307,7 @@ export function renderReport(rows, meta = {}) {
       L.push('| Room | Goal | Kind | ' + groups.map((g) => `${g.label} reached / deaths / share / rate`).join(' | ') + ' |');
       L.push('|---|---|---|' + groups.map(() => '---').join('|') + '|');
       const stats = groups.map((g) => roomStats(g.rows));
-      for (let i = 0; i < ROOMS; i++) {
+      for (let i = 0; i < roomsFor(w); i++) {
         const inf = info(i + 1, w);
         L.push(`| ${i + 1} | ${inf.goal === 'survive' ? '⏱️ survive' : 'clear'} | ${inf.kind === 'elite' ? '⭐ elite' : inf.kind === 'boss' ? '👑 boss' : 'normal'} | ` + stats.map((st) => `${st[i].reached} / ${st[i].deaths} / ${pct(st[i].share)} / ${pct(st[i].rate)}`).join(' | ') + ' |');
       }
