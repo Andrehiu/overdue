@@ -68,7 +68,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/status.test.js` | 146 | Status effects (v1.15.0 part A): freeze rule, boss immunity, chain rule, proc scaling, ink/chill/zap maths. Pure, no DOM. |
 | `test/story-meta.test.js` | 335 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
 | `test/water-enemies.test.js` | 130 | Act II water enemies (v1.16.0 part B): eel surface/dive timer, boat drop cadence, spawn and movement only on water, endless/Act I untouched. Pure rules, no DOM. |
-| `scripts/qa/run.mjs` | 1662 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
+| `scripts/qa/run.mjs` | 1661 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 50 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
 | `scripts/codemap.mjs` | 113 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
@@ -385,7 +385,7 @@ ENEMY_TYPES:3 · isBossWave:14 · baseBudget:17 · waveBudget:19 · composeWave:
 
 ## scripts/qa/run.mjs
 
-results:29 · record:30 · want:34 · recorder:36 · pool:38 · sh:41 · TYPES:57 · TARGETS:67 · FULL_TARGETS:79 · FILL_JS:82 · TITLE_FIT_JS:83 · shot:95 · PINNED_CHECK:103 · RETURNING_SAVE:137 · TITLE_MENUS_JS:143 · screensFlow:147 · menusFlow:634 · rotateOverlayFlow:740 · ROTATIONS:780 · rotationFlow:785 · shapesFlow:816 · act2Flow:845 · statusFlow:1049 · lookFeelFlow:1081 · newPlayerFlow:1159 · newPerksFlow:1253 · steadyContext:1321 · basicsFlow:1339 · perfSample:1541 · perfDetail:1547 · perfChecks:1553 · md:1649
+results:29 · record:30 · want:34 · recorder:36 · pool:38 · sh:41 · TYPES:57 · TARGETS:67 · FULL_TARGETS:79 · FILL_JS:82 · TITLE_FIT_JS:83 · shot:95 · PINNED_CHECK:103 · RETURNING_SAVE:137 · TITLE_MENUS_JS:143 · screensFlow:147 · menusFlow:634 · rotateOverlayFlow:740 · ROTATIONS:780 · rotationFlow:785 · shapesFlow:816 · act2Flow:845 · statusFlow:1048 · lookFeelFlow:1080 · newPlayerFlow:1158 · newPerksFlow:1252 · steadyContext:1320 · basicsFlow:1338 · perfSample:1540 · perfDetail:1546 · perfChecks:1552 · md:1648
 
 ## scripts/build.mjs
 
