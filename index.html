@@ -162,13 +162,18 @@
       <div class="cols codex-cols">
         <div><h3>Collected Works<small class="cap">perk combos</small></h3><ul id="codexCombos" class="codex-list"></ul></div>
         <div><h3>Masterworks<small class="cap">max-level bonuses</small></h3><ul id="codexMasters" class="codex-list"></ul></div>
+        <div><h3>Field Notes<small class="cap">creatures you have met</small></h3><ul id="codexCreatures" class="codex-list"></ul></div>
       </div>
       <div class="menu row"><button data-act="back">Back</button></div>
     </section>
 
     <section id="story" class="screen" hidden>
-      <h2>Story: the library wings</h2>
-      <p class="muted small">Clear all 7 rooms of a wing to unlock the next. Each wing is tougher than the last. Perks reset every run; Renovations don’t.</p>
+      <div class="act-nav">
+        <button id="actPrev" data-act="actprev" type="button" aria-label="Previous act">‹</button>
+        <h2 id="actTitle">Act I · The Library</h2>
+        <button id="actNext" data-act="actnext" type="button" aria-label="Next act">›</button>
+      </div>
+      <p class="muted small">Clear every room of a wing to unlock the next. Each wing is tougher than the last. Swipe to change act. Perks reset every run; Renovations don’t.</p>
       <div id="wingGrid" class="wing-grid"></div>
       <div class="wing-detail">
         <h3 id="wingName"></h3>
@@ -233,6 +238,13 @@
         <p>Add <b>Overdue!</b> to your Home Screen. Safari can wipe a website’s saved data after about a week, but an installed app keeps it.</p>
         <ol><li>Tap the <b>Share</b> button <span aria-hidden="true">⎙</span> in Safari</li><li>Choose <b>Add to Home Screen</b></li></ol>
         <div class="menu row"><button id="btnNudgeOk" type="button" class="primary">Got it</button><button id="btnNudgeOff" type="button">Don’t show again</button></div>
+      </div>
+    </div>
+    <div id="whatsNew" class="nudge" role="dialog" aria-label="What's new" hidden>
+      <div class="nudge-card">
+        <h3 id="wnTitle"></h3>
+        <ul id="wnLines"></ul>
+        <div class="menu row"><button id="btnWnOk" type="button" class="primary">Got it</button></div>
       </div>
     </div>
     <div id="toast" role="status" hidden></div>

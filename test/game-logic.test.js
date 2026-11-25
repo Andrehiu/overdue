@@ -325,13 +325,13 @@ const shelfGap = (a, b) => Math.max(a.x - (b.x + b.w), b.x - (a.x + a.w), a.y - 
 
 test('aisles are at least 2 cells (60 px) wide in every room, on every screen shape, and never empty', async () => {
   const A = await load('arena');
-  const { WINGS, ROOMS_PER_WING, difficulty, layoutSeed, roomShape } = await load('story');
+  const { WINGS, roomsIn, difficulty, layoutSeed, roomShape } = await load('story');
   const shapes = [[32, 18], [18, 32], [28, 20], [20, 28], ...[0.5, 1, 1.4, 2, 2.05, 2.17, 2.2].map((a) => A.gridForAspect(a)), ...[1.33, 1.52, 2, 2.17, 2.2].map((a) => A.gridForAspect(a, true))];
   const check = (a, label) => {
-    assert.ok(a.shelves.length > 0, `${label}: has shelves`);
-    assert.ok(A.isConnected(a.solid), `${label}: connected`);
+    assert.ok(a.shelves.length > 0 || a.water, `${label}: has shelves (or water)`);
+    assert.ok(A.isConnected(a.walk || a.solid), `${label}: connected`);
     for (let y = A.SAFE.y0; y <= A.SAFE.y1; y++) for (let x = A.SAFE.x0; x <= A.SAFE.x1; x++) assert.equal(a.solid[A.idx(x, y)], 0, `${label}: spawn zone clear`);
-    assert.ok(A.isWide(a.solid), `${label}: every free cell is in a free 2x2 block`);
+    assert.ok(A.isWide(a.walk || a.solid), `${label}: every free cell is in a free 2x2 block`);
     if (a.shape !== 'scatter') return; // shaped rooms may have touching walls; the 2x2 rule above is what they must keep
     for (const s of a.shelves) { // walls
       assert.ok(s.x >= A.AISLE && s.y >= A.AISLE && A.COLS - (s.x + s.w) >= A.AISLE && A.ROWS - (s.y + s.h) >= A.AISLE, `${label}: wall aisle`);
@@ -344,7 +344,7 @@ test('aisles are at least 2 cells (60 px) wide in every room, on every screen sh
     for (const [cols, rows] of shapes) {
       A.setGrid(cols, rows);
       for (let seed = 1; seed <= 20; seed++) for (let wave = 1; wave <= 30; wave++) check(A.generateArena(seed, wave), `${cols}x${rows} endless seed ${seed} wave ${wave}`);
-      for (let w = 1; w <= WINGS.length; w++) for (let r = 1; r <= ROOMS_PER_WING; r++) {
+      for (let w = 1; w <= WINGS.length; w++) for (let r = 1; r <= roomsIn(w); r++) {
         check(A.generateArena(layoutSeed(w, r), r, difficulty(w, r).shelvesPerHalf, roomShape(w, r)), `${cols}x${rows} story wing ${w} room ${r}`);
       }
     }

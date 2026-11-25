@@ -1,7 +1,7 @@
 // Balance bot (v1.7.1 tooling): pure helpers only, no browser. See scripts/balance-lib.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-const { chooseDoor, pickPerk, chooseMove, aggregate, findings, renderReport, roomStats, surviveChecks } = await import('../scripts/balance-lib.mjs');
+const { chooseDoor, pickPerk, chooseMove, aggregate, findings, renderReport, roomStats, surviveChecks, ACT2_ROOMS, roomsFor } = await import('../scripts/balance-lib.mjs');
 
 test('door policies: rare, rest, mixed; Mystery Shelf only as a last resort; fixed doors are taken', () => {
   assert.equal(chooseDoor('rare', ['rest', 'rare'], 5), 'rare');
@@ -81,8 +81,9 @@ test('what-stands-out: biggest wing drop, best policy, death pile-up; report ren
 
 test('the balance bot knows the wing length', async () => {
   const { ROOMS } = await import('../scripts/balance-lib.mjs');
-  const { ROOMS_PER_WING } = await import('../src/story.js');
-  assert.equal(ROOMS, ROOMS_PER_WING);
+  const { ROOMS_PER_WING, ACT2_ROOMS: A2, roomsIn } = await import('../src/story.js');
+  assert.equal(ROOMS, ROOMS_PER_WING); assert.equal(ACT2_ROOMS, A2);
+  for (let w = 1; w <= 12; w++) assert.equal(roomsFor(w), roomsIn(w));
 });
 
 test('per-room stats: reached counts, death share and reach-conditional death rate', () => {
@@ -120,7 +121,7 @@ test('v1.14.0 tooling: force-perks parsing, histogram percentiles, pooled run-lo
   assert.deepEqual(L.parseForce('hardcover'), [['hardcover', 1]]);
   assert.deepEqual(L.parseForce('dewey:9,../x:1,:2,'), [['dewey', 3]]);
   assert.deepEqual(L.parseForce(''), []); assert.deepEqual(L.parseForce('none'), []);
-  assert.deepEqual(L.RENO_PRESETS, ['none', 'half', 'max']);
+  assert.deepEqual(L.RENO_PRESETS, ['none', 'half', 'p65', 'max']);
   assert.equal(L.histP([0, 0, 0], 0.5), null); assert.equal(L.histP([5, 0, 5], 0.5, 0.1), 0); assert.equal(L.histP([5, 0, 5], 0.95, 0.1), 0.2);
   const run = (o) => ({ dealt: { throw: 80, crit: 20, orbit: 0 }, taken: { bunny: 2 }, thrown: 10, ended: 10, thrownHit: 4, evict: 3, flight: [0, 5, 5], life: [2, 8], pages: { hits: 2, crossed: 3, crossedHit: 1, blocked: 2, blockedHit: 2 }, bossKills: [30], seconds: 100, ...o });
   const m = L.poolMetrics([{ metrics: run() }, { metrics: run({ taken: { 'page:fan': 1 }, bossKills: [] }) }, { outcome: 'error' }]);

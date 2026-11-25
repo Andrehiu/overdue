@@ -23,24 +23,25 @@ test('story grids are ~20% longer per side, even columns, follow the screen shap
 test('every room shape of every story room is valid at the new sizes (connected, wide, spawn clear, flow field reaches all, doors)', async () => {
   const A = await load('arena');
   const { computeFlowField } = await load('flowfield');
-  const { WINGS, ROOMS_PER_WING, difficulty, layoutSeed, roomShape } = await load('story');
+  const { WINGS, roomsIn, difficulty, layoutSeed, roomShape } = await load('story');
   try {
     for (const asp of ASPECTS) {
       const [cols, rows] = A.gridForAspect(asp, true);
       A.setGrid(cols, rows);
       const k = A.areaK();
       assert.ok(k >= 1.2, `area scale ${k.toFixed(2)} at ${cols}x${rows}`);
-      for (let w = 1; w <= WINGS.length; w++) for (let r = 1; r <= ROOMS_PER_WING; r++) {
+      for (let w = 1; w <= WINGS.length; w++) for (let r = 1; r <= roomsIn(w); r++) {
         const label = `${cols}x${rows} wing ${w} room ${r}`;
         const d = difficulty(w, r), shape = roomShape(w, r);
         const a = A.generateArena(layoutSeed(w, r), r, Math.round(d.shelvesPerHalf * k), shape);
-        assert.ok(a.shelves.length > 0, `${label}: has shelves`);
-        assert.ok(A.isConnected(a.solid), `${label}: connected`);
-        assert.ok(A.isWide(a.solid), `${label}: shelf gaps >= 60 px`);
+        assert.ok(a.shelves.length > 0 || a.water, `${label}: has shelves (or water)`);
+        const walk = a.walk || a.solid;   // Act II: shelves + deep water
+        assert.ok(A.isConnected(walk), `${label}: connected`);
+        assert.ok(A.isWide(walk), `${label}: shelf gaps >= 60 px`);
         for (let y = A.SAFE.y0; y <= A.SAFE.y1; y++) for (let x = A.SAFE.x0; x <= A.SAFE.x1; x++) assert.equal(a.solid[A.idx(x, y)], 0, `${label}: spawn clear`);
-        const f = computeFlowField(a.solid, cols, rows, cols >> 1, rows >> 1);
-        for (let i = 0; i < a.solid.length; i++) if (!a.solid[i]) assert.ok(Number.isFinite(f.dist[i]), `${label}: flow field reaches cell ${i}`);
-        const edge = A.edgeCells(a.solid);
+        const f = computeFlowField(walk, cols, rows, cols >> 1, rows >> 1);
+        for (let i = 0; i < walk.length; i++) if (!walk[i]) assert.ok(Number.isFinite(f.dist[i]), `${label}: flow field reaches cell ${i}`);
+        const edge = A.edgeCells(walk);
         assert.ok(edge.length >= 12, `${label}: ${edge.length} entry points`);
       }
     }

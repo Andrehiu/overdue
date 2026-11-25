@@ -17,6 +17,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       # Unit tests, every screen on phone/tablet/desktop, perf budget (relaxed for CI runners), privacy scan
       - run: npm run qa -- --ci
+        env:
+          QA_PRIVATE_TERMS: ${{ secrets.QA_PRIVATE_TERMS }}   # optional; unset = scan skipped
       - name: Upload QA report and screenshots
         if: always()
         uses: actions/upload-artifact@v4

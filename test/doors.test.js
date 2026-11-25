@@ -153,3 +153,20 @@ test('Rare pick (v1.14.1): completes a combo first, else advances a Masterwork p
     assert.notEqual(rarePick(r(), { dewey: 1 }, { banned: new Set(['bookmark']) })?.id, 'bookmark');
   }
 });
+
+test('Act II doors: rooms 1-8 of a 9-room wing get offers, elite door before room 5, author door before room 9, none after the boss', async () => {
+  const { doorOffer } = await load('doors');
+  const { roomsIn, eliteRoom } = await load('story');
+  for (const wing of [11, 12]) {
+    assert.equal(roomsIn(wing), 9); assert.equal(eliteRoom(wing), 5);
+    for (let room = 1; room <= 8; room++) {
+      const o = doorOffer(7, wing, room);
+      if (room === 4) assert.deepEqual(o, ['elite']);
+      else if (room === 8) assert.deepEqual(o, ['author']);
+      else assert.equal(o.length, 2, `wing ${wing} room ${room}`);
+    }
+    assert.deepEqual(doorOffer(7, wing, 9), []);
+    assert.deepEqual(doorOffer(7, wing, 0), []);
+  }
+  assert.equal(doorOffer(7, 10, 7).length, 0); assert.deepEqual(doorOffer(7, 10, 6), ['author']);   // Act I unchanged
+});

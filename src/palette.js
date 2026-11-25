@@ -17,6 +17,14 @@ export const PLAYER = {
   trail: '#9be7dc',    // Dewey Decimal Guidance: teal dotted homing trail
   glint: '#ffffff',    // Plot Twist: white arrowhead (pierce)
   crack: '#ffd54a',    // Spine Breaker: glowing cracked spine
+  cat: '#8fa6c0',      // Library Cat: grey-blue fur
+  catCollar: '#2fc4b2', // Library Cat: teal collar
+  // Status effects (v1.15.0): each its own colour, none an enemy hue
+  ink: '#9a6bff',      // Leaky Pen: violet ink drop
+  inkRim: '#d9c8ff',   // ...with a light rim
+  chill: '#74e6ff',    // Cold Storage: cyan snowflake + faint body tint
+  static: '#c8ff4d',   // Static Cling: lime spark + arc
+  pop: '#9be7dc',      // Pop-up Book: teal ring (with white)
 };
 
 export const ENEMY = { page: '#ff3b4e' };

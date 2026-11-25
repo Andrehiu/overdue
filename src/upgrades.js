@@ -7,6 +7,8 @@
 //   master  — a "Masterwork": one per perk, unlocked by taking that perk to 3/3. Outsized power.
 // Unlocked combos and Masterworks ("specials") always take the first card slot until taken.
 
+import { POP_RADIUS, POP_MULT } from './status.js';
+
 export function baseStats() {
   return {
     maxHp: 5, speed: 210, fireRate: 4, damage: 1, projectiles: 1, spread: 0.2,
@@ -28,6 +30,14 @@ export function baseStats() {
     tomeEvery: 0, zone: false, sagaEvery: 0, bounceAccel: 0, bookLife: 1.3, dashCharges: 1,
     regenPerWave: 0, shhhGlobal: false, critMult: 2.5, orbitPulse: false, amnesty: false,
     burstMult: 1, nookDamage: 0, wrapHoming: false,
+    // v1.15.0 part B: Margin Notes, Last Chapter, Library Cat, Crossfire
+    marginLvl: 0, compass: false,          // Margin Notes level 0-3; Compass Rose: every 3rd throw fires 8 ways
+    lastChapter: 0, cliffhanger: false,    // Last Chapter: damage bonus per missing heart (max 3 count); Cliffhanger: +50% throw rate at 1 heart
+    catLvl: 0, colony: false,              // Library Cat level 0-3; Stray Colony: a second cat, pounces stun
+    crossfire: false,                      // Margin Notes + Spine Breaker: side and rear books burst bigger on shelves
+    // status perks (v1.15.0 part A; src/status.js)
+    ink: 0, inkDur: 0, chill: 0, staticChance: 0, staticLvl: 0, staticJumps: 0, staticDmg: 0.6, popLvl: 0, popRadius: 0, popMult: 0,
+    indelible: false, deepFreeze: false, finale: false, brittle: false, conductive: false, superconductor: false, inkBombs: false,
   };
 }
 
@@ -56,6 +66,16 @@ export const UPGRADES = [
   perk({ id: 'readingnook', icon: '🛋️', short: 'Nook', name: 'Reading Nook', desc: '+40% throw rate while standing next to a shelf', max: 3, weight: 6, apply: (s) => { s.nook += 0.4; } }),
   perk({ id: 'interlibrary', icon: '🔁', short: 'Loan', name: 'Interlibrary Loan', desc: 'Books leaving the library come back through the opposite wall', max: 3, weight: 5, apply: (s) => { s.wraps += 1; } }),
 
+  // ---- v1.15.0 part B: angles, nerve, a cat ----
+  perk({ id: 'margin', icon: '↗️', short: 'Margin Notes', name: 'Margin Notes', desc: 'Extra books fly off at an angle', max: 3, weight: 5, apply: (s) => { s.marginLvl += 1; } }),
+  perk({ id: 'lastchapter', icon: '📉', short: 'Last Chapter', name: 'Last Chapter', desc: 'More damage for every heart you are missing', max: 3, weight: 5, apply: (s) => { s.lastChapter = s.lastChapter ? s.lastChapter + 0.1 : 0.2; } }),
+  perk({ id: 'librarycat', icon: '🐈', short: 'Library Cat', name: 'Library Cat', desc: 'A cat pounces on enemies', max: 3, weight: 5, apply: (s) => { s.catLvl += 1; } }),
+  // ---- status perks (v1.15.0): ink, cold and static; they meet each other in the combos below ----
+  perk({ id: 'leakypen', icon: '🖊️', short: 'Leaky Pen', name: 'Leaky Pen', desc: 'Hits soak enemies in ink', max: 3, weight: 5, apply: (s) => { s.ink = !s.ink ? 0.8 : s.ink < 0.85 ? 0.85 : 1; s.inkDur = s.ink >= 1 ? 3 : 2; } }),
+  perk({ id: 'coldstorage', icon: '❄️', short: 'Cold Storage', name: 'Cold Storage', desc: 'Hits slow enemies', max: 3, weight: 5, apply: (s) => { s.chill = !s.chill ? 0.3 : s.chill < 0.33 ? 0.35 : 0.4; } }),
+  perk({ id: 'static', icon: '🔌', short: 'Static Cling', name: 'Static Cling', desc: 'Hits sometimes zap a nearby enemy', max: 3, weight: 5, apply: (s) => { s.staticChance = [0.45, 0.5, 0.55][Math.min(2, s.staticLvl)]; s.staticLvl++; s.staticJumps = s.staticLvl >= 3 ? 2 : 0; } }),
+  perk({ id: 'popup', icon: '🎉', short: 'Pop-up Book', name: 'Pop-up Book', desc: 'Defeated enemies pop, hurting enemies nearby', max: 3, weight: 5, apply: (s) => { s.popLvl = Math.min(3, s.popLvl + 1); s.popRadius = POP_RADIUS[s.popLvl]; s.popMult = POP_MULT[s.popLvl]; } }),
+
   // ---- cursed books: big upside, real cost ----
   cursed({ id: 'bannedbook', icon: '💀', short: 'Banned Book', name: 'Banned Book', desc: '+100% book damage, books pierce 1 enemy. −1 max heart.', apply: (s, p) => { s.damage += 1; s.pierce += 1; s.maxHp = Math.max(1, s.maxHp - 1); if (p) p.hp = Math.min(p.hp, s.maxHp); } }),
   cursed({ id: 'loudreader', icon: '📢', short: 'Loud Reader', name: 'Loud Reader', desc: 'SHHH! recharges 3× faster, is 50% bigger and stuns longer. Enemies move 15% faster.', apply: (s) => { s.shhhCd /= 3; s.shhhRadius *= 1.5; s.shhhStun *= 1.5; s.enemySpeedMult *= 1.15; } }),
@@ -66,8 +86,14 @@ export const UPGRADES = [
   combo({ id: 'unreliable', icon: '🎭', short: 'Narrator', name: 'Unreliable Narrator', requires: ['plottwist', 'trilogy'], desc: 'A book that pierces an enemy splits into two.', apply: (s) => { s.splitOnPierce = true; } }),
   combo({ id: 'silentreading', icon: '📖', short: 'Silent Read', name: 'Silent Reading', requires: ['quietplease', 'audiobook'], desc: 'SHHH! flings a ring of piercing books outward.', apply: (s) => { s.shhhVolley = 10; } }),
   combo({ id: 'allnighter', icon: '🌙', short: 'All-Nighter', name: 'All-Nighter', requires: ['coffee', 'graceperiod'], desc: 'Dashing through enemies hits them for 3× damage. −20% dash cooldown.', apply: (s) => { s.dashDamage = 3; s.dashCd *= 0.8; } }),
-  combo({ id: 'annotated', icon: '🖋️', short: 'Annotated', name: 'Annotated Edition', requires: ['footnotes', 'hardcover'], desc: 'Critical hits splash ink on everything nearby.', apply: (s) => { s.critBurst = 60; } }),
+  combo({ id: 'annotated', icon: '🖋️', short: 'Annotated', name: 'Annotated Edition', requires: ['footnotes', 'hardcover'], desc: 'Critical hits burst, hurting everything nearby.', apply: (s) => { s.critBurst = 60; } }),
   combo({ id: 'collapsing', icon: '🏚️', short: 'Collapsing', name: 'Collapsing Stacks', requires: ['spinebreaker', 'bookmark'], desc: 'Every ricochet also bursts. Bounce your way through a crowd.', apply: (s) => { s.bounceBurst = true; s.bounces += 1; } }),
+
+  combo({ id: 'crossfire', icon: '✖️', short: 'Crossfire', name: 'Crossfire', requires: ['margin', 'spinebreaker'], desc: 'Margin Notes books burst 50% bigger on shelves.', apply: (s) => { s.crossfire = true; } }),
+  combo({ id: 'brittle', icon: '💔', short: 'Brittle', name: 'Brittle Pages', requires: ['leakypen', 'coldstorage'], desc: 'Inked and slowed enemies shatter at 20% health. Bosses take 25% more damage instead.', apply: (s) => { s.brittle = true; } }),
+  combo({ id: 'conductive', icon: '🔋', short: 'Conductive', name: 'Conductive Ink', requires: ['static', 'leakypen'], desc: 'Zaps seek out inked enemies and spread ink.', apply: (s) => { s.conductive = true; } }),
+  combo({ id: 'superconductor', icon: '🥶', short: 'Superconduct', name: 'Superconductor', requires: ['coldstorage', 'static'], desc: 'Zaps freeze slowed enemies for 0.5s. Bosses are immune.', apply: (s) => { s.superconductor = true; } }),
+  combo({ id: 'inkbombs', icon: '💣', short: 'Ink Bombs', name: 'Ink Bombs', requires: ['popup', 'leakypen'], desc: 'Pops spread ink onto everything they hit.', apply: (s) => { s.inkBombs = true; } }),
 
   // ---- Masterworks: take a perk to 3/3 to unlock its outsized finale ----
   master('hardcover', { id: 'm_tome', icon: '📜', short: 'Tome', name: 'Leather-Bound Tome', desc: 'Every 5th throw is a giant tome: 5× damage, pierces everything.', apply: (s) => { s.tomeEvery = 5; } }),
@@ -75,8 +101,8 @@ export const UPGRADES = [
   master('trilogy', { id: 'm_saga', icon: '🏛️', short: 'Saga', name: 'Complete Saga', desc: 'Every 3rd throw adds a fan of 7 books.', apply: (s) => { s.sagaEvery = 3; } }),
   master('bookmark', { id: 'm_infinite', icon: '♾️', short: 'Infinite', name: 'Infinite Bookmark', desc: '+3 bounces, and books speed up 15% with every bounce.', apply: (s) => { s.bounces += 3; s.bounceAccel = 0.15; } }),
   master('plottwist', { id: 'm_twist', icon: '🎬', short: 'Twist End', name: 'Twist Ending', desc: 'Books pierce through everything.', apply: (s) => { s.pierce = 99; } }),
-  master('dewey', { id: 'm_congress', icon: '🏛', short: 'Congress', name: 'Library of Congress', desc: 'Near-perfect homing, and books fly twice as far.', apply: (s) => { s.homing = Math.max(s.homing, 14); s.homingRange = Math.max(s.homingRange, 420); s.bookLife *= 2; } }),
-  master('coffee', { id: 'm_caffeine', icon: '⚡️', short: 'Caffeine', name: 'Caffeine Overdose', desc: 'Two dash charges.', apply: (s) => { s.dashCharges = 2; } }),
+  master('dewey', { id: 'm_congress', icon: '🔭', short: 'Congress', name: 'Library of Congress', desc: 'Near-perfect homing, and books fly twice as far.', apply: (s) => { s.homing = Math.max(s.homing, 14); s.homingRange = Math.max(s.homingRange, 420); s.bookLife *= 2; } }),
+  master('coffee', { id: 'm_caffeine', icon: '🥤', short: 'Caffeine', name: 'Caffeine Overdose', desc: 'Two dash charges.', apply: (s) => { s.dashCharges = 2; } }),
   master('extendedloan', { id: 'm_lifetime', icon: '💳', short: 'Lifetime', name: 'Lifetime Membership', desc: 'Heal 1 heart every time you clear a wave.', apply: (s) => { s.regenPerWave = 1; } }),
   master('quietplease', { id: 'm_silence', icon: '🔇', short: 'Silence', name: 'Absolute Silence', desc: 'SHHH! freezes every enemy in the library for 2.5s.', apply: (s) => { s.shhhGlobal = true; } }),
   master('footnotes', { id: 'm_biblio', icon: '📑', short: 'Biblio', name: 'Bibliography', desc: 'Critical hits deal 5× damage instead of 2.5×.', apply: (s) => { s.critMult = 5; } }),
@@ -85,7 +111,19 @@ export const UPGRADES = [
   master('spinebreaker', { id: 'm_demolition', icon: '🧨', short: 'Demolition', name: 'Demolition Crew', desc: 'Shelf bursts are twice as big and hit 3× harder.', apply: (s) => { s.shelfBurst *= 2; s.burstMult = 3; } }),
   master('readingnook', { id: 'm_fortress', icon: '🏰', short: 'Fortress', name: 'Fortress of Solitude', desc: 'Next to a shelf you also deal double damage.', apply: (s) => { s.nookDamage = 1; } }),
   master('interlibrary', { id: 'm_interdim', icon: '🌌', short: 'Interdim.', name: 'Interdimensional Loan', desc: 'Looped books home in once and hit twice as hard.', apply: (s) => { s.wrapHoming = true; } }),
+  master('margin', { id: 'm_compass', icon: '🌐', short: 'Compass Rose', name: 'Compass Rose', desc: 'Every 3rd throw fires books in 8 directions.', apply: (s) => { s.compass = true; } }),
+  master('lastchapter', { id: 'm_cliffhanger', icon: '🎞️', short: 'Cliffhanger', name: 'Cliffhanger', desc: 'At 1 heart, you throw 50% faster.', apply: (s) => { s.cliffhanger = true; } }),
+  master('librarycat', { id: 'm_colony', icon: '🐾', short: 'Stray Colony', name: 'Stray Colony', desc: 'A second cat joins, and pounces stun.', apply: (s) => { s.colony = true; } }),
+  master('leakypen', { id: 'm_indelible', icon: '✒️', short: 'Indelible', name: 'Indelible', desc: 'Inked enemies that die splash ink on everything nearby.', apply: (s) => { s.indelible = true; } }),
+  master('coldstorage', { id: 'm_deepfreeze', icon: '🧊', short: 'Deep Freeze', name: 'Deep Freeze', desc: 'Every 5th hit on a slowed enemy freezes it for 1s. Bosses are immune.', apply: (s) => { s.deepFreeze = true; } }),
+  master('static', { id: 'm_powergrid', icon: '🏭', short: 'Power Grid', name: 'Power Grid', desc: 'Zaps jump 3 times at 75% damage.', apply: (s) => { s.staticJumps = 3; s.staticDmg = 0.75; } }),
+  master('popup', { id: 'm_finale', icon: '🎆', short: 'Finale', name: 'Grand Finale', desc: 'Pops can set off more pops (one extra round).', apply: (s) => { s.finale = true; } }),
 ];
+
+/** Every id added in 1.15.0 (new perks, Masterworks, combos): these get the NEW badge. One array, so a release only edits here. */
+export const NEW_IN_1_15 = ['leakypen', 'coldstorage', 'static', 'popup', 'margin', 'lastchapter', 'librarycat',
+  'm_indelible', 'm_deepfreeze', 'm_powergrid', 'm_finale', 'm_compass', 'm_cliffhanger', 'm_colony',
+  'brittle', 'conductive', 'superconductor', 'inkbombs', 'crossfire'];
 
 // What a card changes, in player words: multipliers, plain-word tiers, counts and seconds
 // (no internal units like px or rad/s).
@@ -151,6 +189,15 @@ const GAIN = [
   ['shelfBurst', (a, b) => (a === 0 ? 'Books burst when they hit shelves' : 'Bigger shelf bursts')],
   ['nook', (a, b) => `+${pct(b - a)} throw speed next to shelves`],
   ['wraps', (a, b) => (a === 0 ? 'Books come back through the walls' : `+${b - a} trip through the walls`)],
+  ['marginLvl', (a, b) => (b === 1 ? '+2 books thrown diagonally' : b === 2 ? '+1 book thrown behind you' : '+2 more diagonal books')],
+  ['lastChapter', (a, b) => `+${pct(b)} damage per missing heart (up to 3)`],
+  ['catLvl', (a, b) => (b === 1 ? 'A cat pounces on enemies for 2× damage every 1.6 seconds' : b === 2 ? 'Pounces 30% more often and hit 50% harder' : 'Pounces hit everything nearby')],
+  ['ink', (a, b) => (a === 0 ? `Hits soak enemies in ink: +${pct(b)} damage over 2s` : `Ink deals +${pct(b)} of a hit over ${b >= 1 ? 3 : 2}s`)],
+  ['chill', (a, b) => (a === 0 ? `Hits slow enemies ${pct(b)}` : `Slows enemies ${pct(b)}`)],
+  ['staticChance', (a, b) => (a === 0 ? `${pct(b)} of hits zap a nearby enemy` : `${pct(b)} of hits zap`)],
+  ['staticJumps', (a, b) => `Zaps jump ${b} times`],
+  ['popRadius', (a, b) => (a === 0 ? 'Defeated enemies pop, hurting enemies nearby' : 'Bigger pops')],
+  ['popMult', (a, b) => (a === 0 ? '' : 'Pops hit twice as hard')],
   ['scoreMult', (a, b) => `+${pct(b / a - 1)} score`],
   ['fineMult', (a, b) => `+${pct(b / a - 1)} fines`],
   ['shhhStun', (a, b) => `+${pct(b / a - 1)} SHHH! stun time`],
@@ -161,7 +208,7 @@ export function gainText(u, stats, player) {
   const s = { ...stats }, p = player ? { ...player } : null;
   u.apply(s, p);
   const out = [];
-  for (const [k, fmt] of GAIN) if (s[k] !== stats[k]) out.push(fmt(stats[k], s[k]));
+  for (const [k, fmt] of GAIN) if (s[k] !== stats[k]) { const t = fmt(stats[k], s[k]); if (t) out.push(t); }
   const healed = p && player ? p.hp - player.hp - Math.max(0, s.maxHp - stats.maxHp) : 0;
   if (p && player && p.hp > player.hp && s.maxHp === stats.maxHp) out.push(`Heals ${p.hp - player.hp}`);
   else if (healed > 0) out.push(`heals ${healed}`);
@@ -229,6 +276,15 @@ export function unlockedMasterworks(owned = {}) {
 /** The Masterwork a perk leads to (or undefined). */
 export const masterworkFor = (perkId) => UPGRADES.find((u) => u.kind === 'master' && u.requires[0] === perkId);
 
+/** Slightly favour a perk that completes a combo with one you already own, so pairs land in a 15-20 pick run. */
+export const PARTNER_BIAS = 1.3;
+export function partnerBias(u, owned = {}) {
+  if (u.kind !== 'perk') return 1;
+  const hit = UPGRADES.some((c) => c.kind === 'combo' && !owned[c.id] && c.requires.includes(u.id)
+    && c.requires.some((r) => r !== u.id && owned[r]));
+  return hit ? PARTNER_BIAS : 1;
+}
+
 /**
  * Draw `n` distinct perks. An unlocked combo always takes the first slot;
  * the rest are weighted by rarity. `ctx.lights` = whether dynamic lighting is on.
@@ -241,7 +297,7 @@ export function rollUpgrades(rng, owned = {}, n = 3, ctx = {}) {
   const pool = UPGRADES.filter((u) => u.kind !== 'combo' && u.kind !== 'master' && (owned[u.id] || 0) < u.max
     && !(u.needsLights && ctx.lights === false) && !banned.has(u.id) && !exclude.has(u.id));
   while (out.length < n && pool.length) {
-    const pick = rng.weighted(pool);
+    const pick = rng.weighted(pool.map((u) => ({ u, w: u.weight * partnerBias(u, owned) })), 'w').u;
     out.push(pick);
     pool.splice(pool.indexOf(pick), 1);
   }

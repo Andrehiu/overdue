@@ -6,6 +6,9 @@ export const ENEMY_TYPES = {
   patron: { cost: 3, unlock: 3, weight: 2, maxGroup: 2 },
   worm: { cost: 6, unlock: 4, weight: 1.5, maxGroup: 1 },
   golem: { cost: 5, unlock: 6, weight: 1.2, maxGroup: 2 },
+  // Act II water enemies (v1.16.0 part B): opt-in only. A wing must list them in `weights` (story.js `enemyTypes`); endless and Act I never roll them.
+  eel: { cost: 4, unlock: 1, weight: 1, maxGroup: 2, optIn: true },
+  boat: { cost: 2.5, unlock: 1, weight: 1, maxGroup: 2, optIn: true },
 };
 
 export const isBossWave = (w) => w > 0 && w % 5 === 0;
@@ -35,7 +38,7 @@ export function composeWave(wave, rng, opts = {}) {
   const gap = Math.max(0.45, (2.3 - wave * 0.09) * (opts.gapMult ?? 1));
   const shift = opts.unlockShift || 0;
   const unlocked = Object.entries(ENEMY_TYPES)
-    .filter(([type, d]) => d.unlock - shift <= wave && (opts.weights?.[type] ?? 1) > 0)
+    .filter(([type, d]) => d.unlock - shift <= wave && (opts.weights?.[type] ?? (d.optIn ? 0 : 1)) > 0)
     .map(([type, d]) => ({ type, ...d, weight: d.weight * (opts.weights?.[type] ?? 1) }));
   let t = 0.8;
   for (let guard = 0; guard < 500; guard++) {

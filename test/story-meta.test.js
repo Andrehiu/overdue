@@ -5,32 +5,69 @@ import assert from 'node:assert/strict';
 const load = (m) => import(`../src/${m}.js`);
 
 test('every room is harder than the one before it, in every wing', async () => {
-  const { WINGS, ROOMS_PER_WING, difficulty, threat } = await load('story');
+  const { WINGS, roomsIn, difficulty, threat } = await load('story');
   for (let w = 1; w <= WINGS.length; w++) {
-    for (let r = 2; r <= ROOMS_PER_WING; r++) {
+    for (let r = 2; r <= roomsIn(w); r++) {
       const prev = threat(difficulty(w, r - 1)), cur = threat(difficulty(w, r));
       assert.ok(cur > prev, `wing ${w}: room ${r} (${cur.toFixed(1)}) should beat room ${r - 1} (${prev.toFixed(1)})`);
     }
   }
 });
 
-test('every wing is harder than the previous wing, room for room', async () => {
-  const { WINGS, ROOMS_PER_WING, SURVIVE_BUDGET_MULT, difficulty, threat } = await load('story');
+// Wing w-1's room to compare wing w's room r with: the same room index when both wings have the same length, else the
+// room of the same kind at the same position on the old 10-room curve (the nearest one at or below it; Act II's extra rooms sit between).
+function twin(S, w, r) {
+  if (S.roomsIn(w - 1) === S.roomsIn(w)) return r;
+  const pos = S.curveRoom(r, w);
+  let best = 1;
+  for (let q = 1; q <= S.roomsIn(w - 1); q++) if (S.curveRoom(q, w - 1) <= pos && S.roomKind(w - 1, q) === S.roomKind(w, r)) best = q;   // same kind: elite vs elite, boss vs boss
+  return best;
+}
+
+test('every wing is harder than the previous wing, room for room (Act II compares at the same position on the old curve)', async () => {
+  const S = await load('story');
+  const { WINGS, roomsIn, SURVIVE_BUDGET_MULT, difficulty, threat } = S;
   for (let w = 2; w <= WINGS.length; w++) {
-    for (let r = 1; r <= ROOMS_PER_WING; r++) {
-      const a = difficulty(w - 1, r), b = difficulty(w, r);
-      assert.ok(threat(b) > threat(a), `wing ${w} room ${r} should beat wing ${w - 1}`);
-      for (const k of ['hpMult', 'speedMult', 'hazardSpeed']) assert.ok(b[k] > a[k], `${k} rises from wing ${w - 1} to ${w} (room ${r})`);
+    for (let r = 1; r <= roomsIn(w); r++) {
+      const a = difficulty(w - 1, twin(S, w, r)), b = difficulty(w, r);
+      assert.ok(threat(b) > threat(a), `wing ${w} room ${r} should beat wing ${w - 1} room ${twin(S, w, r)}`);
+      for (const k of ['hpMult', 'speedMult', 'hazardSpeed']) assert.ok(b[k] > a[k] || (b.pos > a.pos && b[k] >= a[k]), `${k} rises from wing ${w - 1} to ${w} (room ${r})`);
       // Budget compared without the Survive multiplier (a Survive room's extra budget is its own, tested separately); threat above covers the rest.
       const plain = (d) => d.budget / (d.goal === 'survive' ? SURVIVE_BUDGET_MULT : 1);
-      assert.ok(plain(b) > plain(a), `budget rises from wing ${w - 1} to ${w} (room ${r})`);
+      assert.ok(plain(b) > plain(a) || b.kind !== a.kind, `budget rises from wing ${w - 1} to ${w} (room ${r})`);
       assert.ok(b.eliteChance >= a.eliteChance && b.bossTier >= a.bossTier && b.gapMult <= a.gapMult);
     }
   }
 });
 
+test('Act II: 9 rooms, elite at 5, boss at 9; wing 11 beats wing 10 at every position, rooms 8-9 beat wing 10\'s boss room', async () => {
+  const S = await load('story');
+  const { roomsIn, eliteRoom, bossRoom, roomKind, difficulty, threat, CURVE_ACT2, CURVE } = S;
+  assert.deepEqual(CURVE_ACT2, [1, 2, 3, 4, 5, 6, 8, 9, 10]);
+  assert.ok(CURVE_ACT2.every((v, i) => i === 0 || v > CURVE_ACT2[i - 1]));
+  for (const w of [1, 10]) { assert.equal(roomsIn(w), 7); assert.equal(eliteRoom(w), 4); assert.equal(bossRoom(w), 7); }
+  for (const w of [11, 12]) {
+    assert.equal(roomsIn(w), 9); assert.equal(eliteRoom(w), 5); assert.equal(bossRoom(w), 9);
+    assert.ok(CURVE_ACT2[eliteRoom(w) - 1] >= CURVE[3 + 0] && CURVE_ACT2[eliteRoom(w) - 1] >= 5, 'elite sits at the old elite position or later');
+    assert.equal(CURVE_ACT2[bossRoom(w) - 1], 10, 'boss at the old boss position');
+    assert.equal(roomKind(w, 5), 'elite'); assert.equal(roomKind(w, 9), 'boss'); assert.equal(roomKind(w, 4), 'normal'); assert.equal(roomKind(w, 7), 'normal');
+    assert.equal(roomKind(10, 4), 'elite'); assert.equal(roomKind(10, 7), 'boss');
+  }
+  // Same position on the old curve (shared positions 1, 2, 4, 5, 8, 10): wing 11 must beat wing 10 by a clear margin.
+  for (const [r11, r10] of [[1, 1], [2, 2], [4, 3], [5, 4], [7, 6], [9, 7]]) {
+    const a = difficulty(10, r10), b = difficulty(11, r11);
+    assert.equal(S.curveRoom(r11, 11), S.curveRoom(r10, 10), 'same position');
+    assert.ok(threat(b) > threat(a) * 1.1, `wing 11 room ${r11} is at least 10% harder than wing 10 room ${r10}`);
+  }
+  // Rooms 8 and 9 sit at or past the old boss position's neighbourhood: both beat wing 10's boss room.
+  const boss10 = threat(difficulty(10, 7));
+  for (const r of [8, 9]) assert.ok(threat(difficulty(11, r)) > boss10, `wing 11 room ${r} beats wing 10's boss room`);
+  // Wing 12 beats wing 11 room for room (same length).
+  for (let r = 1; r <= 9; r++) assert.ok(threat(difficulty(12, r)) > threat(difficulty(11, r)), `wing 12 room ${r} beats wing 11`);
+});
+
 test('wing 1 plays like the opening of endless (mapped onto the old curve); room 4 is elite and room 7 a boss', async () => {
-  const { difficulty, roomKind, composeRoom, WINGS, CURVE, curveRoom, ROOMS_PER_WING, ELITE_ROOM, BOSS_ROOM, wingHp, BOSS_BUDGET_STEP } = await load('story');
+  const { difficulty, roomKind, composeRoom, WINGS, CURVE, curveRoom, ROOMS_PER_WING, ELITE_ROOM, BOSS_ROOM, roomsIn, eliteRoom, bossRoom, wingHp, BOSS_BUDGET_STEP, STORY_HP_MULT } = await load('story');
   const { Rng } = await load('util');
   assert.deepEqual(CURVE, [1, 2, 4, 5, 7, 8, 10]);
   assert.equal(CURVE.length, ROOMS_PER_WING);
@@ -38,44 +75,44 @@ test('wing 1 plays like the opening of endless (mapped onto the old curve); room
   assert.equal(CURVE[ELITE_ROOM - 1], 5); assert.equal(CURVE[BOSS_ROOM - 1], 10);
   assert.equal(curveRoom(1), 1);
   // Room 3 sits at old position 4: its numbers are the old room 4's.
-  assert.equal(difficulty(1, 3).hpMult, 1 + 0.08 * 3);
+  assert.equal(difficulty(1, 3).hpMult, (1 + 0.08 * 3) * STORY_HP_MULT);   // v1.15.2: story HP -5%
   assert.equal(difficulty(1, 1).eliteChance, 0);
-  assert.equal(roomKind(4), 'elite'); assert.equal(roomKind(7), 'boss'); assert.equal(roomKind(5), 'normal');
+  assert.equal(roomKind(1, 4), 'elite'); assert.equal(roomKind(1, 7), 'boss'); assert.equal(roomKind(1, 5), 'normal');
   for (let w = 1; w <= WINGS.length; w++) {
-    const elite = composeRoom(w, ELITE_ROOM, new Rng(w)).spawns;
-    assert.ok(elite.length > 0 && elite.filter((s) => s.type !== 'worm').every((s) => s.elite), `wing ${w} room ${ELITE_ROOM} is all elites`);
-    const boss = composeRoom(w, BOSS_ROOM, new Rng(w));
+    const elite = composeRoom(w, eliteRoom(w), new Rng(w)).spawns;
+    assert.ok(elite.length > 0 && elite.filter((s) => s.type !== 'worm').every((s) => s.elite), `wing ${w} room ${eliteRoom(w)} is all elites`);
+    const boss = composeRoom(w, bossRoom(w), new Rng(w));
     assert.equal(boss.spawns.filter((s) => s.type === 'boss').length, 1);
-    for (let r = 1; r < BOSS_ROOM; r++) assert.ok(!composeRoom(w, r, new Rng(r)).spawns.some((s) => s.type === 'boss'));
-    // Boss HP follows the flattened wing curve (v1.14.0); wing 1 is still 330.
-    assert.equal(difficulty(w, BOSS_ROOM).bossHp, Math.round(330 * wingHp(w - 1) * (1 + BOSS_BUDGET_STEP * (w - 1))));
+    for (let r = 1; r < bossRoom(w); r++) assert.ok(!composeRoom(w, r, new Rng(r)).spawns.some((s) => s.type === 'boss'));
+    // Boss HP follows the flattened wing curve (v1.14.0); story HP -5% since v1.15.2.
+    assert.equal(difficulty(w, bossRoom(w)).bossHp, Math.round(330 * STORY_HP_MULT * wingHp(w - 1) * (1 + BOSS_BUDGET_STEP * (w - 1))));
   }
 });
 
 test('roomGoal: never room 1, the elite or the boss room; capped per wing; deterministic; most wings have one', async () => {
-  const { roomGoal, WINGS, ROOMS_PER_WING, ELITE_ROOM, BOSS_ROOM } = await load('story');
+  const { roomGoal, WINGS, roomsIn, eliteRoom, bossRoom } = await load('story');
   let wingsWith = 0;
   for (let w = 1; w <= WINGS.length; w++) {
     let n = 0;
-    for (let r = 1; r <= ROOMS_PER_WING; r++) {
+    for (let r = 1; r <= roomsIn(w); r++) {
       const g = roomGoal(w, r);
       assert.equal(g, roomGoal(w, r));
       assert.ok(g === 'clear' || g === 'survive');
-      if (g === 'survive') { n++; assert.ok(r !== 1 && r !== ELITE_ROOM && r !== BOSS_ROOM, `wing ${w} room ${r} must not be a goal room`); }
+      if (g === 'survive') { n++; assert.ok(r !== 1 && r !== eliteRoom(w) && r !== bossRoom(w), `wing ${w} room ${r} must not be a goal room`); }
     }
     assert.ok(n <= 1, `wing ${w} has ${n} Survive rooms`);
     if (n) wingsWith++;
   }
-  assert.ok(wingsWith >= 6 && wingsWith <= 8, `${wingsWith} of 10 wings have a Survive room`);
+  assert.ok(wingsWith >= 6 && wingsWith <= 10, `${wingsWith} of ${WINGS.length} wings have a Survive room`);
 });
 
 test('a Survive room is never easier than the same room played plain, and its spawns fill the whole timer', async () => {
-  const { roomGoal, difficulty, threat, composeRoom, WINGS, ROOMS_PER_WING, SURVIVE_SECONDS, SURVIVE_BUDGET_MULT } = await load('story');
+  const { roomGoal, difficulty, threat, composeRoom, WINGS, roomsIn, SURVIVE_SECONDS, SURVIVE_BUDGET_MULT } = await load('story');
   const { ENEMY_TYPES } = await load('waves');
   const { Rng } = await load('util');
   assert.ok(SURVIVE_BUDGET_MULT >= 1);
   let found = 0;
-  for (let w = 1; w <= WINGS.length; w++) for (let r = 1; r <= ROOMS_PER_WING; r++) {
+  for (let w = 1; w <= WINGS.length; w++) for (let r = 1; r <= roomsIn(w); r++) {
     if (roomGoal(w, r) !== 'survive') continue;
     found++;
     const d = difficulty(w, r), plain = { ...d, goal: 'clear', budget: d.budget / SURVIVE_BUDGET_MULT };
@@ -93,12 +130,12 @@ test('a Survive room is never easier than the same room played plain, and its sp
 });
 
 test('Survive rooms build up: every spawn lands well before the buzzer and the budget arrives in a rising crescendo', async () => {
-  const { roomGoal, composeRoom, WINGS, ROOMS_PER_WING, SURVIVE_SECONDS, SURVIVE_CHUNKS } = await load('story');
+  const { roomGoal, composeRoom, WINGS, roomsIn, SURVIVE_SECONDS, SURVIVE_CHUNKS } = await load('story');
   const { ENEMY_TYPES } = await load('waves');
   const { Rng } = await load('util');
   const [c1, c2] = [SURVIVE_CHUNKS[1].from, SURVIVE_CHUNKS[2].from];   // phase boundaries
   let rooms = 0;
-  for (let w = 1; w <= WINGS.length; w++) for (let r = 1; r <= ROOMS_PER_WING; r++) {
+  for (let w = 1; w <= WINGS.length; w++) for (let r = 1; r <= roomsIn(w); r++) {
     if (roomGoal(w, r) !== 'survive') continue;
     rooms++;
     let early = 0, mid = 0, late = 0;
@@ -125,6 +162,17 @@ test('fines: a full 7-room wing pays within 10% of the old 10-room wing, elite a
   }
 });
 
+test('fines: an Act II wing keeps Act II\'s per-room pay (9 rooms pay ~9/7 of the 7-room formula); elite and boss stay the biggest', async () => {
+  const { roomReward, roomKind } = await load('story');
+  for (const w of [11, 12]) {
+    const plain = Math.round(1.6 * (3 + w)), elite = Math.round(1.25 * (10 + w * 3)), boss = Math.round(0.9 * (25 + w * 8));
+    let total = 0;
+    for (let r = 1; r <= 9; r++) { total += roomReward(w, r); assert.equal(roomReward(w, r), roomKind(w, r) === 'boss' ? boss : roomKind(w, r) === 'elite' ? elite : plain); }
+    assert.equal(total, 7 * plain + elite + boss);
+    assert.ok(roomReward(w, 9) > roomReward(w, 5) && roomReward(w, 5) > roomReward(w, 1));
+  }
+});
+
 test('an old 10-room save loads safely: best clamps to 7, wing 1 stays cleared, wing 2 stays unlocked', async () => {
   const { normalizeProgress } = await load('meta');
   const p = normalizeProgress({ v: 1, fines: 40, lifetime: 90, unlocked: 2, best: { 1: 10, 2: 6 }, cleared: [1], reno: { spines: 2 } });
@@ -144,10 +192,10 @@ test('composeWave without story options is unchanged (endless runs stay reproduc
 
 test('story layouts are fixed per room and every room is connected', async () => {
   const { generateArena, isConnected, setOrientation } = await load('arena');
-  const { WINGS, ROOMS_PER_WING, difficulty, layoutSeed, roomShape } = await load('story');
+  const { WINGS, roomsIn, difficulty, layoutSeed, roomShape } = await load('story');
   for (const portrait of [false, true]) {
     setOrientation(portrait);
-    for (let w = 1; w <= WINGS.length; w++) for (let r = 1; r <= ROOMS_PER_WING; r++) {
+    for (let w = 1; w <= WINGS.length; w++) for (let r = 1; r <= roomsIn(w); r++) {
       const d = difficulty(w, r);
       const a = generateArena(layoutSeed(w, r), r, d.shelvesPerHalf, roomShape(w, r)), b = generateArena(layoutSeed(w, r), r, d.shelvesPerHalf, roomShape(w, r));
       assert.deepEqual(a.shelves, b.shelves);
@@ -220,16 +268,16 @@ test('a lost wing-1 run that dies in the room after the elite room still affords
 });
 
 test('every wing has room shapes; elite and boss rooms are open; shapes do not repeat back to back', async () => {
-  const { WINGS, ROOMS_PER_WING, ELITE_ROOM, BOSS_ROOM, roomShape } = await load('story');
-  const { SHAPES } = await load('arena');
+  const { WINGS, roomsIn, eliteRoom, bossRoom, roomShape } = await load('story');
+  const { SHAPES, WATER_SHAPES } = await load('arena');
   for (let w = 1; w <= WINGS.length; w++) {
     const list = WINGS[w - 1].shapes;
-    assert.ok(list.length >= 1 && list.length <= 3 && list.every((s) => SHAPES.includes(s)), `wing ${w} shapes`);
+    assert.ok(list.length >= 1 && list.length <= 3 && list.every((s) => SHAPES.includes(s) || WATER_SHAPES.includes(s)), `wing ${w} shapes`);
     const open = ['pillars', 'reading'].find((s) => list.includes(s)) || 'scatter';
-    for (let r = 1; r <= ROOMS_PER_WING; r++) {
+    for (let r = 1; r <= roomsIn(w); r++) {
       const s = roomShape(w, r);
       assert.equal(s, roomShape(w, r), 'deterministic');
-      if (r === ELITE_ROOM || r === BOSS_ROOM) { assert.equal(s, open, `wing ${w} room ${r} is the open shape`); continue; }
+      if (r === eliteRoom(w) || r === bossRoom(w)) { assert.equal(s, open, `wing ${w} room ${r} is the open shape`); continue; }
       assert.ok(list.includes(s), `wing ${w} room ${r}: ${s} is one of the wing's shapes`);
       if (r > 1 && list.length >= 2) assert.notEqual(s, roomShape(w, r - 1), `wing ${w}: room ${r} repeats ${s}`);
     }
@@ -266,4 +314,21 @@ test('every wing has an intro, taunt and cleared line, each 1-60 characters', as
   for (const w of WINGS) for (const k of ['intro', 'taunt', 'cleared']) {
     assert.ok(typeof w[k] === 'string' && w[k].length > 0 && w[k].length <= 60, `${w.id}.${k}: ${w[k]}`);
   }
+});
+
+test('saves: an Act II best of 7 (the 1.16.0 boss) stays cleared with wing 12 unlocked; best clamps per wing (7 in Act I, 9 in Act II)', async () => {
+  const { normalizeProgress, recordRun } = await load('meta');
+  const old = { v: 1, fines: 120, lifetime: 400, unlocked: 12, best: { 1: 7, 10: 7, 11: 7, 12: 3 }, cleared: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], reno: { spines: 2 } };
+  const p = normalizeProgress(JSON.parse(JSON.stringify(old)));
+  assert.equal(p.best[11], 7); assert.ok(p.cleared.includes(11)); assert.equal(p.unlocked, 12); assert.equal(p.best[12], 3);
+  assert.deepEqual(Object.keys(p).sort(), ['best', 'cleared', 'fines', 'lifetime', 'reno', 'unlocked', 'v']);
+  assert.equal(p.reno.spines, 2); assert.equal(p.fines, 120);
+  // Clamp per wing: Act I stops at 7, Act II at 9.
+  const q = normalizeProgress({ unlocked: 12, best: { 3: 9, 11: 12, 12: 9 }, cleared: [] });
+  assert.equal(q.best[3], 7); assert.equal(q.best[11], 9); assert.equal(q.best[12], 9);
+  // A run that reaches room 9 of wing 11 is recorded as 9; a run in Act I can't exceed 7.
+  const r = recordRun(p, { fines: 10, mode: 'story', wing: 11, room: 9, cleared: false });
+  assert.equal(r.progress.best[11], 9);
+  const r2 = recordRun(p, { fines: 10, mode: 'story', wing: 2, room: 9, cleared: false });
+  assert.equal(r2.progress.best[2], 7);
 });
