@@ -3,12 +3,12 @@
 The plan and the owner's decisions, kept current by the planner session. **Planners: read this after CLAUDE.md.**
 Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <topic>`; their prompts are saved in `docs/handoffs/`.
 
-## Current state (planning 4 → planning 5, 2026-11-25)
-- **Live:** v1.16.0 (46889c7, pushed 2026-11-25; planning 5 must confirm the Pages run is green before calling it live). = Act II
+## Current state (planning 5, 2026-11-25)
+- **Live:** v1.16.0 (46889c7): Pages run green first try (run 37, the first with the build → deploy split). CI for 46889c7 was still running at 08:33 UTC. = Act II
   "The Sunken Stacks" wings 11–12 (water, stone walkways, Ink Eel, Paper Boat, act swipe on the wing map, hidden tester switch:
   7 taps on the title version line, `overdue.tester.v1`) + deploy split (pages.yml build job → deploy job; first real test is this
   push). Before: 1.15.0 new perks, 1.15.1 look & feel, 1.15.2 story HP −5%, 1.15.3 Margin 30% narrower + auto-aim (line of
-  sight, sticky, 50% lead), 1.15.4 diagonal see-through SHHH/DASH. No coder or tester running (all archived).
+  sight, sticky, 50% lead), 1.15.4 diagonal see-through SHHH/DASH. **Running:** 1.16.1 coder `session_014kswNmJdTHfULWiYMAJkcn` (branch `claude/act2-longer`, handoff `docs/handoffs/1.16.1-act2-longer.md`), started 08:32 UTC; check-in at 09:49 UTC; tester after.
 - **Planner branch:** `claude/brave-galileo-jyg38o` (= main + docs). Review worktree used: scratchpad `rev`.
 - **Roles (CLAUDE.md):** planner plans; Sonnet coders code (max 2 at once); **one Sonnet tester per release** (tag `overdue-tester`,
   template `docs/handoffs/tester-template.md`, doesn't count toward the 2). First tester (1.16.0) worked well: ~12 min, caught the
@@ -46,7 +46,7 @@ Older decisions (2026-11-21 to 23, all shipped): `docs/roadmap-archive.md`. Prod
 | Version | What | Status |
 |---|---|---|
 | 1.15.0–1.16.0 | New perks; look & feel; story −5%; Margin + auto-aim; diagonal buttons; Act II wings 11–12 + eels/boats + tester switch + deploy split | Shipped 2026-11-24/25 (details: `docs/roadmap-archive.md`) |
-| 1.16.1 | **Act II longer:** 9 rooms per Act II wing, +15% enemies, wing 11 clearly harder than 10; What's-new card vs version line | Next |
+| 1.16.1 | **Act II longer:** 9 rooms per Act II wing, +15% enemies, wing 11 clearly harder than 10; What's-new card vs version line | Coder running |
 | 1.16.x | Cat readability; strong-perk tuning (after tester data); Act II wings 13–20 in batches + 2 bosses + crab | Planned |
 | later | Acts III (Conservatory) and IV (Clockwork); Book Bag (Renovations 2.0); Player look | Planned |
 | — | **Bigger map (parked):** camera-follow map; revisit only if the cramped feeling returns | Parked |
