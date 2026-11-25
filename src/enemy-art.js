@@ -6,7 +6,10 @@
 // and then drawn with drawImage + a transform, so there is no shadowBlur / filter / path rebuild per enemy per frame.
 // Hitboxes are untouched: only the drawing size changes (visual R below, DEF.r in main.js stays).
 
+import { EEL } from './water-enemies.js';
+
 const TAU = Math.PI * 2;
+const EEL_RISE = EEL.rise, EEL_DIVE = EEL.dive;
 const OL = '#120a06';
 const GOLD = '#ffd54a';
 const RED = '#ff4d5e';
@@ -23,6 +26,9 @@ export const COL = {
   worm: { head: '#ff8fb1', seg: '#e0607f', seg2: '#c94a6a', band: '#7a2a40' },
   golem: { book: '#b8860b', book2: '#9a700a', dark: '#6b4f0c' },
   coin: { face: '#ffd54a', rim: '#b8860b' },
+  // Act II (v1.16.0 part B). Ink fins are a very dark crimson (still an enemy hue), so the eel reads as an orange-red enemy.
+  eel: { body: '#ff6a3d', belly: '#ffb08a', fin: '#3a0a1c', tell: '#ff8a5c' },
+  boat: { paper: '#ffb3c1', fold: '#f08a9e', stripe: '#e0344a' },
 };
 export const GOLD_TYPES = ['golem', 'coin'];
 
@@ -30,6 +36,7 @@ export const GOLD_TYPES = ['golem', 'coin'];
 export const BURST = {
   bunny: [COL.bunny.body, COL.bunny.shade], notice: [COL.notice.paper, COL.notice.ink], patron: [COL.patron.head, '#ffd8a8'],
   worm: [COL.worm.seg, COL.worm.head], golem: ['#d4a017', '#8a6d1a'], coin: [COL.coin.face],
+  eel: [COL.eel.body, COL.eel.belly], boat: [COL.boat.paper, COL.boat.stripe],
 };
 
 // ---------------------------------------------------------------- sprite cache helpers
@@ -109,6 +116,38 @@ function bunnyBody(g, k, elite) {
   g.fillStyle = 'rgba(122,63,85,0.35)'; g.beginPath(); g.arc(0.25 * R, 0.4 * R, 0.5 * R, 0, TAU); g.fill();
   ell(g, 0, 0.12 * R, 0.55 * R, 0.38 * R, 0, c.light, 0); // lighter face patch
   for (const s of [-1, 1]) bead(g, s * 0.27 * R, 0.08 * R, 1.6, elite);
+}
+
+// ---------------------------------------------------------------- Act II: ink eel (swims in water) and paper boat
+/** Ink Eel, seen when it is up: an S-curve of orange-red coils, a pale belly, dark ink fins along the back, an open mouth. Faces +x. */
+function eelBody(g, k, elite) {
+  const c = COL.eel, pts = [];
+  for (let i = 0; i < 8; i++) pts.push([(-15 + i * 3.6) * k, Math.sin(i * 0.95) * 3.2 * k, (2.6 + i * 0.5) * k]);   // tail -> neck, growing
+  for (let i = 0; i < 7; i++) { // dark fins on the back, behind the body
+    const [x, y, r] = pts[i]; g.fillStyle = c.fin; g.beginPath();
+    g.moveTo(x - 2.2 * k, y - r * 0.6); g.lineTo(x + 0.6 * k, y - r - 4.6 * k); g.lineTo(x + 2.6 * k, y - r * 0.6); g.closePath(); g.fill();
+  }
+  g.fillStyle = OL; for (const [x, y, r] of pts) { g.beginPath(); g.arc(x, y, r + 1.7, 0, TAU); g.fill(); }
+  g.fillStyle = c.body; for (const [x, y, r] of pts) { g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
+  g.fillStyle = c.belly; for (const [x, y, r] of pts) { g.beginPath(); g.ellipse(x, y + r * 0.35, r * 0.7, r * 0.4, 0, 0, TAU); g.fill(); }
+  const [hx, hy, hr] = pts[7];
+  shape(g, '#7a1d12', (g2) => { g2.moveTo(hx + hr * 0.2, hy - hr * 0.1); g2.lineTo(hx + hr * 1.6, hy - hr * 0.55); g2.lineTo(hx + hr * 1.6, hy + hr * 0.55); g2.closePath(); }, 1.6);   // open mouth
+  bead(g, hx + hr * 0.1, hy - hr * 0.45, 1.9 * k, elite);
+}
+/** Just the rising fin (the tell), drawn scaled from the water line. */
+function eelFin(g, k) {
+  const c = COL.eel;
+  shape(g, c.fin, (g2) => { g2.moveTo(-5 * k, 4 * k); g2.lineTo(0.5 * k, -12 * k); g2.lineTo(6 * k, 4 * k); g2.closePath(); }, 1.6);
+  g.strokeStyle = c.tell; g.lineWidth = 1.2; g.beginPath(); g.moveTo(-3 * k, 3 * k); g.lineTo(0.5 * k, -9 * k); g.stroke();
+}
+/** Paper Boat: a folded pink hull with a red stripe, one sail and one worried eye. */
+function boatBody(g, k, elite) {
+  const c = COL.boat, R = 11 * k;
+  shape(g, c.paper, (g2) => { g2.moveTo(-R * 1.15, 0); g2.lineTo(R * 1.15, 0); g2.lineTo(R * 0.7, R * 0.62); g2.lineTo(-R * 0.7, R * 0.62); g2.closePath(); });   // hull
+  shape(g, c.stripe, (g2) => { g2.moveTo(-R * 1.02, R * 0.12); g2.lineTo(R * 1.02, R * 0.12); g2.lineTo(R * 0.92, R * 0.3); g2.lineTo(-R * 0.92, R * 0.3); g2.closePath(); }, 0);
+  shape(g, c.paper, (g2) => { g2.moveTo(-R * 0.05, 0); g2.lineTo(-R * 0.05, -R * 1.25); g2.lineTo(R * 0.85, -R * 0.1); g2.closePath(); });   // sail
+  shape(g, c.fold, (g2) => { g2.moveTo(-R * 0.05, 0); g2.lineTo(-R * 0.05, -R * 1.25); g2.lineTo(-R * 0.75, -R * 0.1); g2.closePath(); }, 1.6);   // folded half
+  bead(g, R * 0.2, -R * 0.38, 1.7 * k, elite);
 }
 
 // ---------------------------------------------------------------- notice: pink slip, one angry eye, DUE stamp
@@ -244,6 +283,15 @@ function setFor(type, elite) {
       s.body = spr(id('b'), 32 * k, (g) => golemStack(g, k, elite));
       s.top = 24 * k;
       break;
+    case 'eel':
+      s.body = spr(id('b'), 30 * k, (g) => eelBody(g, k, elite));
+      s.fin = spr(id('f'), 16 * k, (g) => eelFin(g, k));
+      s.top = 16 * k;
+      break;
+    case 'boat':
+      s.body = spr(id('b'), 20 * k, (g) => boatBody(g, k, elite));
+      s.top = 16 * k;
+      break;
     case 'coin':
       s.body = spr(id('b'), 10 * k, (g) => coinBody(g, k));
       s.face = spr(id('f'), 10 * k, (g) => coinFace(g, k, elite));
@@ -346,6 +394,30 @@ export function drawEnemy(ctx, e, env) {
       if (e.hp < e.maxHp) { ctx.fillStyle = '#000'; ctx.fillRect(-18, 29, 36, 4); ctx.fillStyle = GOLD; ctx.fillRect(-18, 29, 36 * (e.hp / e.maxHp), 4); }
       break;
     }
+    case 'eel': {   // phases come from src/water-enemies.js: under (a dark patch + faint ripple), rise (fin + bright rings = the tell), up (full body), dive
+      const ph = e.ph || 'under', pt = ph === 'rise' ? 1 - e.phT / EEL_RISE : ph === 'dive' ? 1 - e.phT / EEL_DIVE : 0;
+      const ring = (rad, a, col) => { ctx.strokeStyle = col; ctx.globalAlpha = a; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.ellipse(0, 4, rad, rad * 0.45, 0, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1; };
+      if (ph === 'under') {
+        ctx.fillStyle = 'rgba(2,14,20,0.35)'; ctx.beginPath(); ctx.ellipse(0, 3, 15, 7, 0, 0, TAU); ctx.fill();
+        ring(11 + 3 * Math.sin(e.t * 3), 0.16, 'rgb(190,240,245)');
+      } else if (ph === 'rise') {
+        ring(10 + 18 * pt, 0.75 * (1 - pt * 0.4), COL.eel.tell); ring(6 + 12 * pt, 0.55, 'rgb(255,255,255)');
+        ctx.translate(0, 4 - 4 * pt); ctx.scale(0.4 + 0.6 * pt, 0.3 + 0.7 * pt); put(ctx, flash ? white(set.fin) : set.fin);
+      } else {
+        const sc = ph === 'dive' ? 1 - pt * 0.85 : 1;
+        if (ph === 'up') ring(24 + 2 * Math.sin(e.t * 6), 0.4, COL.eel.tell);
+        ctx.rotate(ph === 'dive' ? look : look + Math.sin(e.t * 9) * 0.06); ctx.scale(sc, sc); ctx.translate(0, ph === 'dive' ? 6 * pt : 0);
+        bodyWithOutline(ctx, set.body, e, flash, warn);
+      }
+      break;
+    }
+    case 'boat': {
+      const bob = Math.sin(e.t * 2.2) * 1.6, drop = e.dropFlash > 0 ? e.dropFlash / 0.35 : 0;
+      ctx.fillStyle = 'rgba(190,240,245,0.22)'; ctx.beginPath(); ctx.ellipse(0, 9, 16, 5, 0, 0, TAU); ctx.fill();   // wake
+      ctx.translate(0, bob); ctx.rotate(Math.sin(e.t * 1.7) * 0.12 + drop * 0.25); ctx.scale(1 + drop * 0.12, 1 - drop * 0.12);
+      bodyWithOutline(ctx, set.body, e, flash, warn);
+      break;
+    }
     case 'coin': {
       const sx = 0.3 + Math.abs(Math.cos(e.t * 8)) * 0.7;
       ctx.scale(sx, 1);
@@ -355,7 +427,7 @@ export function drawEnemy(ctx, e, env) {
     }
   }
   ctx.restore();
-  if (e.elite) { // crown stays upright, perched on the top of the own silhouette
+  if (e.elite && !(type === 'eel' && e.ph !== 'up')) { // crown stays upright, perched on the top of the own silhouette
     const c = crownSprite();
     ctx.drawImage(c, e.x - c.half, e.y + (lift - set.top - 7) * (e.vs || 1) - c.half, c.half * 2, c.half * 2);
   }

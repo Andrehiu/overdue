@@ -9,6 +9,7 @@ import { BUILD, versionLabel, fetchLatestBuild } from './version.js';
 import { CATALOGUE } from './catalogue.js';
 import { computeFlowField, lineOfSight } from './flowfield.js';
 import { composeWave } from './waves.js';
+import { isWaterType, DRY_SWAP, EEL, BOAT, eelInit, eelStep, boatInit, boatStep, moveInWater, discInWater, inWater, waterSpawn, nearestWalkway, hasWater } from './water-enemies.js';
 import { NEW_IN_1_15, baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips, buildChips, specialReason, levelInfo, perkTip, normalizeTips, TIPS } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist, aimSource, aimStick } from './util.js';
 import { PLAYER, bookLook } from './palette.js';
@@ -866,7 +867,23 @@ function renderReach(el) {
 }
 
 /** Library Codex: every combo and Masterwork, found or still a mystery. */
+/** Creatures met (Act II): ids `enemy:<type>` in codex.seen (same saved shape, just new ids). */
+const CREATURES = [
+  { id: 'enemy:eel', icon: '🐍', name: 'Ink Eel', how: 'Swims under the water, then surfaces and spits a fan of pages. Only hittable while it is up.', hint: 'Lives in Act II water' },
+  { id: 'enemy:boat', icon: '⛵', name: 'Paper Boat', how: 'Drifts on the water and drops an Overdue Notice on the walkway every few seconds. Fragile.', hint: 'Lives in Act II water' },
+];
 function renderCodex() {
+  const cl = $('#codexCreatures');
+  cl.textContent = '';
+  for (const c of CREATURES) {
+    const has = codex.seen.has(c.id);
+    const li = document.createElement('li'); li.className = has ? 'found' : 'locked';
+    const ic = document.createElement('span'); ic.className = 'icon'; ic.textContent = has ? c.icon : '?';
+    const body = document.createElement('div');
+    const name = document.createElement('strong'); name.textContent = has ? c.name : '???';
+    const how = document.createElement('small'); how.textContent = has ? c.how : c.hint;
+    body.append(name, how); li.append(ic, body); cl.appendChild(li);
+  }
   const specials = UPGRADES.filter((u) => u.kind === 'combo' || u.kind === 'master');
   const found = specials.filter((u) => codex.found.has(u.id)).length;
   $('#codexProgress').textContent = `${found} of ${specials.length} discovered`;
@@ -930,6 +947,8 @@ const DEF = {
   worm: { r: 9, hp: 2, speed: 105, score: 40 },
   golem: { r: 22, hp: 14, speed: 42, score: 300 },
   coin: { r: 7, hp: 1, speed: 140, score: 20 },
+  eel: { r: 13, hp: 5, speed: 100, score: 160 },   // Act II: swims under water, surfaces to spit (src/water-enemies.js)
+  boat: { r: 12, hp: 1, speed: 36, score: 90 },    // Act II: drifts on water, drops Overdue Notices on the walkways (hp is set in materialise)
   boss: { r: 40, hp: 1, speed: 60, score: 2000 },
 };
 
@@ -970,8 +989,10 @@ function updateSpawning(dt) {
   game.waveT += dt;
   while (spawnQueue.length && spawnQueue[0].t <= game.waveT) {
     const s = spawnQueue.shift();
-    const p = s.type === 'boss' ? { x: W / 2, y: 130 } : spawnPoint();
-    telegraphs.push({ type: s.type, x: p.x, y: p.y, t: 0, dur: s.type === 'boss' ? 1.6 : 0.85, elite: !!s.elite });
+    // Water enemies spawn on water; in a room without water they swap for a dry enemy of about the same cost.
+    const type = isWaterType(s.type) && !hasWater(arena) ? DRY_SWAP[s.type] : s.type;
+    const p = type === 'boss' ? { x: W / 2, y: 130 } : isWaterType(type) ? (waterSpawn(arena.water, COLS, ROWS, CELL, player.x, player.y) || spawnPoint()) : spawnPoint();
+    telegraphs.push({ type, x: p.x, y: p.y, t: 0, dur: type === 'boss' ? 1.6 : 0.85, elite: !!s.elite });
     sound.play('spawn');
   }
   for (let i = telegraphs.length - 1; i >= 0; i--) {
@@ -979,13 +1000,13 @@ function updateSpawning(dt) {
     tg.t += dt;
     if (tg.t >= tg.dur) {
       telegraphs.splice(i, 1);
-      materialise(tg.type, tg.x, tg.y, tg.elite);
+      materialise(tg.type, tg.x, tg.y, tg.elite, tg.boat);
     }
   }
 }
 
-function materialise(type, x, y, elite = false) {
-  if (type !== 'boss') { x += (Math.random() - 0.5) * 8; y += (Math.random() - 0.5) * 8; }
+function materialise(type, x, y, elite = false, fromBoat = false) {
+  if (type !== 'boss' && !isWaterType(type)) { x += (Math.random() - 0.5) * 8; y += (Math.random() - 0.5) * 8; }
   burst(x, y, 14, elite ? ['#ffd54a', '#fff'] : ['#b48cff', '#fff'], 120, 0.5);
   if (type === 'worm') {
     const headHp = game.diff ? 4 * (1 + curveRoom(game.wave) * 0.08) * (1 + 0.22 * (game.wingN - 1)) : 4 * (1 + game.wave * 0.08);
@@ -1003,7 +1024,12 @@ function materialise(type, x, y, elite = false) {
     if (isStory()) floatText(x, y + 60, `${e.name}: ${wingDef().taunt}`, '#ffe9a8', 13, 2.5);
     sound.play('boss'); sound.setIntensity(2);
     shake(0.7);
-  } else makeEnemy(type, x, y, elite ? { elite: true } : {});
+  } else if (isWaterType(type)) {
+    const e = makeEnemy(type, x, y, { ...(elite ? { elite: true } : {}), ...(type === 'boat' ? { hp: BOAT.hp, maxHp: BOAT.hp } : {}) });
+    e.hd = Math.random() * TAU; e.hdT = 0; e.wx = e.x; e.wy = e.y;
+    if (type === 'eel') eelInit(e); else boatInit(e);
+    if (!codex.seen.has(`enemy:${type}`)) { codex.seen.add(`enemy:${type}`); saveCodex(); }
+  } else makeEnemy(type, x, y, { ...(elite ? { elite: true } : {}), ...(fromBoat ? { boat: true } : {}) });
 }
 
 // ======================================================================
@@ -1134,6 +1160,7 @@ let aimVariant = 'all';  // balance measuring only (debug hook): 'today' | 'open
 function nearestEnemy(x, y, maxD = Infinity) {
   let best = null, bd = maxD * maxD;
   for (const e of enemies) {
+    if (e.under) continue;
     const d = (e.x - x) ** 2 + (e.y - y) ** 2;
     if (d < bd) { bd = d; best = e; }
   }
@@ -1550,6 +1577,24 @@ function seek(e) {
   return { x: tx / tl, y: ty / tl, d };
 }
 
+/** Water enemies wander toward the player (+ jitter); when a step is refused (shore) they turn away. `jit` = how wild the wander is (rad). */
+function waterHeading(e, dt, tx, ty, jit) {
+  if (e.blk) { e.blk = false; e.hd += (Math.random() < 0.5 ? -1 : 1) * (1 + Math.random()); e.hdT = 0.45; }
+  else e.hdT -= dt;
+  if (e.hdT <= 0) { e.hd = Math.atan2(ty - e.y, tx - e.x) + (Math.random() - 0.5) * jit; e.hdT = 0.7 + Math.random() * 0.5; }
+}
+/** Paper Boat: drop an Overdue Notice (telegraphed, 0.85 s) on the walkway cell nearest to the boat. */
+function boatDrop(e) {
+  if (game.state !== 'playing' || enemies.length > 40) return;
+  const live = enemies.filter((n) => n.boat && !n.dead).length + telegraphs.filter((t) => t.boat).length;
+  if (live >= BOAT.maxNotices) return;
+  const c = nearestWalkway(walkGrid(), COLS, ROWS, CELL, e.x, e.y);
+  if (!c) return;
+  telegraphs.push({ type: 'notice', x: c.x, y: c.y, t: 0, dur: 0.85, elite: false, boat: true });
+  e.dropFlash = 0.35;
+  sound.play('spawn');
+}
+
 function updateEnemies(dt) {
   const p = player;
   for (const e of enemies) {
@@ -1599,11 +1644,26 @@ function updateEnemies(dt) {
         }
         break;
       }
+      case 'eel': {
+        // Under water it swims toward you (staying on water); then rises (ripple + fin: the tell), spits a 3-page fan, dives. It can only be hit while it is up.
+        const st = eelStep(e, dt);
+        if (st.fire && game.state === 'playing') { const a = Math.atan2(p.y - e.y, p.x - e.x); hazPat = 'page:eel'; fan(e.x, e.y, a, EEL.fanPages, EEL.fanSpread, EEL.pageSpeed); }
+        const sp = e.ph === 'under' ? e.speed : e.ph === 'dive' ? e.speed * 0.25 : e.speed * 0.15;
+        waterHeading(e, dt, p.x, p.y, 1.2);
+        mx = Math.cos(e.hd) * sp; my = Math.sin(e.hd) * sp; break;
+      }
+      case 'boat': {
+        // Drifts slowly along the water and drops an Overdue Notice on the nearest walkway about every 4 s (never more than BOAT.maxNotices alive).
+        const st = boatStep(e, dt);
+        if (st.drop) boatDrop(e);
+        waterHeading(e, dt, p.x, p.y, 2.2);
+        mx = Math.cos(e.hd) * e.speed; my = Math.sin(e.hd) * e.speed; break;
+      }
       case 'boss': bossAI(e, dt); break;
     }
     if (e.chillT > 0) { const f = chillFactor(e); mx *= f; my *= f; }   // Cold Storage (bosses get half the slow)
     // Elites return fire: an aimed page (a 3-page fan from wing 7) when they can see you.
-    if (e.elite && e.stun <= 0 && game.state === 'playing') {
+    if (e.elite && e.stun <= 0 && !e.under && game.state === 'playing') {
       e.shootT -= dt;
       if (e.shootT <= 0) {
         e.shootT = (game.diff ? game.diff.eliteShootEvery : 3) * (0.8 + Math.random() * 0.4);
@@ -1614,7 +1674,10 @@ function updateEnemies(dt) {
         }
       }
     }
-    if (e.type !== 'boss' || e.mode !== 'charge') { e.x += (mx + e.vx) * dt; e.y += (my + e.vy) * dt; }
+    if (isWaterType(e.type)) {   // water enemies only ever move into water cells
+      const r = moveInWater(arena.water, COLS, ROWS, CELL, e.x, e.y, (mx + e.vx) * dt, (my + e.vy) * dt, e.r * 0.6);
+      e.x = r.x; e.y = r.y; if (r.blocked) e.blk = true;
+    } else if (e.type !== 'boss' || e.mode !== 'charge') { e.x += (mx + e.vx) * dt; e.y += (my + e.vy) * dt; }
   }
   // Separation (cheap O(n²); n stays < ~100) + world collision
   for (let i = 0; i < enemies.length; i++) {
@@ -1633,6 +1696,9 @@ function updateEnemies(dt) {
   }
   for (const e of enemies) {
     if (e.type === 'boss') { e.x = clamp(e.x, e.r, W - e.r); e.y = clamp(e.y, e.r, H - e.r); }
+    else if (isWaterType(e.type)) {   // separation may nudge them: if that left the water, go back to the last good spot
+      if (discInWater(arena.water, COLS, ROWS, CELL, e.x, e.y, e.r * 0.6)) { e.wx = e.x; e.wy = e.y; } else { e.x = e.wx; e.y = e.wy; }
+    }
     else if (!(e.type === 'worm' && e.leader)) collideWorld(e, e.r);
     // observed velocity (smoothed) for auto-aim lead; capped so teleports/boss charges stay sane
     if (e.lx !== undefined && dt > 0) { const k = 0.4; e.pvx = clamp((e.pvx || 0) * (1 - k) + ((e.x - e.lx) / dt) * k, -450, 450); e.pvy = clamp((e.pvy || 0) * (1 - k) + ((e.y - e.ly) / dt) * k, -450, 450); }
@@ -1640,7 +1706,7 @@ function updateEnemies(dt) {
     // Contact damage
     if (game.state === 'playing' || game.state === 'waveclear') {
       const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy);
-      if (d < p.r + e.r - 3 && !(e.trans > 0)) hurtPlayer(e.x, e.y, e.type === 'boss' && e.mode === 'charge' ? 'boss:charge' : e.type, !!e.elite);
+      if (d < p.r + e.r - 3 && !(e.trans > 0) && !e.under) hurtPlayer(e.x, e.y, e.type === 'boss' && e.mode === 'charge' ? 'boss:charge' : e.type, !!e.elite);
     }
   }
   for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].dead) enemies.splice(i, 1);
@@ -1722,6 +1788,7 @@ function bossImmune(e) {
 }
 function damageEnemy(e, dmg, kx, ky, crit, src = 'other') {
   if (e.dead) return;
+  if (e.under) return;   // a submerged Ink Eel can't be hurt by anything (books, orbit, cat, ink, SHHH)
   if (e.trans > 0) { bossImmune(e); return; }   // boss is mid-transformation
   const quiet = isStatusSource(src);   // ink / zap / pop damage is silent and never chains
   if (e.type === 'boss') dmg *= statusDamageMult(e, stats.brittle);   // chilled bosses take +25%
@@ -1917,7 +1984,7 @@ function updateBooks(dt) {
     }
     if (!remove) {
       for (const e of enemies) {
-        if (e.dead || b.hit.has(e)) continue;
+        if (e.dead || e.under || b.hit.has(e)) continue;   // books fly over a submerged eel
         const rr = e.r + b.r;
         if (e.trans > 0 && (e.x - b.x) ** 2 + (e.y - b.y) ** 2 < rr * rr) { bossImmune(e); continue; }   // books pass through
         if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 < rr * rr) {
@@ -2311,7 +2378,7 @@ function render() {
 
   for (const t of telegraphs) drawTelegraph(t);
   for (const k of pickups) drawPickup(k);
-  for (const e of enemies) { const k = shadowK(e); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(e.x + 3, e.y + e.r * 0.8, e.r * 0.9 * k, e.r * 0.4 * k, 0, 0, TAU); ctx.fill(); }
+  for (const e of enemies) { if (isWaterType(e.type)) continue; const k = shadowK(e); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(e.x + 3, e.y + e.r * 0.8, e.r * 0.9 * k, e.r * 0.4 * k, 0, 0, TAU); ctx.fill(); }
   drawWorms(ctx, enemies);
   for (let i = enemies.length - 1; i >= 0; i--) drawEnemy(enemies[i]);
   if (stats.ink || stats.chill || stats.staticChance) for (const e of enemies) if (e.inkT > 0 || e.chillT > 0 || e.frozenT > 0 || e.staticT > 0) drawStatus(e);   // only runs with a status perk
@@ -3292,7 +3359,7 @@ if (DEBUG) {
   window.__overdue = {
     game, get bg() { return bg; }, get arena() { return arena; }, get tester() { return tester; }, get cats() { return cats; }, grid: () => `${COLS}x${ROWS}`, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, enemies, get content() { return content; },
     fire, damageEnemy, orbiterPositions, consts: { STORY_ENEMY_SCALE, ORBIT_RADIUS, ORBIT_SCALE, BOSS_TRANS, MARGIN_SIDE, MARGIN_WIDE },   // QA only (v1.15.1 look & feel checks)
-    makeEnemy, freeze: (on) => { debugFreeze = !!on; }, startRun: (m, w) => startRun(m, w, { noGuide: true }), startWave, get guide() { return game.guide; }, tipsSeen: () => tips.seen.slice(), setSurviveT: (t) => { game.surviveT = t; }, killAll: () => { for (const e of [...enemies]) killEnemy(e, 'cleanup'); spawnQueue.length = 0; telegraphs.length = 0; },
+    materialise, makeEnemy, freeze: (on) => { debugFreeze = !!on; }, startRun: (m, w) => startRun(m, w, { noGuide: true }), startWave, get guide() { return game.guide; }, tipsSeen: () => tips.seen.slice(), setSurviveT: (t) => { game.surviveT = t; }, killAll: () => { for (const e of [...enemies]) killEnemy(e, 'cleanup'); spawnQueue.length = 0; telegraphs.length = 0; },
     get progress() { return progress; }, setFines: (n) => { progress = { ...progress, fines: n }; saveProgress(); renderFineBadges(); },
     unlockAll: () => { progress = { ...progress, unlocked: WINGS.length }; saveProgress(); },
 

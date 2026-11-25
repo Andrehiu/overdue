@@ -17,7 +17,7 @@ test('kill-burst colours follow the body hues (gold types excepted)', () => {
     if (GOLD_TYPES.includes(type)) continue;
     for (const hex of cols) assert.ok(isEnemyHue(hex), `${type} burst ${hex}`);
   }
-  assert.deepEqual(Object.keys(BURST).sort(), ['bunny', 'coin', 'golem', 'notice', 'patron', 'worm']);
+  assert.deepEqual(Object.keys(BURST).sort(), ['boat', 'bunny', 'coin', 'eel', 'golem', 'notice', 'patron', 'worm']);
 });
 
 test('patron ripple shows only while charging, and stays faint', () => {

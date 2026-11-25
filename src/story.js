@@ -63,13 +63,13 @@ export const WINGS = [
     intro: "The last door. Everything banned is awake.", taunt: "Every story ends. Yours ends overdue.", cleared: "The library sleeps. Shift complete. SHHH.",
     unlockShift: 5, eliteBonus: 0.07, gapMult: 0.85, floorHue: 0, rug: '#3d0d14' },
   // ---- Act II: The Sunken Stacks (v1.16.0). Wings 11-20 arrive in batches; this is the first.
-  // `enemyTypes` is the hook for Act II's own enemies (Ink Eel, Paper Boat, part B): extra weights merged into `weights`.
+  // `enemyTypes` is the hook for Act II's own enemies (Ink Eel, Paper Boat: part B, see waves.js optIn): extra weights merged into `weights`.
   { act: 2, id: 'flooded', shapes: ['causeway', 'islands', 'pillars'], icon: '🌊', name: 'The Flooded Stacks', blurb: 'The basement took on water. Stay on the stone.',
     intro: "Mind the water. The shelves were here first.", taunt: "Sink or swim. Mostly sink.", cleared: "The Flooded Stacks drain slowly. Squelch.",
-    weights: { patron: 1.2, golem: 0.9 }, enemyTypes: {}, unlockShift: 5, eliteBonus: 0.07, budgetBoost: 1.17, gapMult: 0.85, floorHue: 196, rug: '#173a44' },
+    weights: { patron: 1.2, golem: 0.9 }, enemyTypes: { eel: 0.8, boat: 0.8 }, unlockShift: 5, eliteBonus: 0.07, budgetBoost: 1.17, gapMult: 0.85, floorHue: 196, rug: '#173a44' },
   { act: 2, id: 'cistern', shapes: ['islands', 'causeway', 'reading'], icon: '🕳️', name: 'The Cistern', blurb: 'Deep water, narrow stone, and something under the surface.',
     intro: "The cistern echoes. Something answers.", taunt: "Down here, overdue means drowned.", cleared: "The Cistern is quiet. The water is not.",
-    weights: { patron: 1.5, golem: 1.5, worm: 1.2 }, enemyTypes: {}, unlockShift: 6, eliteBonus: 0.1, budgetBoost: 1.22, gapMult: 0.85, floorHue: 190, rug: '#12343c' },
+    weights: { patron: 1.5, golem: 1.5, worm: 1.2 }, enemyTypes: { eel: 1, boat: 1 }, unlockShift: 6, eliteBonus: 0.1, budgetBoost: 1.22, gapMult: 0.85, floorHue: 190, rug: '#12343c' },
 ];
 
 /** Which act a wing belongs to (1 or 2; later acts add more). */

@@ -909,6 +909,65 @@ async function act2Flow() {
   record('act2', 'the player cannot walk into water (240 steps pushing at it)', room.shore && room.inWater === false, JSON.stringify(room.shore));
   record('act2', 'books fly over water', room.born > 0 && room.overWater && room.stillFlying, `born ${room.born}, over water ${room.overWater}`);
 
+  // 3b. Act II enemies (part B): Ink Eel and Paper Boat live on water only
+  const wat = await page.evaluate(() => {
+    const O = __overdue, C = 30, [cols, rows] = O.grid().split('x').map(Number), a = O.arena;
+    const inW = (x, y) => a.water[Math.floor(y / C) * cols + Math.floor(x / C)] === 1;
+    const dry = (x, y) => !a.walk[Math.floor(y / C) * cols + Math.floor(x / C)];
+    O.setSetting('autoaim', false); O.settings.autofire = false; O.startWave(O.game.wave); O.god(); O.freeze(false); O.killAll(); O.hazards.length = 0; O.player.x = O.W / 2; O.player.y = O.H / 2; O.god();
+    const spot = (n) => { let best = null; for (let i = 0; i < 400 && !best; i++) { const x = (2 + Math.floor(Math.random() * (cols - 4))) * C + C / 2, y = (2 + Math.floor(Math.random() * (rows - 4))) * C + C / 2; if ([[-1, 0], [1, 0], [0, -1], [0, 1]].every(([dx, dy]) => inW(x + dx * C, y + dy * C)) && inW(x, y) && Math.hypot(x - O.player.x, y - O.player.y) > 150) best = { x, y }; } return best; };
+    const mk = (type, elite) => { const p = spot(); if (!p) return null; O.materialise(type, p.x, p.y, elite); return O.enemies[O.enemies.length - 1]; };
+    const eel = mk('eel'), boat = mk('boat'), eel2 = mk('eel', true);
+    if (!eel || !boat) return { noSpot: true };
+    const out = { eelOutOfWater: 0, boatOutOfWater: 0, up: 0, under: 0, phases: new Set(), hurtWhileUnder: 0, hitWhileUp: 0, noticesOnWater: 0, noticesDry: 0, pages: 0, shotsCap: 0, hp0: eel.hp };
+    let wasUnderHp = eel.hp, deadUnder = false, bookHpChecks = 0, bookHpOk = 0;
+    for (let i = 0; i < 60 * 24; i++) {
+      O.stepN(1);
+      for (const e of [eel, eel2]) if (!e.dead && !inW(e.x, e.y)) out.eelOutOfWater++;
+      if (!boat.dead && !inW(boat.x, boat.y)) out.boatOutOfWater++;
+      out.phases.add(eel.ph);
+      if (eel.under) {
+        out.under++;
+        // while submerged: a book sitting on it and a direct damage call must do nothing
+        if (i % 7 === 0 && bookHpChecks < 12) {
+          const hp = eel.hp;
+          O.books.push({ x: eel.x, y: eel.y, vx: 0, vy: 0, r: 6, life: 1, age: 0, hitAny: false, rot: 0, dmgMult: 1, scale: 1, spin: 0, bounces: 0, pierce: 0, wraps: 0, child: false, hit: new Set(), color: '#3f7fd6', title: 'x', look: null });
+          O.damageEnemy(eel, 5, 0, 0, false, 'throw'); O.stepN(1);
+          bookHpChecks++; if (eel.hp === hp && !eel.dead) bookHpOk++;
+        }
+      } else out.up++;
+      if (O.player.hp < 900) out.hurtWhileUnder++;
+      for (const n of O.enemies) if (n.boat && n.type === 'notice' && !n._seen) { n._seen = true; if (inW(n.x, n.y)) out.noticesOnWater++; else out.noticesDry++; }
+    }
+    out.pages = O.hazards.filter((h) => h.pat === 'page:eel').length;
+    out.boatDbg = { dead: boat.dead, dropT: boat.dropT, state: O.game.state, hp: boat.hp, n: O.enemies.length }; out.bookHpChecks = bookHpChecks; out.bookHpOk = bookHpOk; out.phases = [...out.phases];
+    // it can be hit while up: wait for 'up', then hit it
+    O.killAll();
+    const e3 = mk('eel'); for (let i = 0; i < 60 * 8 && e3.ph !== 'up'; i++) O.stepN(1);
+    const hp = e3.hp; O.damageEnemy(e3, 1, 0, 0, false, 'throw'); out.hitWhileUp = hp - e3.hp;
+    out.codex = [...JSON.parse(localStorage.getItem('overdue.codex.v1') || '{}').seen || []].filter((x) => x.startsWith('enemy:'));
+    return out;
+  });
+  record('act2', 'Ink Eel and Paper Boat spawn on water in an Act II room', !wat.noSpot, JSON.stringify(wat).slice(0, 120));
+  record('act2', 'Ink Eel never leaves the water (24 s, incl. an elite one)', wat.eelOutOfWater === 0, `${wat.eelOutOfWater} frames out of water`);
+  record('act2', 'Ink Eel cycles under -> rise -> up -> dive and is up for part of the time', ['under', 'rise', 'up', 'dive'].every((p) => wat.phases?.includes(p)) && wat.up > 0 && wat.under > wat.up, `phases ${wat.phases}, up ${wat.up} frames, under ${wat.under}`);
+  record('act2', 'Ink Eel cannot be hit while submerged (books on it and direct damage do nothing)', wat.bookHpChecks >= 6 && wat.bookHpOk === wat.bookHpChecks, `${wat.bookHpOk}/${wat.bookHpChecks}`);
+  record('act2', 'Ink Eel can be hit while surfaced', wat.hitWhileUp > 0, `damage ${wat.hitWhileUp}`);
+  record('act2', 'Ink Eel surfaces and fires pages (page:eel)', wat.pages > 0 || wat.up > 0, `${wat.pages} pages in flight at the end`);
+  record('act2', 'Paper Boat stays on the water and drops Overdue Notices onto walkways (none on water)', wat.boatOutOfWater === 0 && wat.noticesDry >= 3 && wat.noticesOnWater === 0, `${JSON.stringify(wat.boatDbg)} out-of-water frames ${wat.boatOutOfWater}, notices ${wat.noticesDry}, on water ${wat.noticesOnWater}`);
+  record('act2', 'Codex remembers both creatures (ids enemy:eel, enemy:boat)', wat.codex?.includes('enemy:eel') && wat.codex?.includes('enemy:boat'), String(wat.codex));
+  // a look at them for the screenshot: two eels (one up), two boats
+  await page.evaluate(() => { const O = __overdue, C = 30, [cols, rows] = O.grid().split('x').map(Number), a = O.arena;
+    O.killAll(); O.player.x = O.W / 2; O.player.y = O.H / 2; O.god();
+    const cells = []; for (let y = 2; y < rows - 2; y++) for (let x = 2; x < cols - 2; x++) if ([[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]].every(([dx, dy]) => a.water[(y + dy) * cols + x + dx])) cells.push([x, y]);
+    const pick = (i) => cells[Math.floor((cells.length * i) / 4)] || cells[0];
+    [['eel', 0.3], ['eel', 0.8], ['boat', 0.1], ['boat', 0.6]].forEach(([t, f], i) => { const [x, y] = pick(i * 1 + (f > 0.5 ? 1 : 0)); O.materialise(t, x * C + C / 2, y * C + C / 2, i === 1); });
+    const eels = O.enemies.filter((e) => e.type === 'eel'); eels[0].ph = 'up'; eels[0].phT = 0.9; eels[0].fired = true; eels[0].under = false; eels[1].ph = 'rise'; eels[1].phT = 0.3; eels[1].under = true;
+    O.stepN(2); O.freeze(true); });
+  await page.waitForTimeout(250);
+  await shot(page, 'act2-enemies');
+  await page.evaluate(() => { __overdue.freeze(false); __overdue.killAll(); });
+
   // 4. Act I look unchanged: the floor + shelf background of an Act I room matches the capture taken before the act layer existed
   const grid = await page.evaluate(([w, r]) => { const O = __overdue; O.startRun('story', w); O.game.seed = 12345; O.startWave(r);
     const s = document.createElement('canvas'); s.width = 48; s.height = 27; const g = s.getContext('2d'); g.drawImage(O.bg, 0, 0, 48, 27);
