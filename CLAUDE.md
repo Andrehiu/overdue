@@ -22,10 +22,18 @@ message says "You are a coder session"; every other session is a planner.
   - Tag: `overdue-coder`.
   - Start its prompt with "You are a coder session" and make it stand alone: goal, known cause, exact scope, tests,
     definition of done, and what to report back.
-- Checks on the coder until it finishes, then **reviews its work itself**: fetches the branch, reads the diff, runs
-  `npm test` and `npm run qa`, and looks at the screenshots. Only then reports to the owner, with numbers.
+- Checks on the coder until it finishes, then starts a **tester session** for the release (see Tester) and reviews its report,
+  spot-checking key numbers and screenshots. Only then reports to the owner, with numbers.
 - If the coder's work is wrong, sends it fixes, or (after asking the owner) deletes its branch and starts again.
 - Ships to `main` only when the owner says so.
+
+**Tester (one session per release, model Sonnet, tag `overdue-tester`, title `Overdue · v<version> test`):** started by the
+planner once the coder says done. It never edits game code and never pushes. It checks the release branch independently:
+`npm test`, `npm run qa` once, the diff touches only what the handoff asked for, every changed screen at phone size against the
+handoff's acceptance list, a "try to break it" pass (tester switch, old save / fresh install, iPad, edge cases near the change),
+and re-runs the bot for balance changes. It reports a pass/fail table with screenshot paths and "what only a real device can
+confirm". Prompt template: `docs/handoffs/tester-template.md`. The planner reads the report, spot-checks key numbers and
+screenshots, and only then asks the owner to ship. Testers don't count toward the owner's 2-coder limit.
 
 **Coder:** does the task it was given, following everything below. It never hands work to another session.
 

@@ -37,6 +37,7 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-25 | Tester role: one Sonnet tester session per release reviews the branch (QA, screens, try-to-break, bot) and reports; planner reads the report, spot-checks, then asks to ship. Testers don't count toward the 2-coder limit. CLAUDE.md + `docs/handoffs/tester-template.md` | Owner: go |
 | 2026-11-25 | Act II look A (Sunken Stacks) first; B and C later acts. Wing map: Act II visible but locked, unlocked sequentially (wing 11 after wing 10), swipe between acts. Hidden tester switch (7 taps on version line, `overdue.tester.v1`, never touches progress). Lighting system unchanged. Max-Renovation targets wing 11 ~25%, 12 ~20% | Owner |
 | 2026-11-25 | **Act II (10 new wings, 11–20)** chosen over 5 wings; must look completely different. Lighting system stays (CLAUDE.md rule), floor/shelves/lamp colour/enemies/bosses change. Looks page https://claude.ai/artifact/9wgzQWpVvdovMR5fiGdu95 (A Sunken Stacks = pick, B Overgrown Conservatory, C Clockwork Archive), waiting for letter. Act II becomes 1.16.x; Book Bag → after | Owner |
 | 2026-11-25 | More wings: owner wants them ("definitely"); also "a bit too easy with the right perks and maxed Renovations". 3-option page https://claude.ai/artifact/AUvSEnVqQyuEgX4kn5zRt6 (A Basement wings 11–15 = pick, B Act II 11–20, C 3 wings + Overtime), waiting for letter. Buttons 1.15.4: owner picked diagonal (DASH up right edge, SHHH lower-left), see-through .12 | Owner |
