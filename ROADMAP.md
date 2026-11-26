@@ -42,6 +42,8 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-26 | **Balance bot: check once per release** (tune only a wing that misses its target by > ±8 pts, one re-run); full Act II tuning pass once after wing 20. 1.17.0 stays one coder (A), started after 1.16.3 ships. | Owner (usage rationing) |
+| 2026-11-26 | "Overdue Game" sidebar group is manual: starting a session from the planner branch does not put it there (tested with the 1.16.2 re-test). Keep tagging `overdue`. | Tested |
 | 2026-11-26 | Wing 15 boss = **A, The Harbourmaster** (paper flagship, broadsides with gaps, boat launches, anchors, rams). Old Inkmaw (giant eel) parked for the wing-20 finale; Lamplighter parked for a later act. Page https://claude.ai/artifact/Y2okcfTgkycMZzwahoxEWB | Owner |
 | 2026-11-26 | Every Overdue session is tagged `overdue` (plus `overdue-coder` / `overdue-tester`) so they group together; 53 old sessions retagged | Owner (sessions getting messy) |
 | 2026-11-25 | 1.16.2 (owner, playtest): DASH/SHHH between mockups A and B (closer to corner); Banned Book B: +75% dmg, keep pierce, lose ⅓ max hearts (min 1) | Owner |
