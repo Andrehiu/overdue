@@ -63,9 +63,9 @@ export function guidePrompt(beat, { aimOff = false, used = false } = {}) {
 
 /** The one-time card for a big release. Add a new entry only for big releases; small ones never show a card. */
 export const WHATS_NEW = {
-  release: '1.16.0',
-  title: 'New in 1.16: Act II, The Sunken Stacks',
-  lines: ['Clear The Restricted Section to open wings 11 and 12.', 'Flooded rooms: stay on the stone, mind the eels and paper boats.', 'Act II wings have 9 rooms, with a Rogue Author in room 9.'],
+  release: '1.17.0',
+  title: 'New in 1.17: three new wings and the Harbourmaster',
+  lines: ['Wings 13, 14 and 15 open in Act II, after wing 12.', 'The Tide Pools, The Dry Dock and The Lantern Harbour: more eels, more boats.', 'Wing 15 ends with a new boss: the Harbourmaster.'],
   button: 'Got it',
 };
 export const whatsNewFlag = (card = WHATS_NEW) => `whatsnew-${card.release}`;

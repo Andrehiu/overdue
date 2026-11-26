@@ -101,3 +101,24 @@ test('per-wing tuning dials never make a wing easier (budgetBoost >= 1)', async 
   const S = await load('story');
   for (const w of S.WINGS) assert.ok((w.budgetBoost || 1) >= 1, `${w.id} budgetBoost`);
 });
+
+test('v1.16.2: walkers are at most 0.7 cells wide for walls, so a golem fits the 2-cell gaps the flow field plans through', async () => {
+  const { wallRadius } = await load('flowfield'), { CELL } = await load('arena');
+  assert.equal(wallRadius(12, CELL), 12, 'small walkers keep their size');
+  assert.equal(wallRadius(30, CELL), 21, 'a big golem is capped at 0.7 cells');
+  for (const r of [12, 15, 22, 24, 30, 40]) assert.ok(wallRadius(r, CELL) * 2 <= CELL * 2 * 0.75, `r ${r} fits a 2-cell gap with slack`);
+});
+
+const load2 = (m) => import(`../src/${m}.js`);
+test('v1.17.0 wings 13-15: Act II, 9 rooms, harder than the previous wing at every room, elites/boss rooms open, wing 15 boss room is the harbour', async () => {
+  const S = await load2('story'), A = await load2('arena');
+  assert.ok(S.WINGS.length >= 15);
+  for (const w of [13, 14, 15]) {
+    assert.equal(S.actOf(w), 2); assert.equal(S.roomsIn(w), 9);
+    for (let r = 1; r <= 9; r++) assert.ok(S.threat(S.difficulty(w, r)) > S.threat(S.difficulty(w - 1, r)), `wing ${w} room ${r} is harder than wing ${w - 1}`);
+    assert.ok(S.WINGS[w - 1].shapes.some((x) => A.WATER_SHAPES.includes(x)));
+    assert.ok(!A.WATER_SHAPES.includes(S.roomShape(w, 5)), 'elite room is open ground');
+  }
+  assert.equal(S.roomShape(15, 9), 'harbour'); assert.notEqual(S.roomShape(14, 9), 'harbour');
+  assert.equal(S.WINGS[14].taunt, 'No ship leaves this harbour with an overdue book. Including yours.');
+});

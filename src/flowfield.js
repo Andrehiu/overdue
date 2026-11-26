@@ -41,17 +41,22 @@ class MinHeap {
   }
 }
 
-function canStep(solid, cols, rows, cx, cy, dx, dy) {
+function canStep(solid, cols, rows, cx, cy, dx, dy, wide = false) {
   const nx = cx + dx, ny = cy + dy;
   if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) return false;
   if (solid[ny * cols + nx]) return false;
   // No diagonal corner-cutting through shelf corners.
   if (dx && dy && (solid[cy * cols + nx] || solid[ny * cols + cx])) return false;
+  if (wide && !(dx && dy)) {   // v1.17.0 (story): a straight step must lie inside a free 2x2 block, so nobody is routed through a one-cell pinch they can't fit
+    const free = (x, y) => x >= 0 && y >= 0 && x < cols && y < rows && !solid[y * cols + x];
+    if (dx) return (free(cx, cy - 1) && free(nx, cy - 1)) || (free(cx, cy + 1) && free(nx, cy + 1));
+    return (free(cx - 1, cy) && free(cx - 1, ny)) || (free(cx + 1, cy) && free(cx + 1, ny));
+  }
   return true;
 }
 
 /** Returns {dist, dirX, dirY} per cell; dir points one step closer to the target. */
-export function computeFlowField(solid, cols, rows, tc, tr) {
+export function computeFlowField(solid, cols, rows, tc, tr, wide = false) {
   const n = cols * rows;
   const dist = new Float32Array(n).fill(Infinity);
   const dirX = new Float32Array(n), dirY = new Float32Array(n);
@@ -64,7 +69,7 @@ export function computeFlowField(solid, cols, rows, tc, tr) {
     if (d > dist[i]) continue;
     const cx = i % cols, cy = (i / cols) | 0;
     for (const [dx, dy, c] of NEIGH) {
-      if (!canStep(solid, cols, rows, cx, cy, dx, dy)) continue;
+      if (!canStep(solid, cols, rows, cx, cy, dx, dy, wide)) continue;
       const ni = (cy + dy) * cols + cx + dx;
       const nd = d + c;
       // Push the float32-rounded value: comparing a float64 key against the float32 store
@@ -77,7 +82,7 @@ export function computeFlowField(solid, cols, rows, tc, tr) {
     const cx = i % cols, cy = (i / cols) | 0;
     let best = dist[i], bx = 0, by = 0;
     for (const [dx, dy] of NEIGH) {
-      if (!canStep(solid, cols, rows, cx, cy, dx, dy)) continue;
+      if (!canStep(solid, cols, rows, cx, cy, dx, dy, wide)) continue;
       const nd = dist[(cy + dy) * cols + cx + dx];
       if (nd < best) { best = nd; bx = dx; by = dy; }
     }
@@ -99,3 +104,10 @@ export function lineOfSight(solid, cols, rows, cell, x0, y0, x1, y1) {
   }
   return true;
 }
+
+/**
+ * v1.16.2: the flow field plans over whole cells, so a walker must be able to follow it through the narrowest gap it plans (2 cells =
+ * 2 x cell). Big walkers (Ledger Golem, r up to 30 = one cell) are wider than that gap and wedged in it for good, taking the queue behind
+ * them along (Act II islands rooms). Walls see a walker as at most 0.7 cells wide (r 21 at CELL 30): the body can still look bigger.
+ */
+export const wallRadius = (r, cell) => Math.min(r, cell * 0.7);

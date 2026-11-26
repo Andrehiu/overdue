@@ -37,10 +37,11 @@ export const SURVIVE_BUDGET_MULT = 1.05;   // total spawn budget vs the plain ro
 export const SURVIVE_END = SURVIVE_SECONDS - 10;     // no spawn after this, so the last enemies still have time to be fought
 // Budget shares and the time slice of the 30 s each chunk fills (thin start, heavy finish).
 export const SURVIVE_CHUNKS = [{ share: 0.2, from: 0.8, to: 6 }, { share: 0.3, from: 6.5, to: 12 }, { share: 0.5, from: 12.5, to: SURVIVE_END }];
-const SURVIVE_ROOMS = { 1: [3], 2: [], 3: [5], 4: [6], 5: [6], 6: [], 7: [5], 8: [3], 9: [], 10: [6], 11: [7], 12: [3] };
+const SURVIVE_ROOMS = { 1: [3], 2: [], 3: [5], 4: [6], 5: [6], 6: [], 7: [5], 8: [3], 9: [], 10: [6], 11: [7], 12: [3], 13: [], 14: [6], 15: [] };
 /** 'clear' (kill everything) or 'survive' (stay alive SURVIVE_SECONDS). Deterministic per wing + room. */
 export const roomGoal = (wing, room) => ((SURVIVE_ROOMS[wing] || []).includes(room) ? 'survive' : 'clear');
 
+// eliteCap: a ceiling on the random-elite chance (default 0.5); wings 14-15 sit under it so late rooms aren't wall-to-wall elites (v1.17.0)
 // weights: enemy mix · unlockShift: enemy types arrive earlier · density: extra shelves per half
 // shapes: the room layouts this wing uses (see arena.js) · gapMult: < 1 means less breathing room between spawn groups · eliteBonus: extra elite chance
 export const WINGS = [
@@ -82,6 +83,16 @@ export const WINGS = [
   { act: 2, id: 'cistern', shapes: ['islands', 'causeway', 'reading'], icon: '🕳️', name: 'The Cistern', blurb: 'Deep water, narrow stone, and something under the surface.',
     intro: "The cistern echoes. Something answers.", taunt: "Down here, overdue means drowned.", cleared: "The Cistern is quiet. The water is not.",
     weights: { patron: 1.5, golem: 1.5, worm: 1.2 }, enemyTypes: { eel: 1, boat: 1 }, unlockShift: 6, eliteBonus: 0.14, budgetBoost: 1.22, gapMult: 0.75, floorHue: 190, rug: '#12343c' },
+  // ---- v1.17.0: wings 13-15. Gentle steps up from the Cistern (see budgetBoost / eliteBonus / gapMult); wing 15 ends on the Harbourmaster.
+  { act: 2, id: 'tidepools', shapes: ['islands', 'causeway', 'pillars'], icon: '🐚', name: 'The Tide Pools', blurb: 'Many small islands and a lot of bridges. The eels like it.',
+    intro: "Low tide. Everything that lives here is awake.", taunt: "Shallow, shallow, shallow... deep.", cleared: "The Tide Pools settle. A shell clicks shut.",
+    weights: { worm: 1 }, enemyTypes: { eel: 1.3, boat: 0.8 }, unlockShift: 6, eliteBonus: 0.14, budgetBoost: 1.19, gapMult: 0.7, floorHue: 188, rug: '#12343c' },
+  { act: 2, id: 'drydock', shapes: ['causeway', 'islands', 'reading'], icon: '⚓', name: 'The Dry Dock', blurb: 'Long causeways, boats everywhere, golems on the quay.',
+    intro: "The boats are in. The captain is not.", taunt: "Anchors aweigh. Fines too.", cleared: "The Dry Dock empties. Somewhere, a bell.",
+    weights: { golem: 1.2, patron: 1 }, enemyTypes: { boat: 1.4, eel: 0.9 }, unlockShift: 6, eliteBonus: 0.14, eliteCap: 0.42, budgetBoost: 1.16, gapMult: 0.68, floorHue: 192, rug: '#103038' },
+  { act: 2, id: 'harbour', boss: 'harbourmaster', shapes: ['islands', 'causeway', 'reading'], icon: '🏮', name: 'The Lantern Harbour', blurb: 'The last light on the water. The Harbourmaster is on duty.',
+    intro: "Lanterns lit. The harbour is open for business.", taunt: "No ship leaves this harbour with an overdue book. Including yours.", cleared: "The Lantern Harbour goes dark. Quiet tide.",
+    weights: { patron: 1.3, golem: 1.3 }, enemyTypes: { eel: 1.1, boat: 1.2 }, unlockShift: 6, eliteBonus: 0.14, eliteCap: 0.42, budgetBoost: 1.14, gapMult: 0.66, floorHue: 198, rug: '#0e2c36' },
 ];
 
 /** Which act a wing belongs to (1 or 2; later acts add more). */
@@ -117,7 +128,7 @@ export function difficulty(wing, room) {
     budget,
     hpMult: (1 + 0.08 * (r - 1)) * wingHp(w) * STORY_HP_MULT,
     speedMult: (1 + Math.min(0.35, r * 0.015)) * (1 + 0.02 * w),
-    eliteChance: kind === 'elite' ? 1 : Math.min(0.5, 0.025 * w + 0.008 * (r - 1) + Math.max(...WINGS.slice(0, w + 1).map((x) => x.eliteBonus || 0))),
+    eliteChance: kind === 'elite' ? 1 : Math.min(def.eliteCap || 0.5, 0.025 * w + 0.008 * (r - 1) + Math.max(...WINGS.slice(0, w + 1).map((x) => x.eliteBonus || 0))),
     hazardSpeed: 1 + 0.03 * w + 0.01 * (r - 1),
     // Spawn pressure never relaxes: a wing keeps the tightest pacing of any wing before it.
     gapMult: Math.max(0.65, Math.min(...WINGS.slice(0, w + 1).map((x) => x.gapMult || 1)) * (1 - 0.015 * w)),
@@ -170,6 +181,7 @@ const forcedRoom = (wing, room) => room === eliteRoom(wing) || room === bossRoom
  */
 export function roomShape(wing, room) {
   const list = (WINGS[wing - 1] || WINGS[0]).shapes;
+  if (room === bossRoom(wing) && (WINGS[wing - 1] || {}).boss === 'harbourmaster') return 'harbour';   // v1.17.0: the Harbourmaster's channels
   if (forcedRoom(wing, room)) return ['pillars', 'reading'].find((x) => list.includes(x)) || 'scatter';   // Act II elite / boss rooms: the most open shape too (never water-heavy)
   const start = hashString(`shape:${layoutSeed(wing, room)}`) % list.length;
   const prev = room > 1 ? roomShape(wing, room - 1) : null;

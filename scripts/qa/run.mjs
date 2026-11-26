@@ -72,6 +72,7 @@ const TARGETS = [
   ['iphone-se-landscape', { ...devices['iPhone 13 landscape'], viewport: { width: 667, height: 331 }, screen: { width: 667, height: 375 } }],
   ['iphone-13-safari-landscape', { ...devices['iPhone 13 landscape'], viewport: { width: 750, height: 342 } }],
   ['iphone-15-pro-max-landscape', { ...devices['iPhone 13 landscape'], viewport: { width: 932, height: 430 }, screen: { width: 932, height: 430 } }],
+  ['ipad-13-landscape', { ...devices['iPad Pro 11 landscape'], viewport: { width: 1366, height: 1024 }, screen: { width: 1366, height: 1024 } }],
   ['ipad-safari-landscape', { ...devices['iPad Pro 11 landscape'], viewport: { width: 1180, height: 740 } }],
 ];
 // Tiers (v1.11.3 QA trim): the full gameplay flow runs on these three; every other size gets the fit-only pass
@@ -131,6 +132,33 @@ const PINNED_CHECK = (id) => {
   }
   return bad;
 };
+
+
+// v1.16.3: every menu / overlay screen fits WITHOUT scrolling, and no text box touches the pinned button row.
+// (A scroll container is allowed to scroll only if the content genuinely can't fit; QA treats any scroll as a failure, so shrink type/spacing instead.)
+const FIT_CHECK = (id) => {
+  const scr = document.getElementById(id), bad = [];
+  if (!scr || scr.hidden) return [`${id} not showing`];
+  if (scr.scrollHeight > scr.clientHeight + 1) bad.push(`scrolls: ${scr.scrollHeight} > ${scr.clientHeight}`);
+  const row = scr.querySelector(':scope > .menu.row:last-child');
+  if (row) {
+    const rr = row.getBoundingClientRect(), w = document.createTreeWalker(scr, NodeFilter.SHOW_TEXT);
+    for (let n; (n = w.nextNode());) {
+      if (!n.textContent.trim()) continue;
+      const el = n.parentElement;
+      if (row.contains(el) || !el.offsetParent || getComputedStyle(el).visibility === 'hidden') continue;
+      const rg = document.createRange(); rg.selectNodeContents(n);
+      for (const r of rg.getClientRects()) if (r.width >= 1 && r.height >= 1 && r.bottom > rr.top + 1 && r.top < rr.bottom - 1 && r.right > rr.left && r.left < rr.right) { bad.push(`"${n.textContent.trim().slice(0, 24)}" touches the row`); break; }
+    }
+  }
+  return bad;
+};
+
+// v1.16.3: deterministic auto-aim measurements. Right before measuring: the room is live ('playing'), whatever was left over or still queued is gone,
+// and ONE unkillable, stunned bunny stands in line of sight, so the room can't clear mid-measurement (CI saw state 'waveclear', 0 enemies, 0 throws).
+const LIVE_TARGET = `if (O.game.state !== 'playing') { O.startWave(O.game.wave); O.god(); }
+        O.killAll(); O.game.bannerT = 0; O.game.freeze = 0; O.game.timeScale = 1;   // clear killAll's hit-stop too (it swallows steps)
+        { const tb = O.makeEnemy('bunny', O.W / 2 + 260, 60); tb.hp = tb.maxHp = 1e9; tb.stun = 1e9; }`;
 
 // v1.13.0: menus appear as they're earned, so flows that tap Endless / Renovations / Hall of Fame / Codex start as a RETURNING player.
 // (A fresh save shows only Story / How to play / Settings: the new-player flow checks that separately.)
@@ -205,6 +233,18 @@ async function screensFlow(name, opts, full) {
       const clear = ![m.p, ...m.hud].some((o) => hit(m.d, o) || hit(m.s, o));
       const ok = !m.touch || (gap >= 1.5 * em && onScreen(m.d) && onScreen(m.s) && clear);
       record(area, 'v1.15.4: DASH/SHHH circles apart (gap >= 1.5em), clear of pause and the score/combo HUD, fully on screen', ok, `size ${Math.round(m.d.w)}px · circle gap ${Math.round(gap)}px (${(gap / em).toFixed(1)}em) · DASH [${Math.round(m.d.l)},${Math.round(m.d.t)}] SHHH [${Math.round(m.s.l)},${Math.round(m.s.t)}] · bottom margin ${Math.round(m.vh - m.d.b)}/${Math.round(m.vh - m.s.b)}px`);
+    }
+    // v1.16.2: DASH/SHHH hug the bottom-right corner (same share of the screen on every size, measured from the SCREEN edge, not
+    // the letterboxed stage); the pause button clears the iOS status area, the room title and the buttons
+    {
+      const m = await page.evaluate(() => { const rc = (id) => { const r = document.getElementById(id).getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2 }; };
+        return { touch: document.body.classList.contains('touch'), d: rc('btnDash'), s: rc('btnShhh'), p: rc('btnPause'), vw: innerWidth, vh: innerHeight }; });
+      const dx = (m.vw - m.d.cx) / m.vw, dy = (m.vh - m.d.cy) / m.vh;
+      const hit = (a, b) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
+      const inside = (r) => r.l >= 0 && r.r <= m.vw && r.t >= 0 && r.b <= m.vh;
+      const titleBox = { l: m.vw * 0.3, r: m.vw * 0.7, t: 0, b: m.vh * 0.2 };   // room title / wave banner (top centre)
+      const ok = !m.touch || (dx <= 0.08 && dy <= 0.30 && inside(m.d) && inside(m.s) && inside(m.p) && Math.hypot(m.d.cx - m.s.cx, m.d.cy - m.s.cy) >= (m.d.r - m.d.l + m.s.r - m.s.l) / 2 && !hit(m.p, m.d) && !hit(m.p, m.s) && !hit(m.p, titleBox) && m.p.t >= 40);
+      record(area, 'v1.16.2: DASH centre within 8% of the width / 30% of the height from the corner; DASH, SHHH, pause on screen, not overlapping, pause below the status area', ok, `DASH centre ${(dx * 100).toFixed(1)}% from right, ${(dy * 100).toFixed(1)}% from bottom · pause top ${Math.round(m.p.t)}px`);
     }
     record(area, 'run starts', await page.evaluate(() => __overdue.game.state === 'playing'));
 
@@ -459,7 +499,7 @@ async function screensFlow(name, opts, full) {
         await page.locator(`#cards .offer-btn.${path}`).click(); await page.waitForTimeout(500);
         const after = await page.evaluate(() => { const O = __overdue; return { state: O.game.state, title: document.querySelector('#upgradeTitle').textContent, cards: document.querySelectorAll('#cards .card').length, owns: O.game.owned.bannedbook || 0, maxHp: O.stats.maxHp, offer: O.cursedOffer }; });
         record(area, `v1.14.1: Mystery "${path === 'walk' ? 'Walk away' : 'Take it'}" ${path === 'walk' ? 'gives nothing' : 'applies the curse'} and the normal pick follows (no 1 of 2 label)`,
-          after.state === 'upgrade' && after.cards >= 3 && after.offer === null && !/\(1 of 2\)|\(2 of 2\)/.test(after.title) && (path === 'walk' ? after.owns === 0 && after.maxHp === snap.stats.maxHp : after.owns === 1 && after.maxHp === snap.stats.maxHp - 1), JSON.stringify(after));
+          after.state === 'upgrade' && after.cards >= 3 && after.offer === null && !/\(1 of 2\)|\(2 of 2\)/.test(after.title) && (path === 'walk' ? after.owns === 0 && after.maxHp === snap.stats.maxHp : after.owns === 1 && after.maxHp === snap.stats.maxHp - Math.max(1, Math.round(snap.stats.maxHp / 3))), JSON.stringify(after));
         await restore(snap);
       }
     }
@@ -585,10 +625,40 @@ async function screensFlow(name, opts, full) {
       const auto = await sim(`O.setSetting('autoaim', true); O.touch.enabled = true; O.touch.aimId = null; const p = O.player; const t0 = p.throws; p.autoAim = { n: 0, ok: true }; O.stepN(120);
         return { throws: p.throws - t0, aimedFrames: p.autoAim.n, ok: p.autoAim.ok };`);
       record(area, 'auto-aim on: throws with no finger, at a visible enemy (or the nearest when none is visible)', auto.throws >= 1 && auto.aimedFrames >= 1 && auto.ok, JSON.stringify(auto));
+      // v1.16.4: a stuck second finger must never leave the blue aim circle behind, and a resting finger must not override auto-aim.
+      const ptr = (type, id, x, y) => page.evaluate(([type, id, x, y]) => { const c = document.getElementById('game') || document.querySelector('canvas'); const r = c.getBoundingClientRect();
+        c.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', clientX: r.left + x * r.width / __overdue.W, clientY: r.top + y * r.height / __overdue.H, bubbles: true, cancelable: true, isPrimary: id === 11 })); }, [type, id, x, y]);
+      const tc = (type, n) => page.evaluate(([type, n]) => { document.dispatchEvent(new TouchEvent(type, { touches: [], changedTouches: [], bubbles: true })); }, [type, n]);
+      await page.evaluate(() => { const O = __overdue; O.setSetting('autoaim', true); O.releaseTouches(); O.touch.enabled = true; });
+      const shown = () => page.evaluate(() => ({ aimId: __overdue.touch.aimId, shown: __overdue.aimStickShown() }));
+      await ptr('pointerdown', 11, 200, 300); await ptr('pointerdown', 12, 700, 300);
+      const rest = await shown();
+      record(area, 'v1.16.4: auto-aim on, a resting second finger (inside the deadzone) draws no aim circle', rest.aimId === 12 && rest.shown === false, JSON.stringify(rest));
+      const restThrows = await sim(`const p = O.player; const t0 = p.throws; O.stepN(120); return { throws: p.throws - t0 };`);
+      record(area, 'v1.16.4: ...and auto-aim keeps throwing', restThrows.throws >= 1, JSON.stringify(restThrows));
+      await ptr('pointermove', 12, 760, 300);
+      const drag = await shown();
+      record(area, 'v1.16.4: dragging that finger past the deadzone shows the circle', drag.shown === true, JSON.stringify(drag));
+      await page.evaluate(() => { document.dispatchEvent(new TouchEvent('touchcancel', { touches: [], changedTouches: [], bubbles: true })); });
+      const afterCancel = await page.evaluate(() => ({ aimId: __overdue.touch.aimId, moveId: __overdue.touch.moveId, shown: __overdue.aimStickShown() }));
+      record(area, 'v1.16.4: touchcancel clears both sticks, no circle', afterCancel.aimId === null && afterCancel.moveId === null && !afterCancel.shown, JSON.stringify(afterCancel));
+      await page.evaluate(() => { const O = __overdue; O.settings.autoaim = false; });   // manual aim: the circle shows from the first touch, as before
+      await ptr('pointerdown', 21, 200, 300); await ptr('pointerdown', 22, 700, 300);
+      const manualShown = await shown();
+      record(area, 'v1.16.4: manual aim (auto-aim off) still shows the stick from the first touch', manualShown.shown === true, JSON.stringify(manualShown));
+      await page.evaluate(`(() => { const O = __overdue; ${LIVE_TARGET} O.releaseTouches(); O.settings.autoaim = true; })()`);   // pause only works in a live room (CI-style flake otherwise)
+      await ptr('pointerdown', 31, 200, 300); await ptr('pointerdown', 32, 700, 300); await ptr('pointermove', 32, 760, 300);
+      await page.evaluate(() => { document.getElementById('btnPause').click(); });
+      const paused = await page.evaluate(() => ({ state: __overdue.game.state, aimId: __overdue.touch.aimId, moveId: __overdue.touch.moveId }));
+      await page.evaluate(() => { document.querySelector('#pause [data-act=resume]')?.click(); });
+      const resumed = await page.evaluate(() => ({ state: __overdue.game.state, shown: __overdue.aimStickShown() }));
+      record(area, 'v1.16.4: pausing mid-touch drops both fingers; after resume no circle', paused.state === 'paused' && paused.aimId === null && paused.moveId === null && !resumed.shown, JSON.stringify({ paused, resumed }));
+      await page.evaluate(() => { __overdue.releaseTouches(); });
       // v1.15.3: a far enemy in the open is chosen over a nearer one behind a shelf
       // The two bunnies must stand still: enemies get pushed out of walls/shelves they overlap, and a moving target shifts the 50% lead aim (that was
       // the flake). So pick a direction where both discs are free of solid cells (also with the extra shelf cell in place), and report how far they moved.
-      const vis = await sim(`O.freeze(true); O.killAll(); O.stepN(1); O.killAll(); O.stepN(1); const p = O.player;   // killAll only marks enemies dead; a step removes them (a golem leaves coins: twice) p.x = O.W / 2; p.y = O.H / 2; p.vx = p.vy = 0;   // arena centre: a far point is then inside the room (line of sight is false outside the grid)
+      const vis = await sim(`O.freeze(true); O.killAll(); O.stepN(1); O.killAll(); O.stepN(1);   // killAll only marks enemies dead; a step removes them (a golem leaves coins: twice)
+        const p = O.player; p.x = O.W / 2; p.y = O.H / 2; p.vx = p.vy = 0;   // arena centre: a far point is then inside the room (line of sight is false outside the grid). v1.16.3: this used to sit inside the comment above and never ran, so the player stood wherever the last check left them = the flake
         const inside = (x, y) => x > 30 && y > 30 && x < O.W - 30 && y < O.H - 30;
         const freeDisc = (x, y, r) => inside(x, y) && [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r], [r * .7, r * .7], [-r * .7, r * .7], [r * .7, -r * .7], [-r * .7, -r * .7]].every(([dx, dy]) => !O.isSolid(x + dx, y + dy));
         const clear = (a, d) => { for (let r = 10; r <= d; r += 8) if (O.isSolid(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r)) return false; return true; };
@@ -604,17 +674,22 @@ async function screensFlow(name, opts, full) {
         const { aF, aN, wx, wy, was } = pick;
         const far = O.makeEnemy('bunny', pick.fx, pick.fy), near = O.makeEnemy('bunny', pick.nx, pick.ny);
         for (const e of [far, near]) { e.hp = e.maxHp = 999; e.stun = 99; }
+        O.enemies.splice(0, O.enemies.length, far, near);   // v1.16.3: nobody else may be a target (CI/local runs sometimes still had 2-4 leftovers or fresh spawns here)
+        if (O.game.state !== 'playing') O.game.state = 'playing';   // v1.16.2: killAll + a step can clear the wave (state 'waveclear': no aiming at all); that depended on how far the wave had got = flaky
+        O.game.freeze = 0; O.game.timeScale = 1;   // killAll's hit-stop (game.freeze) would swallow these 4 steps: no aim update, 0 throws = the flake
         O.setSetting('autoaim', true); O.touch.aimId = null; O.books.length = 0; p.throws = 0; O.stepN(4);
         const d = Math.abs(Math.atan2(Math.sin(p.aim - aF), Math.cos(p.aim - aF))), dn = Math.abs(Math.atan2(Math.sin(p.aim - aN), Math.cos(p.aim - aN)));
         const moved = [Math.hypot(far.x - pick.fx, far.y - pick.fy), Math.hypot(near.x - pick.nx, near.y - pick.ny)].map((v) => +v.toFixed(1)), others = O.enemies.length - 2;
         O.setSolid(wx, wy, was); O.freeze(false); return { skipped: false, toFar: +d.toFixed(2), toNear: +dn.toFixed(2), throws: p.throws, moved, others, touchOn: O.touch.enabled, aimId: O.touch.aimId, state: O.game.state, autoaim: O.settings.autoaim };`);
       record(area, 'auto-aim: a far enemy in line of sight is chosen over a nearer one behind a shelf', vis.skipped === true || vis.toFar < 0.1, JSON.stringify(vis));
       const over = await sim(`${angOff} const p = O.player;
-        if (O.game.state !== 'playing') { O.startWave(O.game.wave); O.god(); O.killAll(); }   // the room can already be cleared if the check above found no free spot
-        if (!O.enemies.length) { const b = O.makeEnemy('bunny', O.W / 2 + 260, 60); b.hp = b.maxHp = 999; b.stun = 99; } O.touch.aimId = 99; O.touch.ax0 = p.x + 300; O.touch.ay0 = p.y; O.touch.ax = O.touch.ax0 - 60; O.touch.ay = O.touch.ay0; const t0 = p.throws;
+        ${LIVE_TARGET}
+        O.touch.aimId = 99; O.touch.ax0 = p.x + 300; O.touch.ay0 = p.y; O.touch.ax = O.touch.ax0 - 60; O.touch.ay = O.touch.ay0; const t0 = p.throws;
         O.stepN(60); const st = { state: O.game.state, en: O.enemies.length, fireT: +p.fireT.toFixed(2), hp: p.hp, dash: p.dashT }; O.touch.aimId = null; return { throws: p.throws - t0, diff: dd(p.lastThrow, Math.PI), st };`);
       record(area, 'auto-aim on + deflected stick: throws follow the stick', over.throws >= 1 && over.diff < 0.15, JSON.stringify(over));
-      const idleStick = await sim(`const p = O.player; O.touch.aimId = 99; O.touch.ax0 = O.touch.ax = p.x + 300; O.touch.ay0 = O.touch.ay = p.y; p.autoAim = { n: 0, nearest: true }; const t0 = p.throws;
+      const idleStick = await sim(`const p = O.player;
+        ${LIVE_TARGET}
+        O.touch.aimId = 99; O.touch.ax0 = O.touch.ax = p.x + 300; O.touch.ay0 = O.touch.ay = p.y; p.autoAim = { n: 0, nearest: true }; const t0 = p.throws;
         O.stepN(120); O.touch.aimId = null; return { throws: p.throws - t0, aimedFrames: p.autoAim.n };`);
       record(area, 'auto-aim on + stick inside deadzone: auto-aim keeps working', idleStick.throws >= 1 && idleStick.aimedFrames >= 1, JSON.stringify(idleStick));
       await page.evaluate(() => { __overdue.touch.enabled = false; __overdue.setSetting('autoaim', true); });
@@ -661,9 +736,16 @@ async function menusFlow(name, opts) {
       if (id === 'codex' || id === 'shop' || id === 'howto') await shot(page, `${name}-menu-${id}`);
       const bad = await check(id);
       record(area, `${id}: bottom buttons on screen`, !bad.length, bad.join(', '));
+      // The Codex is a catalogue of every perk and combo: it scrolls by nature (the pinned-row check above covers it). Everything else must fit.
+      const fitBad = id === 'codex' ? [] : await page.evaluate(`(${FIT_CHECK})('${id}')`);
+      record(area, `${id}: fits without scrolling (v1.16.3)${id === 'codex' ? ' (exempt: scrolling list)' : ''}`, !fitBad.length, fitBad.join('; '));
       if (['codex', 'shop', 'settings', 'howto'].includes(id)) {
         const ov = await page.evaluate(`(${PINNED_CHECK})('${id}')`);
         record(area, `${id}: pinned row covers nothing and fits the column`, !ov.length, ov.join('; '));
+      }
+      if (id === 'shop') {
+        const rt = await page.$$eval('#shopList .reno > div > small:not(.lvl)', (els) => els.map((e) => e.textContent));
+        record(area, 'shop: every card shows "Now: … → Next: …" (v1.16.3)', rt.length === 10 && rt.every((t) => /^(Now: .+ → Next: .+|Maxed: .+)$/.test(t)), rt[0]);
       }
       if (id === 'howto') {
         const txt = await page.textContent('#howto');
@@ -690,6 +772,8 @@ async function menusFlow(name, opts) {
       const dec = decodeStats(st.code);
       record(area, 'v1.14.0: Share stats makes a valid OVS1: code (fallback box shown when the clipboard is refused)', st.shown && dec.ok && dec.runs.length === 1, st.code.slice(0, 40));
       await shot(page, `${name}-menu-settings-stats`);
+      const sFit = await page.evaluate(`(${FIT_CHECK})('settings')`);   // v1.16.4: unscrolled, so the version line counts too
+      record(area, 'v1.16.4: settings with the stats box open fits without scrolling (version line clear of Back)', !sFit.length, sFit.join('; '));
       const sBad = await page.evaluate(`(${PINNED_CHECK})('settings')`);
       record(area, 'v1.14.0: settings with the stats box open: pinned row covers nothing and fits', !sBad.length, sBad.join('; '));
       await page.click('#settings [data-act=back]'); await page.waitForTimeout(200);
@@ -731,6 +815,36 @@ async function menusFlow(name, opts) {
       return ![...document.querySelectorAll('#gameover h2, #gameover h3')].filter((h) => h.offsetParent).some((h) => { const r = h.getBoundingClientRect(); return r.bottom > tr.top && r.top < tr.bottom && r.right > tr.left && r.left < tr.right; });
     });
     record(area, 'game over: no toast over the headings', toastOk);
+
+    // v1.16.3: end screens, perk pick, doors and pause with a LONG build (14 perks) fit without scrolling and hide nothing behind the pinned row
+    await page.evaluate(() => { localStorage.setItem('overdue.progress.v1', JSON.stringify({ v: 1, fines: 1234, lifetime: 5000, unlocked: 6, best: { 1: 7, 2: 7, 3: 7, 4: 7, 5: 7 }, cleared: [1, 2, 3, 4, 5], reno: {} })); });
+    await page.reload(); await page.waitForTimeout(500);
+    const LONG = ['trilogy', 'trilogy', 'dewey', 'speedreader', 'interlibrary', 'hardcover', 'hardcover', 'hardcover', 'extendedloan', 'footnotes', 'plottwist', 'marginnotes', 'bouncy', 'cat'];
+    for (const kind of ['story-cleared', 'story-lost', 'endless']) {
+      await page.evaluate(([kind, LONG]) => {
+        const O = __overdue; O.startRun(kind === 'endless' ? 'endless' : 'story', 6);
+        for (const id of LONG) { try { O.grant(id); } catch {} }
+        O.startWave(kind === 'endless' ? 9 : 7); O.god();
+        if (kind === 'story-cleared') { O.game.wingCleared = true; O.killAll(); } else { O.player.hp = 1; O.die(); }
+      }, [kind, LONG]);
+      await page.waitForFunction(() => __overdue.game.state === 'gameover', null, { timeout: 20000 }).catch(() => {});
+      await page.waitForTimeout(400);
+      await page.evaluate(() => { for (const i of ['nudge', 'whatsNew']) document.getElementById(i).hidden = true; });
+      if (kind === 'story-cleared' && /ipad-landscape|iphone-se|iphone-landscape/.test(name)) await shot(page, `${name}-end-long-build-cleared`);
+      const eb = await page.evaluate(`(${FIT_CHECK})('gameover')`);
+      record(area, `${kind} end screen with a 14-perk build${kind === 'story-cleared' ? ' + first clear + unlock' : ''}: fits, nothing under the row (v1.16.3)`, !eb.length, eb.join('; '));
+    }
+    await page.evaluate(() => { const O = __overdue; O.startRun('story', 6); for (const id of ['trilogy', 'dewey', 'speedreader', 'interlibrary', 'hardcover', 'extendedloan', 'footnotes', 'plottwist', 'marginnotes', 'bouncy', 'cat']) { try { O.grant(id); } catch {} } O.god(); O.game.cards = 3; O.showUpgrades(); });
+    await page.waitForTimeout(900);
+    const ub = await page.evaluate(`(${FIT_CHECK})('upgrade')`);
+    record(area, 'perk pick with a long build: fits without scrolling (v1.16.3)', !ub.length, ub.join('; '));
+    await page.evaluate(() => { __overdue.player.hp = 2; __overdue.showDoors(['rare', 'rest']); }); await page.waitForTimeout(700);
+    const dbad = await page.evaluate(`(${FIT_CHECK})('doors')`);
+    record(area, 'doors: fits without scrolling (v1.16.3)', !dbad.length, dbad.join('; '));
+    await page.evaluate(() => { const O = __overdue; O.startRun('story', 6); for (const id of ['trilogy', 'dewey', 'speedreader', 'interlibrary', 'hardcover', 'extendedloan', 'footnotes', 'plottwist', 'marginnotes', 'bouncy', 'cat']) { try { O.grant(id); } catch {} } O.god(); });
+    await page.waitForTimeout(600); await page.keyboard.press('Escape'); await page.waitForTimeout(500);
+    const pbad = await page.evaluate(`(${FIT_CHECK})('pause')`);
+    record(area, 'pause with a long build: fits without scrolling (v1.16.3)', !pbad.length, pbad.join('; '));
   } catch (e) { record(area, 'menus flow completed', false, e.message.split('\n')[0]); }
   await ctx.close();
   return record.list;
@@ -896,7 +1010,7 @@ async function act2Flow() {
   await page.click('#title [data-act="story"]'); await page.waitForTimeout(250);
   await page.click('#actNext'); await page.waitForTimeout(150);
   const open = await page.evaluate(() => [...document.querySelectorAll('#wingGrid .wing:not(.soon)')].map((b) => !b.disabled));
-  record('act2', 'tester mode opens wings 11 and 12', open.length === 2 && open.every(Boolean), JSON.stringify(open));
+  record('act2', 'tester mode opens wings 11-15', open.length === 5 && open.every(Boolean), JSON.stringify(open));
   // a tester run banks fines but never unlocks, clears or sets a best room
   await page.evaluate(() => { const O = __overdue; O.startRun('story', 11); O.startWave(3); O.game.fines = 12; O.die(); });
   await page.waitForTimeout(2500);
@@ -930,8 +1044,9 @@ async function act2Flow() {
   // v1.16.1: no walker gets stuck at a shore. In water rooms (islands/causeway) with the player standing still, every ground enemy keeps moving
   // toward them (before the fix, enemies across a pond walked into the water edge and stood there for good).
   const stuck = await page.evaluate(() => {
-    const O = __overdue, bad = [], realRandom = Math.random;
-    for (const [w, room] of [[11, 2], [11, 4], [11, 6], [12, 6]]) for (const seed of [1, 2, 3]) {
+    const O = __overdue, bad = [], realRandom = Math.random, sfx0 = O.settings.sfx;
+    O.setSetting('sfx', false);   // v1.16.2: sound effects draw from Math.random when audio is live, which shifted the seeded stream (flaky); muted = same result every run
+    for (const [w, room] of [[11, 2], [11, 4], [11, 6], [12, 6], [13, 3], [14, 4], [15, 6]]) for (const seed of [1, 2, 3, 6, 9, 22, 23, 32, 35, 40]) {   // v1.16.2: 3 -> 10 seeds; 6/9/22/23/32/35/40 are ones that used to freeze golems
       let a = (seed * 2654435761) >>> 0; Math.random = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
       O.unlockAll(); O.startRun('story', w); O.startWave(room); O.god(); O.drive(true); O.setBotInput({ x: 0, y: 0 });
       O.stepN(40 * 120);                                         // spawns done and everyone has walked for a while
@@ -939,9 +1054,9 @@ async function act2Flow() {
       O.stepN(15 * 120);
       for (const e of O.enemies) { const b = before.get(e); if (!b || ['eel', 'boat', 'coin', 'worm', 'boss', 'patron'].includes(e.type)) continue; if (Math.hypot(e.x - b[0], e.y - b[1]) < 12 && Math.hypot(e.x - O.player.x, e.y - O.player.y) > 140) bad.push(`w${w} r${room} s${seed} ${e.type}@${Math.round(e.x)},${Math.round(e.y)}`); }
     }
-    Math.random = realRandom; O.drive(false); return bad;
+    Math.random = realRandom; O.drive(false); O.setSetting('sfx', sfx0); return bad;
   });
-  record('act2', 'no ground enemy stands still at a shore in Act II water rooms (player standing still, 3 seeds x 4 rooms)', stuck.length === 0, stuck.slice(0, 4).join(' | '));
+  record('act2', 'no ground enemy stands still at a shore in Act II water rooms (player standing still, 10 seeds x 7 rooms (wings 11-15))', stuck.length === 0, stuck.slice(0, 4).join(' | '));
 
   // 3. an Act II water room: renders, the player can't step into water, books fly over it
   const pick = (() => { for (const w of [11, 12]) for (let r = 1; r <= roomsIn(w); r++) if (WATER_SHAPES.includes(roomShape(w, r))) return [w, r]; return null; })();
@@ -994,10 +1109,10 @@ async function act2Flow() {
       out.phases.add(eel.ph);
       if (eel.under) {
         out.under++;
-        // while submerged: a book sitting on it and a direct damage call must do nothing
+        // while submerged: a book sitting on it and a direct damage call must do nothing (v1.16.2: the test book is marked as already hit on every other enemy, so a boat spawned next to the eel can't be killed by it: that was a flake)
         if (i % 7 === 0 && bookHpChecks < 12) {
           const hp = eel.hp;
-          O.books.push({ x: eel.x, y: eel.y, vx: 0, vy: 0, r: 6, life: 1, age: 0, hitAny: false, rot: 0, dmgMult: 1, scale: 1, spin: 0, bounces: 0, pierce: 0, wraps: 0, child: false, hit: new Set(), color: '#3f7fd6', title: 'x', look: null });
+          O.books.push({ x: eel.x, y: eel.y, vx: 0, vy: 0, r: 6, life: 1, age: 0, hitAny: false, rot: 0, dmgMult: 1, scale: 1, spin: 0, bounces: 0, pierce: 0, wraps: 0, child: false, hit: new Set(O.enemies.filter((x) => x !== eel)), color: '#3f7fd6', title: 'x', look: null });
           O.damageEnemy(eel, 5, 0, 0, false, 'throw'); O.stepN(1);
           bookHpChecks++; if (eel.hp === hp && !eel.dead) bookHpOk++;
         }
@@ -1061,6 +1176,43 @@ async function act2Flow() {
 }
 
 // ---------------------------------------------------------------- v1.15.0: status effects (ink, chill, static, pop) look right on a phone
+// ---------------------------------------------------------------- v1.17.0: the Harbourmaster (wing 15 boss): room, tells, a screenshot per phase on two devices
+async function harbourFlow(name, opts) {
+  const record = recorder(), area = `harbour/${name}`;
+  const ctx = await browser.newContext(opts), page = await ctx.newPage(), errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  await page.goto(URL0 + (URL0.includes('?') ? '&' : '?') + 'debug=1'); await page.waitForTimeout(500);
+  await page.evaluate(() => { const O = __overdue; O.unlockAll(); O.startRun('story', 15); O.startWave(9); O.god(); });
+  await page.waitForTimeout(4500);
+  const info = await page.evaluate(() => { const O = __overdue, b = O.game.boss; return { shape: O.arena.shape, boss: !!b && !!b.harbour, name: b && b.name, y: b && Math.round(b.y), water: O.arena.water.reduce((a, v) => a + v, 0), grid: O.grid() }; });
+  record(area, 'wing 15 boss room is the harbour with two channels and the Harbourmaster in a channel', info.shape === 'harbour' && info.boss && info.name === 'The Harbourmaster' && info.y < 70 && info.water > 0, JSON.stringify(info));
+  await shot(page, `${name}-harbour-phase1`);
+  // v1.17.0 cosmetic: the whole ship (hull + eye) on screen and clear of the ROOM label (top lane) and the boss HP bar (bottom lane)
+  for (const [lane, tag] of [[0, 'top'], [1, 'bottom']]) {
+    await page.evaluate((l) => { const O = __overdue, b = O.game.boss; O.freeze(true); b.h.lane = l; b.h.mode = 'sail'; b.h.dir = 1; b.h.wall = null; b.x = O.W / 2; b.h.x = O.W / 2; b.y = b.h.y = l ? O.H - 90 : 60; O.stepN(2); O.freeze(false); O.game.bannerT = 0; O.game.freeze = 0; }, lane);
+    await page.waitForTimeout(60);
+    const pos = await page.evaluate(() => { const O = __overdue, b = O.game.boss, u = O.ui(); return { y: Math.round(b.y), top: Math.round(b.y - 36), bottom: Math.round(b.y + 36), H: O.H, uiK: +u.uiK.toFixed(2) }; });
+    record(area, `${tag} lane: ship hull + eye inside the room's height`, pos.top >= 0 && pos.bottom <= pos.H, JSON.stringify(pos));
+    await shot(page, `${name}-harbour-${tag}-lane`);
+  }
+  await page.evaluate(() => { const b = __overdue.game.boss; b.h.lane = 0; b.y = b.h.y = 60; });
+  const tells = await page.evaluate(async () => { const O = __overdue, b = O.game.boss; let wall = false, pages = 0; O.drive(true); O.setBotInput({ x: 0, y: 0 });
+    for (let i = 0; i < 600; i++) { O.stepN(1); if (b.h.wall) wall = true; pages = Math.max(pages, O.hazards.length); } O.drive(false); return { wall, pages }; });
+  record(area, 'phase 1: broadside walls show a tell and pages fly', tells.wall && tells.pages > 10, JSON.stringify(tells));
+  for (const [ph, hp] of [[2, 0.6], [3, 0.3]]) {
+    await page.evaluate((f) => { const O = __overdue, b = O.game.boss; b.hp = b.maxHp * f; O.drive(true); O.setBotInput({ x: 0, y: 0 }); O.stepN(130); O.drive(false); }, hp);
+    await page.evaluate(() => __overdue.stepN(240)); await page.waitForTimeout(150);
+    const st = await page.evaluate(() => { const b = __overdue.game.boss; return { phase: b.phase, mode: b.h.mode, boats: __overdue.enemies.filter((e) => e.type === 'boat').length }; });
+    record(area, `phase ${ph} reached`, st.phase === ph, JSON.stringify(st));
+    await shot(page, `${name}-harbour-phase${ph}`);
+  }
+  const rest = await page.evaluate(() => { const O = __overdue, b = O.game.boss, W = O.W, H = O.H; let off = 0, inWater = 0; O.drive(true); O.setBotInput({ x: 1, y: 1 });
+    for (let i = 0; i < 1500; i++) { O.stepN(1); if (b.x < 0 || b.x > W || b.y < 0 || b.y > H) off++; if (O.isSolid(O.player.x, O.player.y)) inWater++; } O.drive(false); return { off, inWater }; });
+  record(area, 'the ship stays in the room and the player never enters a channel (phase 3, 12 s)', rest.off === 0 && rest.inWater === 0, JSON.stringify(rest));
+  record(area, 'no page errors', errs.length === 0, errs.slice(0, 2).join(' | '));
+  await ctx.close();
+  return record.list;
+}
 async function statusFlow() {
   const record = recorder();
   const ctx = await browser.newContext(devices['iPhone 13 landscape']);
@@ -1196,9 +1348,10 @@ async function newPlayerFlow(name, opts) {
     await tap('#btnEnterWing'); await page.waitForTimeout(400);
     await page.evaluate(() => __overdue.god());
     record(area, 'guided room starts on a fresh save', await page.evaluate(() => !!__overdue.guide && __overdue.game.state === 'playing' && __overdue.game.wave === 1));
-    record(area, 'Skip button is on screen and clear of the pause button', await (async () => {
+    record(area, 'Skip button is on screen and clear of the pause button and the hearts/fines HUD', await (async () => {
       const sk = await rect('#btnGuideSkip'), pa = await rect('#btnPause');
-      return sk.w > 0 && sk.l >= 0 && sk.r <= (await page.evaluate(() => innerWidth)) && !hit(sk, pa);
+      const cv = await rect('canvas'), hudTL = { l: cv.l, t: cv.t, r: cv.l + 0.2 * cv.w, b: cv.t + 0.105 * cv.h };   // hearts + fines block, top left
+      return sk.w > 0 && sk.l >= 0 && sk.r <= (await page.evaluate(() => innerWidth)) && !hit(sk, pa) && !hit(sk, hudTL);
     })());
     await beatReady(1);
     const b1 = await page.evaluate(() => ({ beat: __overdue.guide.beat, n: __overdue.enemies.length, slow: __overdue.enemies.every((e) => e.speed < 70) }));
@@ -1292,13 +1445,13 @@ async function newPerksFlow(name, opts) {
       const tester = await page.evaluate(() => localStorage.getItem('overdue.tester.v1'));
       record(area, "version line stays visible and tappable with the What's-new card open (7 taps = tester mode)", hit && tester === '{"on":true}', JSON.stringify({ hit, tester }));
       for (let i = 0; i < 7; i++) await page.click('#title .version-label');
-      record(area, "What's new card shows for a returning save, on screen, 2-3 lines", !vis.hidden && /New in 1\.16: Act II, The Sunken Stacks/.test(vis.text) && vis.inView && vis.items >= 2 && vis.items <= 3, JSON.stringify({ ...vis, text: vis.text.slice(0, 60) }));
+      record(area, "What's new card shows for a returning save, on screen, 2-3 lines", !vis.hidden && /New in 1\.17: three new wings and the Harbourmaster/.test(vis.text) && vis.inView && vis.items >= 2 && vis.items <= 3, JSON.stringify({ ...vis, text: vis.text.slice(0, 60) }));
       await page.click('#btnWnOk'); await page.waitForTimeout(200);
       record(area, "What's new card closes with its one button", await page.evaluate(() => document.getElementById('whatsNew').hidden));
       await page.reload(); await page.waitForTimeout(1100);
-      record(area, "What's new card never shows twice", await page.evaluate(() => document.getElementById('whatsNew').hidden && __overdue.tipsSeen().includes('whatsnew-1.16.0')));
+      record(area, "What's new card never shows twice", await page.evaluate(() => document.getElementById('whatsNew').hidden && __overdue.tipsSeen().includes('whatsnew-1.17.0')));
       // NEW badges on the first offer; this player has not been stamped as fresh, so the badges are still pending
-      await page.evaluate(() => { localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.16.0","perk-stack"]}'); }); await page.reload(); await page.waitForTimeout(700);
+      await page.evaluate(() => { localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.17.0","perk-stack"]}'); }); await page.reload(); await page.waitForTimeout(700);
       await page.evaluate(() => { __overdue.startRun('endless'); __overdue.game.banished.add('margin'); __overdue.game.banished.add('librarycat'); __overdue.showUpgrades(); __overdue.showCards(['margin', 'hardcover', 'librarycat']); }); await page.waitForTimeout(900);
       const cls = () => page.evaluate(() => [...document.querySelectorAll('#cards .card')].map((c) => c.classList.contains('new')));
       const first = await cls(); await shot(page, `${name}-perk-new-badge`);
@@ -1312,13 +1465,13 @@ async function newPerksFlow(name, opts) {
     // fresh install: nothing shown, everything stamped
     { const { ctx, page, errors } = await mk(false);
       await page.goto(URL0); await page.waitForTimeout(1100);
-      record(area, "What's new card never shows on a fresh install", await page.evaluate(() => document.getElementById('whatsNew').hidden && __overdue.tipsSeen().includes('whatsnew-1.16.0') && __overdue.tipsSeen().includes('badge-margin')));
+      record(area, "What's new card never shows on a fresh install", await page.evaluate(() => document.getElementById('whatsNew').hidden && __overdue.tipsSeen().includes('whatsnew-1.17.0') && __overdue.tipsSeen().includes('badge-margin')));
       await page.evaluate(() => { __overdue.startRun('endless'); __overdue.showCards(['margin', 'hardcover', 'librarycat']); }); await page.waitForTimeout(500);
       record(area, 'a brand-new player sees no NEW badge on new perks', await page.evaluate(() => document.querySelectorAll('#cards .card').length === 3 && !document.querySelector('#cards .card.new')));
       await ctx.close(); }
     // the cat and Margin Notes books in a room
     { const { ctx, page, errors } = await mk(true);
-      await page.goto(URL0); await page.evaluate(() => localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.16.0"]}')); await page.reload(); await page.waitForTimeout(900);
+      await page.goto(URL0); await page.evaluate(() => localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.17.0"]}')); await page.reload(); await page.waitForTimeout(900);
       await page.evaluate(() => { const O = __overdue; O.startRun('endless'); O.god(); O.grant('librarycat'); for (let i = 0; i < 3; i++) O.grant('margin'); O.grant('dewey'); });
       // Deterministic: hand-step the sim (real loop paused) until 4+ Margin books are airborne AND the cat has hit something, and take the
       // numbers at that very step. (v1.15.4 fix: the old version waited in real time, then screenshotted, then re-read the books: under load
@@ -1526,6 +1679,7 @@ async function basicsFlow() {
   if (want('screens')) { tasks.push(() => rotateOverlayFlow()); for (const r of ROTATIONS) tasks.push(() => rotationFlow(...r)); }
   if (want('shapes')) tasks.push(() => shapesFlow());
   if (want('status')) tasks.push(() => statusFlow());
+  if (want('act2')) for (const [name, opts] of [TARGETS[0], TARGETS.find(([n]) => /ipad/i.test(n) && !/mini/i.test(n)) || TARGETS[1], TARGETS.find(([n]) => /iphone-se/i.test(n)) || TARGETS[0]]) tasks.push(() => harbourFlow(name, opts));
   if (want('act2')) tasks.push(() => act2Flow());
   if (want('lookfeel')) tasks.push(() => lookFeelFlow());
   if (want('newplayer')) for (const [name, opts] of TARGETS) tasks.push(() => newPlayerFlow(name, opts));
@@ -1544,13 +1698,28 @@ async function basicsFlow() {
 const PERF_SAMPLES = 5, PERF_SAMPLE_MS = 2000;
 const PERF_SAMPLE_JS = `(async (N, MS) => {
   const O = __overdue, out = [];
-  const reset = () => { const b = O.enemies.find((e) => e.type === 'boss'); if (b) { b.hp = b.maxHp; O.player.x = b.x; O.player.y = Math.min(b.y + 160, 900); } };
-  const run = (ms) => new Promise((res) => { reset(); const t0 = performance.now(), sim0 = O.game.playTime; let frames = 0;
-    const tick = (now) => { frames++; const b = O.enemies.find((e) => e.type === 'boss'); if (b && b.hp < b.maxHp * 0.5) b.hp = b.maxHp; if (now - t0 < ms) requestAnimationFrame(tick); else res({ sim: (O.game.playTime - sim0) / ((performance.now() - t0) / 1000), fps: frames / ((now - t0) / 1000), books: O.counts().books, hazards: O.counts().hazards }); };
+  // v1.16.4: speed is measured only over ticks where the game is 'playing' with a live boss that is not transforming (BOSS_TRANS), and
+  // a boss that died (wave clear / upgrade screen stop game time) is replaced, so the median can't be dragged down by a phase change or a clear.
+  const bossOf = () => O.enemies.find((e) => e.type === 'boss' && !e.dead);
+  const bossRun = !!bossOf();   // the story-room sample has no boss: it only needs state 'playing'
+  // The boss is held inside ONE phase band per sample (heal to the top of the band when it drops near the bottom), so it never flips phase
+  // (every flip is a 1 s BOSS_TRANS) and never dies (death ends the room and stops game time). Samples rotate through phases 1, 2, 3.
+  const BAND = [[0.70, 1], [0.37, 0.66], [0.25, 0.33]];
+  const reset = (ph = 0) => { if (bossRun && (!bossOf() || O.game.state !== 'playing')) { O.startWave(15); O.god(); } const b = bossOf(); if (b) { b.hp = b.maxHp * BAND[ph][1]; O.player.x = b.x; O.player.y = Math.min(b.y + 160, 900); } };
+  const settle = async () => { for (let i = 0; i < 400 && bossRun && !(bossOf() && O.game.state === 'playing'); i++) await new Promise((r) => setTimeout(r, 25)); };   // a restarted room needs its intro + boss spawn
+  const run = async (ms, ph = 0) => { reset(ph); await settle(); reset(ph); return runOnce(ms, ph); };
+  const runOnce = (ms, ph = 0) => new Promise((res) => { const t0 = performance.now(); let prevT = t0, prevP = O.game.playTime, wall = 0, play = 0, frames = 0, skipped = 0;
+    const ok = () => { const b = bossOf(); return O.game.state === 'playing' && (!bossRun || (b && !(b.trans > 0))); };
+    let prevOk = ok();
+    const tick = (now) => { frames++; const b = bossOf(); if (b && b.hp < b.maxHp * BAND[ph][0]) b.hp = b.maxHp * BAND[ph][1];
+      const okNow = ok(), p = O.game.playTime;
+      if (prevOk && okNow) { wall += (now - prevT) / 1000; play += p - prevP; } else skipped++;
+      prevT = now; prevP = p; prevOk = okNow;
+      if (now - t0 < ms) requestAnimationFrame(tick); else res({ sim: wall > 0 ? play / wall : 0, fps: frames / ((now - t0) / 1000), books: O.counts().books, hazards: O.counts().hazards, skipped, measured: wall, why: O.game.state + "/" + (bossOf() ? "boss hp" + (bossOf().hp / bossOf().maxHp).toFixed(2) + " trans" + (bossOf().trans || 0).toFixed(2) + " ph" + bossOf().phase : "noboss")}); };
     requestAnimationFrame(tick); });
   await run(4000); // warm-up, discarded (fps climbs for the first few seconds as caches and JIT settle)
   for (let s = 0; s < N; s++) {
-    const r = await run(MS);
+    const r = await run(MS, s % 3);
     // game-update time alone (no canvas): 60 steps with the real loop paused
     O.drive(true);
     try { reset(); O.game.freeze = 0; const t0 = performance.now(); for (let i = 0; i < 60; i++) { O.game.freeze = 0; O.stepN(1); } r.upd = (performance.now() - t0) / 60; } finally { O.drive(false); }
@@ -1561,10 +1730,12 @@ const PERF_SAMPLE_JS = `(async (N, MS) => {
 const perfSample = async (page) => {
   const r = await page.evaluate(`${PERF_SAMPLE_JS}(${PERF_SAMPLES}, ${PERF_SAMPLE_MS})`);
   const col = (k) => r.out.map((x) => x[k]);
-  return { sim: median(col('sim')), fps: median(col('fps')), books: Math.max(...col('books')), hazards: Math.max(...col('hazards')), upd: median(col('upd')),
-    simS: col('sim'), fpsS: col('fps'), updS: col('upd') };
+  // a sample with under 0.5 s of qualifying game time (the boss died, the room restarted) says nothing about speed: left out, and fewer than 3 valid samples fails
+  const valid = r.out.filter((x) => x.measured >= 0.5);
+  return { valid: valid.length, sim: valid.length >= 3 ? median(valid.map((x) => x.sim)) : 0, fps: median(col('fps')), books: Math.max(...col('books')), hazards: Math.max(...col('hazards')), upd: median(col('upd')),
+    skipped: col('skipped'), why: col('why'), measured: col('measured'), simS: col('sim'), fpsS: col('fps'), updS: col('upd') };
 };
-const perfDetail = (m) => `median ${m.fps.toFixed(0)} fps, ${m.sim.toFixed(2)}x · game update median ${m.upd.toFixed(2)} ms/frame · fps samples ${m.fpsS.map((v) => v.toFixed(0)).join(', ')}`;
+const perfDetail = (m) => `median ${m.fps.toFixed(0)} fps, ${m.sim.toFixed(2)}x · game update median ${m.upd.toFixed(2)} ms/frame · fps samples ${m.fpsS.map((v) => v.toFixed(0)).join(', ')} · valid samples ${m.valid}/${m.simS.length} · speed samples ${m.simS.map((v) => v.toFixed(2)).join(', ')} · ticks skipped (not playing / boss transforming) ${m.skipped.join(', ')} · end ${(m.why || []).join(' ; ')}`;
 
 // Update time and sim speed always fail QA. fps fails only when a GPU is present; with software rendering (SwiftShader/llvmpipe) it is a ⚠️ warning
 // (canvas raster dominates there, ~78% of frame time, so fps swings 35-59 on one commit).
@@ -1629,6 +1800,19 @@ if (want('perf')) {
 
   record('perf', `status-stacked boss game speed ≥ ${PERF.sim}x`, st.sim >= PERF.sim, perfDetail(st));
   await perfChecks(page, 'status-stacked boss', st);
+  // v1.17.0: wing 15 boss (the Harbourmaster: walls of pages, boats, anchors, rams) with the stacked build
+  await page.evaluate(() => {
+    const O = __overdue; O.unlockAll(); O.startRun('story', 15);
+    for (const id of ['hardcover', 'hardcover', 'hardcover', 'speedreader', 'speedreader', 'speedreader', 'trilogy', 'trilogy', 'trilogy', 'plottwist', 'plottwist', 'plottwist',
+      'footnotes', 'footnotes', 'audiobook', 'audiobook', 'bookmark', 'spinebreaker', 'm_tome', 'm_zone', 'm_saga', 'm_twist', 'm_biblio', 'unreliable', 'annotated']) O.grant(id);
+    O.startWave(9); O.god();
+    O.game.boss && (O.game.boss.hp = O.game.boss.maxHp * 0.3);
+  });
+  await page.waitForTimeout(3500);
+  const hm = await perfSample(page);
+  await shot(page, 'perf-harbourmaster');
+  record('perf', `wing 15 boss (Harbourmaster) game speed ≥ ${PERF.sim}x`, hm.sim >= PERF.sim, perfDetail(hm));
+  await perfChecks(page, 'wing 15 boss (Harbourmaster)', hm);
   // Story late game: wing 10 room 6, a crowd of elites firing fans of pages.
   await page.evaluate(() => { const O = __overdue; O.unlockAll(); O.startRun('story', 10); O.startWave(6); O.god(); });
   await page.waitForTimeout(5000);

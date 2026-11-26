@@ -77,7 +77,7 @@ export const UPGRADES = [
   perk({ id: 'popup', icon: '🎉', short: 'Pop-up Book', name: 'Pop-up Book', desc: 'Defeated enemies pop, hurting enemies nearby', max: 3, weight: 5, apply: (s) => { s.popLvl = Math.min(3, s.popLvl + 1); s.popRadius = POP_RADIUS[s.popLvl]; s.popMult = POP_MULT[s.popLvl]; } }),
 
   // ---- cursed books: big upside, real cost ----
-  cursed({ id: 'bannedbook', icon: '💀', short: 'Banned Book', name: 'Banned Book', desc: '+100% book damage, books pierce 1 enemy. −1 max heart.', apply: (s, p) => { s.damage += 1; s.pierce += 1; s.maxHp = Math.max(1, s.maxHp - 1); if (p) p.hp = Math.min(p.hp, s.maxHp); } }),
+  cursed({ id: 'bannedbook', icon: '💀', short: 'Banned Book', name: 'Banned Book', desc: '+50% book damage, books pierce 1 enemy. Lose a third of your max hearts.', apply: (s, p) => { s.damage += 0.5; s.pierce += 1; s.maxHp = Math.max(1, s.maxHp - Math.max(1, Math.round(s.maxHp / 3))); if (p) p.hp = Math.min(p.hp, s.maxHp); } }),
   cursed({ id: 'loudreader', icon: '📢', short: 'Loud Reader', name: 'Loud Reader', desc: 'SHHH! recharges 3× faster, is 50% bigger and stuns longer. Enemies move 15% faster.', apply: (s) => { s.shhhCd /= 3; s.shhhRadius *= 1.5; s.shhhStun *= 1.5; s.enemySpeedMult *= 1.15; } }),
   cursed({ id: 'lightsout', icon: '🕯️', short: 'Lights Out', name: 'Lights Out', desc: '+50% fines and score. Your lantern shrinks to half.', needsLights: true, apply: (s) => { s.scoreMult *= 1.5; s.fineMult *= 1.5; s.lanternScale *= 0.5; } }),
 
@@ -170,7 +170,7 @@ export function previewChange(u, stats, player) {
 // "Just the gain": one short line per change, in player words (option B on the perk card).
 const pct = (x) => `${Math.round(x * 100)}%`;
 const GAIN = [
-  ['maxHp', (a, b) => (b > a ? `+${b - a} max heart${b - a > 1 ? 's' : ''}` : `−${a - b} max heart`)],
+  ['maxHp', (a, b) => (b > a ? `+${b - a} max heart${b - a > 1 ? 's' : ''}` : `−${a - b} max heart${a - b > 1 ? 's' : ''}`)],
   ['damage', (a, b) => `${b > a ? '+' : '−'}${pct(Math.abs(b - a) / BASE.damage)} damage`],
   ['fireRate', (a, b) => `+${pct(b / a - 1)} throw speed`],
   ['projectiles', (a, b) => `+${b - a} book per throw`],
@@ -295,7 +295,8 @@ export function rollUpgrades(rng, owned = {}, n = 3, ctx = {}) {
   const specials = [...unlockedMasterworks(owned), ...unlockedCombos(owned)].filter((u) => !exclude.has(u.id));
   if (specials.length && !ctx.noSpecial) out.push(rng.pick(specials));
   const pool = UPGRADES.filter((u) => u.kind !== 'combo' && u.kind !== 'master' && (owned[u.id] || 0) < u.max
-    && !(u.needsLights && ctx.lights === false) && !banned.has(u.id) && !exclude.has(u.id));
+    && !(u.needsLights && ctx.lights === false) && !banned.has(u.id) && !exclude.has(u.id)
+    && !(ctx.noCursed && u.kind === 'cursed'));   // v1.16.4: free perks are never cursed books
   while (out.length < n && pool.length) {
     const pick = rng.weighted(pool.map((u) => ({ u, w: u.weight * partnerBias(u, owned) })), 'w').u;
     out.push(pick);

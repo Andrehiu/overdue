@@ -13,10 +13,11 @@ export function playRun(o, { wing, policy, progress, force = [], ban = [], curse
     o.drive(true);
     o.setAimVariant(aim);
     o.setProgress(progress);
+    o.ghostStat.n = 0; o.ghostStat.g = 0;
     o.startRun('story', wing);
     for (const [id, lvl] of force) for (let i = 0; i < lvl; i++) o.grant(id);   // --force-perks: bot only, never in the game
     const t0 = Date.now();
-    let prev = null, stuck = 0, outcome = null, timeoutLeft = null, lastDoor = null, seen = 0;
+    let prev = null, stuck = 0, outcome = null, timeoutLeft = null, timeoutDump = null, lastDoor = null, seen = 0;
     const trace = [];                   // per room: hearts on entry and the door taken (for diagnosing spike rooms)
     for (let guard = 0; guard < 3e6 && !outcome; guard++) {
       const st = g.state;
@@ -38,7 +39,7 @@ export function playRun(o, { wing, policy, progress, force = [], ban = [], curse
       stuck = 0;
       if (st === 'playing' && g.wave !== seen) { seen = g.wave; trace.push({ room: g.wave, hp: o.player.hp, door: lastDoor }); lastDoor = null; }
       if (st === 'playing') {
-        if (g.waveT > roomTimeout || Date.now() - t0 > wallMs) { outcome = 'timeout'; timeoutLeft = o.enemies.map((e) => `${e.type}${e.under ? '~' : ''}@${Math.round(Math.hypot(e.x - o.player.x, e.y - o.player.y))}`).join(','); break; }
+        if (g.waveT > roomTimeout || Date.now() - t0 > wallMs) { outcome = 'timeout'; timeoutLeft = o.enemies.map((e) => `${e.type}${e.under ? '~' : ''}@${Math.round(Math.hypot(e.x - o.player.x, e.y - o.player.y))}`).join(','); timeoutDump = { shape: o.arena.shape, grid: o.grid(), p: [Math.round(o.player.x), Math.round(o.player.y)], e: o.enemies.map((e) => [e.type, Math.round(e.x), Math.round(e.y), Math.round(e.r), +(e.ghostT || 0).toFixed(1), !!e.tryMove, !!e.under]) }; break; }
         prev = think(o, prev, human);
       } else o.setBotInput({ x: 0, y: 0 });
       o.stepN(human ? HUMAN_DECIDE_EVERY : DECIDE_EVERY);
@@ -51,7 +52,7 @@ export function playRun(o, { wing, policy, progress, force = [], ban = [], curse
     const metrics = { dealt: { ...c.dealt }, taken: { ...c.taken }, thrown: c.thrown, ended: c.ended, thrownHit: c.thrownHit, evict: c.evict, shelf: c.shelf || 0, flight: Array.from(c.flight), life: Array.from(c.life), pages: { ...c.pages }, bossKills: c.bossKills.slice(), seconds: g.playTime, lcHits: c.lcHits || 0, lcSum: c.lcSum || 0, lcT: c.lcT || 0, lcLow: c.lcLow || 0 };
     const sm = o.statusMetrics;   // v1.15.0 status perks: stun shares, chain and burst numbers (src/status.js)
     if (sm) metrics.status = { kills: sm.kills, inkKills: sm.inkKills, bursts: sm.bursts, burstHist: sm.burstHist.slice(), maxStatusKills1s: sm.maxStatusKills1s, maxPopChain: sm.maxPopChain, bossSec: sm.bossSec, bossFrozenSec: sm.bossFrozenSec, eliteSec: sm.eliteSec, eliteFrozenSec: sm.eliteFrozenSec };
-    return { wing, policy, outcome, timeoutLeft, room, hearts: o.player.hp, fines: banked ?? Math.round(g.fines), time: Math.round(g.playTime), kills: g.kills, errors, trace, metrics, record: g.lastRun };
+    return { wing, policy, outcome, timeoutLeft, timeoutDump, room, hearts: o.player.hp, fines: banked ?? Math.round(g.fines), time: Math.round(g.playTime), kills: g.kills, errors, trace, metrics, ghost: [o.ghostStat.g, o.ghostStat.n], record: g.lastRun };
   } catch (e) {
     return { wing, policy, outcome: 'error', room: g.wave, hearts: 0, fines: 0, time: Math.round(g.playTime || 0), errors: [String(e && e.message || e)] };
   } finally {

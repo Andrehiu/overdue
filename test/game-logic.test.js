@@ -178,7 +178,7 @@ test('rebalance: no single core perk more than doubles output at level 1', async
   byId('hardcover').apply(s); assert.equal(s.damage, 1.5);
   byId('trilogy').apply(s); assert.equal(s.projectiles, 2);
   const c = baseStats();
-  byId('bannedbook').apply(c, { hp: 5 }); assert.equal(c.damage, 2); assert.equal(c.maxHp, 4); assert.equal(c.pierce, 1, 'v1.14.1: Banned Book also pierces 1');
+  byId('bannedbook').apply(c, { hp: 5 }); assert.equal(c.damage, 1.5); assert.equal(c.maxHp, 3, 'v1.16.2: lose a third of 5 hearts = 2'); assert.equal(c.pierce, 1, 'v1.14.1: Banned Book also pierces 1');
   const l = baseStats(); byId('lightsout').apply(l); assert.equal(l.fineMult, 1.5); assert.equal(l.scoreMult, 1.5); assert.equal(l.lanternScale, 0.5);
   const r = baseStats(); byId('loudreader').apply(r); assert.equal(r.shhhRadius, 210); assert.equal(r.shhhStun, 1.5);
 });
@@ -224,6 +224,9 @@ test('cards say just the gain, hint at combos, and Banish keeps perks out of the
   const { byId, baseStats, gainText, comboHints, rollUpgrades } = await load('upgrades');
   const { Rng } = await load('util');
   const s = baseStats();
+  // v1.16.2: the loss side pluralises too (Banned Book takes a third of your max hearts)
+  assert.ok(gainText(byId('bannedbook'), { ...s, maxHp: 6 }, { hp: 6 }).includes('−2 max hearts'));
+  assert.ok(gainText(byId('bannedbook'), { ...s, maxHp: 3 }, { hp: 3 }).includes('−1 max heart'));
   assert.deepEqual(gainText(byId('extendedloan'), s, { hp: 3 }), ['+1 max heart', 'heals 2']);
   assert.deepEqual(gainText(byId('extendedloan'), s, { hp: 5 }), ['+1 max heart']);
   assert.deepEqual(gainText(byId('hardcover'), s, { hp: 5 }), ['+50% damage']);
@@ -610,4 +613,28 @@ test('v1.11.2 touching collinear shelves merge into one rect: same cells as soli
       }
     }
   } finally { A.setOrientation(false); }
+});
+
+test('v1.16.4: Head Start never hands out a cursed book (cursed books are only ever an offered choice)', async () => {
+  const { rollUpgrades } = await load('upgrades');
+  const { runBonuses } = await load('meta');
+  const { Rng } = await load('util');
+  let rolled = 0;
+  for (const lvl of [0, 1, 2]) {
+    const n = runBonuses({ reno: lvl ? { headstart: lvl } : {} }).startPerks;
+    for (let seed = 1; seed <= 600; seed++) for (const lights of [true, false]) {
+      const picks = n ? rollUpgrades(new Rng(seed), {}, n, { noSpecial: true, noCursed: true, lights }) : [];
+      rolled += picks.length;
+      assert.ok(!picks.some((p) => p.kind === 'cursed'), `seed ${seed} level ${lvl} gave a cursed book`);
+    }
+  }
+  assert.ok(rolled > 1000);
+  // the same roll without the flag does hand them out, so the test can fail
+  let leaks = 0;
+  for (let seed = 1; seed <= 600; seed++) if (rollUpgrades(new Rng(seed), {}, 2, { noSpecial: true }).some((p) => p.kind === 'cursed')) leaks++;
+  assert.ok(leaks > 0);
+  // an offered choice still includes them
+  let offered = 0;
+  for (let seed = 1; seed <= 600; seed++) if (rollUpgrades(new Rng(seed), {}, 3).some((p) => p.kind === 'cursed')) offered++;
+  assert.ok(offered > 0);
 });

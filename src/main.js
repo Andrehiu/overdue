@@ -7,20 +7,21 @@ import { RUN_KEY, newCounters, addDealt, addTaken, bookEnded, sampleFlight, buil
 import { createBackend } from './backend.js';
 import { BUILD, versionLabel, fetchLatestBuild } from './version.js';
 import { CATALOGUE } from './catalogue.js';
-import { computeFlowField, lineOfSight } from './flowfield.js';
+import { computeFlowField, lineOfSight, wallRadius } from './flowfield.js';
 import { composeWave } from './waves.js';
 import { isWaterType, DRY_SWAP, EEL, BOAT, eelInit, eelStep, boatInit, boatStep, moveInWater, discInWater, inWater, waterSpawn, nearestWalkway, hasWater, HUNT, huntActive, labelPonds, nearestInPond } from './water-enemies.js';
 import { NEW_IN_1_15, baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips, buildChips, specialReason, levelInfo, perkTip, normalizeTips, TIPS } from './upgrades.js';
 import { Rng, clamp, lerp, TAU, hashString, angleDiff, pushCircleOutOfRect, cornerAssist, aimSource, aimStick } from './util.js';
 import { PLAYER, bookLook } from './palette.js';
 import { isStatusSource, canProc, procChance, freeze, chillFactor, applyChill, applyInk, tickInk, shouldShatter, statusDamageMult, makeBurstBudget, deepFreezeHit, zapChain, makeMetrics, tickMetrics, ZAP_REACH, ZAP_POOL, ZAP_LIFE, DEEP_FREEZE_TIME, SUPER_FREEZE_TIME, SPLASH_RADIUS, SPLASH_STRENGTH, POP_CHAIN_HITS } from './status.js';
-import { BURST, shadowK, drawEnemy as drawArtEnemy, drawWorms } from './enemy-art.js';
+import { BURST, shadowK, drawEnemy as drawArtEnemy, drawWorms, drawHarbourmaster } from './enemy-art.js';
+import { HM, newHarbour, harbourStep, harbourPhase, wallPages, contactRadius, laneYs } from './harbour.js';
 import { SoundEngine } from './audio.js';
 import { actOf, WINGS_PER_ACT, WINGS, roomsIn, bossRoom, eliteRoom, SURVIVE_SECONDS, curveRoom, difficulty, composeRoom, layoutSeed, roomShape, roomReward } from './story.js';
 import { DOORS, soleDoor, doorOffer, applyDoor, doorReward, mysteryPrize, rarePick } from './doors.js';
 import { GUIDE_FLAG, UNLOCK_FLAG, MENUS, unlockToast, hasPlayed, unlockedMenus, newUnlocks, shouldGuide, GUIDE_BEATS, guidePrompt, WHATS_NEW, whatsNewAction, whatsNewFlag, badgeFlag, badgedCards } from './newplayer.js';
 import { BACKUP_KEYS, encodeBackup, decodeBackup, describeBackup } from './backup.js';
-import { PROGRESS_KEY, RENOVATIONS, normalizeProgress, applyRenovations, runBonuses, recordRun, level, nextCost, canBuy, buy } from './meta.js';
+import { PROGRESS_KEY, RENOVATIONS, normalizeProgress, applyRenovations, runBonuses, recordRun, level, nextCost, canBuy, buy, renoText } from './meta.js';
 
 // ======================================================================
 // Setup, settings, content
@@ -211,6 +212,20 @@ const endPointer = (e) => {
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
 addEventListener('pointerup', (e) => { if (e.pointerType !== 'touch' && e.button === 0) mouse.down = false; });
+// v1.16.4: a stick whose finger is gone must never linger (touchcancel, system gestures, a finger lifted over a menu).
+function releaseTouches() { touch.moveId = null; touch.aimId = null; }
+addEventListener('pointerup', (e) => { if (e.pointerType === 'touch') endPointer(e); }, true);
+addEventListener('pointercancel', (e) => { if (e.pointerType === 'touch') endPointer(e); }, true);
+canvas.addEventListener('lostpointercapture', (e) => { if (e.pointerType === 'touch') endPointer(e); });
+// Safety net: more sticks held than fingers on the screen means one never got its end event. Drop the aim stick first.
+function syncTouches(e) {
+  const n = e.touches ? e.touches.length : 0, held = (touch.moveId !== null) + (touch.aimId !== null);
+  if (n >= held) return;
+  if (n === 0) releaseTouches(); else if (touch.aimId !== null) touch.aimId = null; else touch.moveId = null;
+}
+for (const t of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) addEventListener(t, syncTouches, { capture: true, passive: true });
+addEventListener('blur', releaseTouches);
+document.addEventListener('visibilitychange', () => { if (document.hidden) releaseTouches(); });
 
 function enableTouch() {
   if (touch.enabled) return;
@@ -317,7 +332,7 @@ function startRun(mode = 'endless', wing = 1, opts = {}) {
   player.hp = stats.maxHp;
   player.revives = bonus.revives;
   // Head Start: free random perks (never specials) before room/wave 1.
-  const head = bonus.startPerks ? rollUpgrades(rng, game.owned, bonus.startPerks, rollOpts({ noSpecial: true })) : [];
+  const head = bonus.startPerks ? rollUpgrades(rng, game.owned, bonus.startPerks, rollOpts({ noSpecial: true, noCursed: true })) : [];
   freeQueue.length = 0; hideFreePerk();
   for (const u of head) { queueFreePerk(u, 'Head Start'); game.owned[u.id] = (game.owned[u.id] || 0) + 1; game.picks.push(u.id); u.apply(stats, player); }
   // v1.13.0: the very first story run opens with a short guided room (skippable). Debug hooks pass noGuide.
@@ -333,6 +348,7 @@ function clearWorld() {
 }
 
 function startWave(n) {
+  releaseTouches();
   game.wave = n;
   clearWorld();
   game.diff = isStory() ? applyDoor(difficulty(game.wingN, n), game.door) : null;
@@ -910,6 +926,7 @@ function renderCodex() {
 function pause() {
   if (game.state !== 'playing') return;
   game.state = 'paused';
+  releaseTouches();
   sound.setMuffled(true);
   mouse.down = false;
   renderBuild($('#pauseBuild'));
@@ -991,7 +1008,7 @@ function updateSpawning(dt) {
     const s = spawnQueue.shift();
     // Water enemies spawn on water; in a room without water they swap for a dry enemy of about the same cost.
     const type = isWaterType(s.type) && !hasWater(arena) ? DRY_SWAP[s.type] : s.type;
-    const p = type === 'boss' ? { x: W / 2, y: 130 } : isWaterType(type) ? (waterSpawn(arena.water, COLS, ROWS, CELL, player.x, player.y) || spawnPoint()) : spawnPoint();
+    const p = type === 'boss' ? (arena.shape === 'harbour' ? { x: W / 2, y: laneYs(H, CELL)[0] + 40 } : { x: W / 2, y: 130 }) : isWaterType(type) ? (waterSpawn(arena.water, COLS, ROWS, CELL, player.x, player.y) || spawnPoint()) : spawnPoint();
     telegraphs.push({ type, x: p.x, y: p.y, t: 0, dur: type === 'boss' ? 1.6 : 0.85, elite: !!s.elite });
     sound.play('spawn');
   }
@@ -1019,8 +1036,12 @@ function materialise(type, x, y, elite = false, fromBoat = false) {
     const e = makeEnemy('boss', x, y, { hp, maxHp: hp, name, atkT: 2, spiral: 0, summonT: 6, mode: 'idle', modeT: 0, tier: game.diff ? game.diff.bossTier : 0,
       cover: `hsl(${hue} 45% 30%)`, spineCol: `hsl(${hue} 50% 16%)`, iris: `hsl(${(hue + 180) % 360} 75% 60%)`,
       glow: `hsla(${hue}, 80%, 60%, 1)`, bar: `hsl(${hue} 65% 55%)` });
+    if (arena.shape === 'harbour') {   // v1.17.0: wing 15's boss is the Harbourmaster, not an author
+      e.harbour = true; e.name = 'The Harbourmaster'; e.hp = e.maxHp = Math.max(1, Math.round(e.maxHp * HM.hpMult)); e.r = Math.round(e.r * HM.scale); e.h = newHarbour(W, H, CELL); e.x = e.h.x; e.y = e.h.y; e.cr = 0;
+      e.bar = '#e0344a'; e.glow = 'hsla(350, 80%, 60%, 1)';
+    }
     game.boss = e;
-    banner(`ROGUE AUTHOR`, e.name);
+    banner(e.harbour ? `THE HARBOURMASTER` : `ROGUE AUTHOR`, e.harbour ? 'Flagship of the Lantern Harbour' : e.name);
     if (isStory()) floatText(x, y + 60, `${e.name}: ${wingDef().taunt}`, '#ffe9a8', 13, 2.5);
     sound.play('boss'); sound.setIntensity(2);
     shake(0.7);
@@ -1296,14 +1317,20 @@ function spawnBook(x, y, a, extra = {}) {
 let currentLook = bookLook({});
 const MARGIN_SIDE = [Math.PI / 8 * 0.7], MARGIN_WIDE = [Math.PI / 12 * 0.7, Math.PI / 6 * 0.7];   // Margin Notes angles: ±15.75°, then ±10.5° and ±21° (v1.15.3: 30% narrower)
 function marginBook(p, a) { spawnBook(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a, { bonus: true, nohome: true, margin: true, pierce: stats.pierce + 1 }); }
+const BOOK_GAP = 6; // px between side-by-side Trilogy books (about half a book's width)
 function fire() {
   const p = player, n = stats.projectiles;
   currentLook = bookLook(game.owned); // perks change how books look (cheap: a few flags per throw)
   p.throws++;
   if (DEBUG) p.lastThrow = { aim: p.aim }; // QA only
+  // Trilogy (v1.16.3): the books of one throw fly side by side, parallel to the aim, in a centred row
+  // (perpendicular offset), not fanned out. A book whose offset spot is inside a shelf starts on the centre line.
+  const px = -Math.sin(p.aim), py = Math.cos(p.aim);
   for (let i = 0; i < n; i++) {
-    const a = p.aim + (i - (n - 1) / 2) * stats.spread + (Math.random() - 0.5) * 0.04;
-    spawnBook(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a);
+    const a = p.aim + (Math.random() - 0.5) * 0.04, side = (i - (n - 1) / 2) * BOOK_GAP;
+    let x = p.x + Math.cos(a) * 14 + px * side, y = p.y + Math.sin(a) * 14 + py * side;
+    if (side && isSolidPx(arena.solid, x, y)) { x = p.x + Math.cos(a) * 14; y = p.y + Math.sin(a) * 14; }
+    spawnBook(x, y, a);
   }
   // Margin Notes (v1.15.0): books off at an angle. They never home and are skipped first at the book cap.
   if (stats.marginLvl) {
@@ -1559,7 +1586,7 @@ function updateFlow(dt) {
   const [cx, cy] = cellOf(player.x, player.y);
   const c = idx(cx, cy);
   if (c !== flowCell || flowT <= 0 || !flow) {
-    flow = computeFlowField(walkGrid(), COLS, ROWS, cx, cy);
+    flow = computeFlowField(walkGrid(), COLS, ROWS, cx, cy, isStory());
     flowCell = c; flowT = 0.5;
   }
 }
@@ -1618,6 +1645,7 @@ function huntDir(e) {
   return { a: Math.atan2(fy, fx) };
 }
 
+const ghostStat = { n: 0, g: 0 };   // debug only: share of enemy-ticks spent ghosting (v1.17.0 measurement)
 function updateEnemies(dt) {
   const p = player;
   waterHunt = game.state === 'playing' && huntActive(enemies, spawnQueue.length + telegraphs.filter((t) => !t.boat).length);
@@ -1695,6 +1723,7 @@ function updateEnemies(dt) {
       }
       case 'boss': bossAI(e, dt); break;
     }
+    e.tryMove = e.stun <= 0 && game.state === 'playing' && e.speed > 0 && Math.hypot(mx, my) > e.speed * 0.3 && Math.hypot(p.x - e.x, p.y - e.y) > p.r + e.r + 40;   // v1.17.0: ghosting only while it is really trying to walk
     if (e.chillT > 0) { const f = chillFactor(e); mx *= f; my *= f; }   // Cold Storage (bosses get half the slow)
     // Elites return fire: an aimed page (a 3-page fan from wing 7) when they can see you.
     if (e.elite && e.stun <= 0 && !e.under && game.state === 'playing') {
@@ -1711,7 +1740,7 @@ function updateEnemies(dt) {
     if (isWaterType(e.type)) {   // water enemies only ever move into water cells
       const r = moveInWater(arena.water, COLS, ROWS, CELL, e.x, e.y, (mx + e.vx) * dt, (my + e.vy) * dt, e.r * 0.6);
       e.x = r.x; e.y = r.y; if (r.blocked) e.blk = true;
-    } else if (e.type !== 'boss' || e.mode !== 'charge') { e.x += (mx + e.vx) * dt; e.y += (my + e.vy) * dt; }
+    } else if ((e.type !== 'boss' || e.mode !== 'charge') && !e.harbour) { e.x += (mx + e.vx) * dt; e.y += (my + e.vy) * dt; }
   }
   // Separation (cheap O(n²); n stays < ~100) + world collision
   for (let i = 0; i < enemies.length; i++) {
@@ -1719,6 +1748,7 @@ function updateEnemies(dt) {
     for (let j = i + 1; j < enemies.length; j++) {
       const b = enemies[j];
       if (a.type === 'worm' && b.type === 'worm') continue;
+      if (a.ghostT > 0 || b.ghostT > 0) continue;   // v1.16.2 stuck recovery: a walker that made no progress passes through others for a moment
       const dx = b.x - a.x, dy = b.y - a.y, min = a.r + b.r, d2 = dx * dx + dy * dy;
       if (d2 < min * min && d2 > 0.01) {
         const d = Math.sqrt(d2), push = (min - d) / 2, nx = dx / d, ny = dy / d;
@@ -1729,21 +1759,60 @@ function updateEnemies(dt) {
     }
   }
   for (const e of enemies) {
-    if (e.type === 'boss') { e.x = clamp(e.x, e.r, W - e.r); e.y = clamp(e.y, e.r, H - e.r); }
+    if (e.harbour) e.x = clamp(e.x, e.r * 0.5, W - e.r * 0.5);
+    else if (e.type === 'boss') { e.x = clamp(e.x, e.r, W - e.r); e.y = clamp(e.y, e.r, H - e.r); }
     else if (isWaterType(e.type)) {   // separation may nudge them: if that left the water, go back to the last good spot
       if (discInWater(arena.water, COLS, ROWS, CELL, e.x, e.y, e.r * 0.6)) { e.wx = e.x; e.wy = e.y; } else { e.x = e.wx; e.y = e.wy; }
     }
-    else if (!(e.type === 'worm' && e.leader)) collideWorld(e, e.r);
+    else if (!(e.type === 'worm' && e.leader)) collideWorld(e, isStory() ? wallRadius(e.r, CELL) : e.r);   // v1.16.2: story only, Endless stays as it was
     // observed velocity (smoothed) for auto-aim lead; capped so teleports/boss charges stay sane
     if (e.lx !== undefined && dt > 0) { const k = 0.4; e.pvx = clamp((e.pvx || 0) * (1 - k) + ((e.x - e.lx) / dt) * k, -450, 450); e.pvy = clamp((e.pvy || 0) * (1 - k) + ((e.y - e.ly) / dt) * k, -450, 450); }
     e.lx = e.x; e.ly = e.y;
+    if (e.type !== 'boss') { ghostStat.n++; if (e.ghostT > 0) ghostStat.g++; }
+    // v1.16.2 stuck recovery (story only; Endless stays as it was): big walkers jam head-on in 2-cell gaps (separation cancels each pair's forward step
+    // and nobody moves). A walker that moved < 10 px in a second while it could walk passes through other enemies for the next second.
+    if (isStory() && e.type !== 'boss' && e.type !== 'coin' && e.type !== 'notice' && !isWaterType(e.type) && !(e.type === 'worm' && e.leader)) {
+      e.ghostT = Math.max(0, (e.ghostT || 0) - dt);
+      if (!e.tryMove) { e.sT = 0; e.sx = undefined; }   // shooting, shouting, standing its ground or stunned: not stuck, restart the clock
+      else {
+        e.sT = (e.sT || 0) + dt;
+        if (e.sT >= 1) {
+          if (e.sx !== undefined && Math.hypot(e.x - e.sx, e.y - e.sy) < 10) e.ghostT = 1;
+          e.sx = e.x; e.sy = e.y; e.sT = 0;
+        }
+      }
+    }
     // Contact damage
     if (game.state === 'playing' || game.state === 'waveclear') {
       const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy);
-      if (d < p.r + e.r - 3 && !(e.trans > 0) && !e.under) hurtPlayer(e.x, e.y, e.type === 'boss' && e.mode === 'charge' ? 'boss:charge' : e.type, !!e.elite);
+      if (d < p.r + (e.cr ?? e.r) - 3 && !(e.trans > 0) && !e.under) hurtPlayer(e.x, e.y, e.type === 'boss' && (e.mode === 'charge' || (e.harbour && e.mode === 'ram')) ? 'boss:charge' : e.type, !!e.elite);
     }
   }
   for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].dead) enemies.splice(i, 1);
+}
+
+const HM_RNG = { next: Math.random, chance: (p) => Math.random() < p };
+/** v1.17.0: the Harbourmaster. Timers and geometry live in src/harbour.js; this runs its events: pages, boats, anchors. */
+function harbourAI(e, dt, phase) {
+  const h = e.h;
+  const boats = enemies.reduce((n, x) => n + (x.type === 'boat' && !x.dead ? 1 : 0), 0) + telegraphs.reduce((n, t) => n + (t.type === 'boat' ? 1 : 0), 0);
+  h.x = e.x; h.y = e.y;
+  const ev = harbourStep(h, dt, { phase, W, H, cell: CELL, r: e.r, player, boats, rng: HM_RNG, hold: game.bannerT > 0 });
+  e.x = h.x; e.y = h.y; e.mode = h.mode; e.cr = contactRadius(h, e.r);
+  for (const v of ev) {
+    if (v.type === 'wallTell' || v.type === 'ramWindup') sound.play('spawn');
+    else if (v.type === 'wallFire') { hazPat = 'page:wall'; for (const x of wallPages(v.plan, W)) shootHazard(x, v.y, v.dy > 0 ? Math.PI / 2 : -Math.PI / 2, HM.wall.speed); sound.play('shoot'); }
+    else if (v.type === 'boats') for (const b of v.list) telegraphs.push({ type: 'boat', x: b.x, y: b.y, t: 0, dur: 0.85, elite: false });
+    else if (v.type === 'anchor') sound.play('dash');
+    else if (v.type === 'anchorLand') {
+      shake(0.3); sound.play('explode'); burst(v.x, v.y, 18, ['#ff6b6b', '#fff'], 180, 0.5);
+      if (Math.hypot(player.x - v.x, player.y - v.y) < HM.anchor.r + player.r - 4) hurtPlayer(v.x, v.y, 'boss:anchor');
+      hazPat = 'page:anchor'; radial(v.x, v.y, HM.anchor.pages, HM.anchor.speed, Math.random() * TAU);
+    }
+    else if (v.type === 'ramGo') sound.play('dash');
+    else if (v.type === 'ramSide') { hazPat = 'page:broadside'; shootHazard(v.x + v.nx * e.r * 0.6, v.y + v.ny * e.r * 0.6, Math.atan2(v.ny, v.nx), 200); }
+    else if (v.type === 'ramEnd' && v.wall) { shake(0.5); sound.play('explode'); }
+  }
 }
 
 function bossAI(e, dt) {
@@ -1755,12 +1824,14 @@ function bossAI(e, dt) {
       // Phase change: the player keeps full control. The boss transforms for BOSS_TRANS seconds (no attacks, no contact damage, can't be hit);
       // the PHASE label is a small non-blocking tag, not the big screen-centre banner.
       e.trans = BOSS_TRANS; e.mode = 'idle'; e.modeT = 0; e.atkT = Math.max(e.atkT, 0.6);
+      if (e.harbour) harbourPhase(e.h, phase);
       game.phaseTag = { text: `PHASE ${phase}`, t: 1.1 };
       shake(0.2); sound.play('boss');
     }
     e.phase = phase;
   }
   if (e.trans > 0) { e.trans = Math.max(0, e.trans - dt); return; }
+  if (e.harbour) { harbourAI(e, dt, phase); return; }
   const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1;
   const aim = Math.atan2(dy, dx);
   e.modeT -= dt;
@@ -2422,6 +2493,7 @@ function render() {
     drawPlayer();
   }
   for (const c of cats) drawCat(c);
+  if (game.boss && game.boss.harbour) drawHarbourTells(game.boss);
   drawHazards();
   for (const g of rings) drawRing(g);
   if (zaps.length) drawZaps();
@@ -2448,7 +2520,7 @@ function render() {
   if (game.state === 'playing' || game.state === 'waveclear' || game.state === 'dying') drawHUD();
   ctx.setTransform(s, 0, 0, s, 0, 0);               // sticks and crosshair follow the finger in world coordinates (sizes scaled by uiK)
   if (touch.enabled && touch.moveId !== null) drawStick();
-  if (touch.enabled && touch.aimId !== null) drawAimStick();
+  if (aimStickShown()) drawAimStick();
   if (!touch.enabled && mouse.seen && (game.state === 'playing' || game.state === 'waveclear')) drawCrosshair();
 }
 
@@ -2566,7 +2638,8 @@ function drawEnemy(e) {
   if (e.vs !== 1) ctx.scale(e.vs, e.vs);
   if (e.trans > 0) { const k = 1 + 0.18 * Math.sin((e.trans / BOSS_TRANS) * Math.PI); ctx.scale(k, k); }
   if (e.stun > 0) { ctx.rotate(Math.sin(e.t * 20) * 0.15); }
-  drawBoss(e, look, e.flash > 0 || (e.trans > 0 && Math.sin(e.trans * 40) > 0));
+  if (e.harbour) drawHarbourmaster(ctx, e, look, e.flash > 0 || (e.trans > 0 && Math.sin(e.trans * 40) > 0));
+  else drawBoss(e, look, e.flash > 0 || (e.trans > 0 && Math.sin(e.trans * 40) > 0));
   ctx.restore();
 }
 
@@ -2602,6 +2675,25 @@ function drawBoss(e, look, white) {
   ctx.fillStyle = e.phase === 3 ? '#ff2d55' : e.iris || '#6c3cff'; ctx.beginPath(); ctx.arc(Math.cos(look) * 6, Math.sin(look) * 4, 7, 0, TAU); ctx.fill();
   ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(Math.cos(look) * 7, Math.sin(look) * 5, 3, 0, TAU); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(Math.cos(look) * 6 - 2.5, Math.sin(look) * 4 - 2.5, 1.6, 0, TAU); ctx.fill();
+}
+
+/** The Harbourmaster's tells in world space: the wall's flashing line (gaps left open), anchor circles and the ram's red line. */
+function drawHarbourTells(e) {
+  const h = e.h;
+  if (h.wall) {
+    const k = h.wall.t / HM.wall.tell, xs = wallPages(h.wall.plan, W);
+    ctx.fillStyle = `rgba(255,90,100,${0.15 + 0.3 * k * (0.6 + 0.4 * Math.sin(h.wall.t * 40))})`;
+    for (const x of xs) ctx.fillRect(x - 3, h.wall.y - 3, 6, 6);
+    ctx.strokeStyle = `rgba(255,120,130,${0.12 + 0.2 * k})`; ctx.lineWidth = 2; ctx.beginPath();
+    for (const g of h.wall.plan.gaps) { ctx.moveTo(g.c - g.w / 2, h.wall.y); ctx.lineTo(g.c - g.w / 2, h.wall.y + h.wall.dy * 40); ctx.moveTo(g.c + g.w / 2, h.wall.y); ctx.lineTo(g.c + g.w / 2, h.wall.y + h.wall.dy * 40); }
+    ctx.stroke();
+  }
+  for (const a of h.anchors) {
+    const k = clamp(a.t / HM.anchor.delay, 0, 1);
+    ctx.strokeStyle = `rgba(255,50,60,${0.5 + 0.4 * k})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(a.x, a.y, HM.anchor.r, 0, TAU); ctx.stroke();
+    ctx.fillStyle = `rgba(255,50,60,${0.1 + 0.3 * k})`; ctx.beginPath(); ctx.arc(a.x, a.y, HM.anchor.r * k, 0, TAU); ctx.fill();
+  }
+  if (h.mode === 'windup') { ctx.strokeStyle = 'rgba(255,60,60,0.7)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(h.cAim) * 700, e.y + Math.sin(h.cAim) * 700); ctx.stroke(); }
 }
 
 function drawTelegraph(t) {
@@ -2835,6 +2927,11 @@ function drawStick() {
   ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(touch.mx0 + dx * k, touch.my0 + dy * k, 18 * uiK, 0, TAU); ctx.fill();
 }
 
+/** v1.16.4: with auto-aim, the aim stick appears only once a finger has dragged past the deadzone; manual aim shows it from the first touch. */
+function aimStickShown() {
+  if (!touch.enabled || touch.aimId === null) return false;
+  return settings.autoaim === false || Math.hypot(touch.ax - touch.ax0, touch.ay - touch.ay0) > touch.dead;
+}
 /** The aim stick: same ring + knob as the move stick, in library blue, with a tick on the ring showing the aim direction. */
 function drawAimStick() {
   const { ax0: x0, ay0: y0 } = touch, dx = touch.ax - x0, dy = touch.ay - y0, d = Math.hypot(dx, dy), k = d > 45 * uiK ? 45 * uiK / d : 1;
@@ -2855,6 +2952,7 @@ function drawAimStick() {
 const SCREENS = ['title', 'howto', 'settings', 'leaderboard', 'upgrade', 'doors', 'pause', 'gameover', 'codex', 'story', 'shop', 'backup'];
 let settingsReturn = 'title', shopReturn = 'title', currentScreen = 'title';
 function showScreen(id) {
+  if (id) releaseTouches();   // a menu opened: any finger still on the stick is no longer steering
   for (const s of SCREENS) $('#' + s).hidden = s !== id;
   if (id !== currentScreen) $('#whatsNew').hidden = true;   // v1.16.1: no screen change leaves the What's-new card drawn on top
   currentScreen = id;
@@ -2941,7 +3039,7 @@ function renderShop() {
     const ic = document.createElement('span'); ic.className = 'icon'; ic.textContent = r.icon;
     const body = document.createElement('div');
     const name = document.createElement('strong'); name.textContent = r.name;
-    const gain = document.createElement('small'); gain.textContent = r.gain;
+    const gain = document.createElement('small'); gain.textContent = renoText(r, lvl);
     const lv = document.createElement('small'); lv.className = 'lvl'; lv.textContent = r.max > 1 ? `${pips(lvl, r.max)}  ${lvl}/${r.max}` : lvl ? 'Owned' : 'One-time';
     body.append(name, gain, lv);
     const b = document.createElement('button');
@@ -3398,7 +3496,7 @@ requestAnimationFrame(frame);
 // Test hooks (only with ?debug) — used by the automated Playwright smoke test.
 if (DEBUG) {
   window.__overdue = {
-    game, get bg() { return bg; }, get arena() { return arena; }, get tester() { return tester; }, get cats() { return cats; }, grid: () => `${COLS}x${ROWS}`, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, enemies, get content() { return content; },
+    game, get bg() { return bg; }, get arena() { return arena; }, get tester() { return tester; }, get cats() { return cats; }, grid: () => `${COLS}x${ROWS}`, get player() { return player; }, counts: () => ({ books: books.length, hazards: hazards.length, rings: rings.length, particles: particles.length, texts: texts.length, flashes: flashes.length, enemies: enemies.length }), get stats() { return stats; }, ghostStat, enemies, get content() { return content; },
     fire, damageEnemy, orbiterPositions, consts: { STORY_ENEMY_SCALE, ORBIT_RADIUS, ORBIT_SCALE, BOSS_TRANS, MARGIN_SIDE, MARGIN_WIDE },   // QA only (v1.15.1 look & feel checks)
     get waterHunt() { return waterHunt; }, materialise, makeEnemy, freeze: (on) => { debugFreeze = !!on; }, startRun: (m, w) => startRun(m, w, { noGuide: true }), startWave, get guide() { return game.guide; }, tipsSeen: () => tips.seen.slice(), setSurviveT: (t) => { game.surviveT = t; }, killAll: () => { for (const e of [...enemies]) killEnemy(e, 'cleanup'); spawnQueue.length = 0; telegraphs.length = 0; },
     get progress() { return progress; }, setFines: (n) => { progress = { ...progress, fines: n }; saveProgress(); renderFineBadges(); },
@@ -3411,7 +3509,7 @@ if (DEBUG) {
     showFreePerk: (id, label) => { queueFreePerk(byId(id), label); flushFreePerks(); }, showUpgrades, showDoors, nextRoom, texts, get cursedOffer() { return game.cursedOffer; }, takeCursed: (take) => { cardsArmedAt = 0; resolveCursedOffer(take); }, get rareId() { return game.rareId; }, get door() { return game.door; },
     // isSolid = what WALKERS can't enter (shelves + Act II water): bot steering and QA
     // ---- balance bot (scripts/balance.mjs): drives the sim headless, faster than real time ----
-    actions, hazards, STEP, books, touch, settings, setSetting, get W() { return W; }, get H() { return H; }, isSolid: (x, y) => isSolidPx(walkGrid(), x, y), setAimVariant: (v) => { aimVariant = v; autoTarget = null; }, setSolid: (x, y, v) => { const [cx, cy] = cellOf(x, y); arena.solid[cy * COLS + cx] = v ? 1 : 0; },
+    aimStickShown, releaseTouches, actions, hazards, STEP, books, touch, settings, setSetting, get W() { return W; }, get H() { return H; }, isSolid: (x, y) => isSolidPx(walkGrid(), x, y), setAimVariant: (v) => { aimVariant = v; autoTarget = null; }, setSolid: (x, y, v) => { const [cx, cy] = cellOf(x, y); arena.solid[cy * COLS + cx] = v ? 1 : 0; },
     get choices() { return currentChoices; }, get doors() { return currentDoors; },
     setBotInput: (mv) => { botInput = mv; }, drive: (on) => { botDrive = !!on; if (!on) botInput = null; },
     stepN: (n) => { for (let i = 0; i < n; i++) step(STEP); },
