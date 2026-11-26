@@ -19,7 +19,7 @@ message says "You are a coder session"; every other session is a planner.
 - Hands each coding task to a **new coder session**: model Sonnet, on this repo (`https://github.com/Andrehiu/overdue`, so
   it is grouped with the other Overdue sessions), one task per session and branch.
   - Title: `Overdue · v<version> <short topic>`, e.g. `Overdue · v1.3.1 stuck fix`.
-  - Tag: `overdue-coder`.
+  - Tags: `overdue` + `overdue-coder` (every Overdue session, planners included, gets `overdue` so they group together).
   - Start its prompt with "You are a coder session" and make it stand alone: goal, known cause, exact scope, tests,
     definition of done, and what to report back.
 - Starting a coder or tester: save and **push the handoff first**, then put the full prompt text in `create_session`'s
@@ -32,7 +32,7 @@ message says "You are a coder session"; every other session is a planner.
 - If the coder's work is wrong, sends it fixes, or (after asking the owner) deletes its branch and starts again.
 - Ships to `main` only when the owner says so.
 
-**Tester (one session per release, model Sonnet, tag `overdue-tester`, title `Overdue · v<version> test`):** started by the
+**Tester (one session per release, model Sonnet, tags `overdue` + `overdue-tester`, title `Overdue · v<version> test`):** started by the
 planner once the coder says done. It never edits game code and never pushes. It checks the release branch independently:
 `npm test`, `npm run qa` once, the diff touches only what the handoff asked for, every changed screen at phone size against the
 handoff's acceptance list, a "try to break it" pass (tester switch, old save / fresh install, iPad, edge cases near the change),

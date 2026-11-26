@@ -3,7 +3,16 @@
 The plan and the owner's decisions, kept current by the planner session. **Planners: read this after CLAUDE.md.**
 Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <topic>`; their prompts are saved in `docs/handoffs/`.
 
-## Current state (planning 5, 2026-11-25 13:35 UTC)
+## Current state (planning 6, 2026-11-26 01:40 UTC)
+- **Live:** v1.16.1 (unchanged). **1.16.2** (`claude/buttons-bannedbook` 5d8df76, Banned Book +50%, owner said ship): the flaky act2 shore
+  check is a **real game bug** (golems/walkers freeze ~15 s depending on leftover state from the previous room; seeds w11 r2 s32, w12 r6 s9).
+  Coder hit its usage limit 14:30, resumed 00:45, fixing in game code. After the fix: short re-check by tester `session_014kswNkdTkdwNKhsVebkjUq`, then ship.
+- **1.16.3** (`claude/playtest-fixes` 582b255, built on 1.16.2): done, idle; after 1.16.2 ships it rebases, runs full QA once, then tester + owner "ship".
+  Note for owner: Codex is exempt from the fit check (catalogue scrolls). Trilogy 3/3 bot w10 76.7→82.3.
+- **1.17.0** wings 13–15 + Harbourmaster: handoff `docs/handoffs/1.17.0-wings13-15-harbourmaster.md` written; start after 1.16.2 ships (2-coder limit).
+- Coders can't send_message to a planner that isn't their parent (1.16.3 was blocked); planning 5 forwards. New coders: create them from the current planner.
+
+## Earlier state (planning 5, 2026-11-25 13:35 UTC)
 - **Live:** v1.16.1 (6e23f80), Pages + CI green first try (2/2 since the build → deploy split). = Act II wings 9 rooms (elite 5,
   survive 7 in wing 11, boss 9), +15% enemies (ACT2_BUDGET_MULT 1.15), wing 11 boost 1.25 / wing 12 boost 1.22 + elite 0.14 + gap 0.75;
   **bug fix:** walkers used `arena.solid` for line of sight and stood at pond shores forever (now `walkGrid()`); What's-new card
@@ -33,6 +42,8 @@ Coder sessions are tagged `overdue-coder` and titled `Overdue · v<version> <top
 ## Decisions (newest first)
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-26 | Wing 15 boss = **A, The Harbourmaster** (paper flagship, broadsides with gaps, boat launches, anchors, rams). Old Inkmaw (giant eel) parked for the wing-20 finale; Lamplighter parked for a later act. Page https://claude.ai/artifact/Y2okcfTgkycMZzwahoxEWB | Owner |
+| 2026-11-26 | Every Overdue session is tagged `overdue` (plus `overdue-coder` / `overdue-tester`) so they group together; 53 old sessions retagged | Owner (sessions getting messy) |
 | 2026-11-25 | 1.16.2 (owner, playtest): DASH/SHHH between mockups A and B (closer to corner); Banned Book B: +75% dmg, keep pierce, lose ⅓ max hearts (min 1) | Owner |
 | 2026-11-25 | Longer levels: Act II wings get 9 rooms (was 7; elite room 5, boss room 9) + ~15% more enemies per room. Act I and endless unchanged (planner default, owner may extend). Keep max-Renovation steps ≤ ~15–20 pts. Planned as 1.16.1 after 1.16.0 ships | Owner: "A + a bit of B" |
 | 2026-11-25 | Future (owner, from testers): (1) Library Cat is mistaken for an enemy when it moves → make it read as friendly; (2) levels ~30% longer (rooms per wing vs room length: open); (3) some perks feel too strong: specifics to collect from the tester (perk names + Share stats codes in chat, never committed) | Owner |
