@@ -1037,7 +1037,7 @@ function materialise(type, x, y, elite = false, fromBoat = false) {
       cover: `hsl(${hue} 45% 30%)`, spineCol: `hsl(${hue} 50% 16%)`, iris: `hsl(${(hue + 180) % 360} 75% 60%)`,
       glow: `hsla(${hue}, 80%, 60%, 1)`, bar: `hsl(${hue} 65% 55%)` });
     if (arena.shape === 'harbour') {   // v1.17.0: wing 15's boss is the Harbourmaster, not an author
-      e.harbour = true; e.name = 'The Harbourmaster'; e.r = Math.round(e.r * HM.scale); e.h = newHarbour(W, H, CELL); e.x = e.h.x; e.y = e.h.y; e.cr = e.r * HM.contactK;
+      e.harbour = true; e.name = 'The Harbourmaster'; e.hp = e.maxHp = Math.max(1, Math.round(e.maxHp * HM.hpMult)); e.r = Math.round(e.r * HM.scale); e.h = newHarbour(W, H, CELL); e.x = e.h.x; e.y = e.h.y; e.cr = e.r * HM.contactK;
       e.bar = '#e0344a'; e.glow = 'hsla(350, 80%, 60%, 1)';
     }
     game.boss = e;

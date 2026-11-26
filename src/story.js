@@ -41,6 +41,7 @@ const SURVIVE_ROOMS = { 1: [3], 2: [], 3: [5], 4: [6], 5: [6], 6: [], 7: [5], 8:
 /** 'clear' (kill everything) or 'survive' (stay alive SURVIVE_SECONDS). Deterministic per wing + room. */
 export const roomGoal = (wing, room) => ((SURVIVE_ROOMS[wing] || []).includes(room) ? 'survive' : 'clear');
 
+// eliteCap: a ceiling on the random-elite chance (default 0.5); wings 14-15 sit under it so late rooms aren't wall-to-wall elites (v1.17.0)
 // weights: enemy mix · unlockShift: enemy types arrive earlier · density: extra shelves per half
 // shapes: the room layouts this wing uses (see arena.js) · gapMult: < 1 means less breathing room between spawn groups · eliteBonus: extra elite chance
 export const WINGS = [
@@ -88,10 +89,10 @@ export const WINGS = [
     weights: { worm: 1 }, enemyTypes: { eel: 1.3, boat: 0.8 }, unlockShift: 6, eliteBonus: 0.14, budgetBoost: 1.19, gapMult: 0.7, floorHue: 188, rug: '#12343c' },
   { act: 2, id: 'drydock', shapes: ['causeway', 'islands', 'reading'], icon: '⚓', name: 'The Dry Dock', blurb: 'Long causeways, boats everywhere, golems on the quay.',
     intro: "The boats are in. The captain is not.", taunt: "Anchors aweigh. Fines too.", cleared: "The Dry Dock empties. Somewhere, a bell.",
-    weights: { golem: 1.2, patron: 1 }, enemyTypes: { boat: 1.4, eel: 0.9 }, unlockShift: 6, eliteBonus: 0.14, budgetBoost: 1.16, gapMult: 0.68, floorHue: 192, rug: '#103038' },
+    weights: { golem: 1.2, patron: 1 }, enemyTypes: { boat: 1.4, eel: 0.9 }, unlockShift: 6, eliteBonus: 0.14, eliteCap: 0.42, budgetBoost: 1.16, gapMult: 0.68, floorHue: 192, rug: '#103038' },
   { act: 2, id: 'harbour', boss: 'harbourmaster', shapes: ['islands', 'causeway', 'reading'], icon: '🏮', name: 'The Lantern Harbour', blurb: 'The last light on the water. The Harbourmaster is on duty.',
     intro: "Lanterns lit. The harbour is open for business.", taunt: "No ship leaves this harbour with an overdue book. Including yours.", cleared: "The Lantern Harbour goes dark. Quiet tide.",
-    weights: { patron: 1.3, golem: 1.3 }, enemyTypes: { eel: 1.1, boat: 1.2 }, unlockShift: 6, eliteBonus: 0.14, budgetBoost: 1.14, gapMult: 0.66, floorHue: 198, rug: '#0e2c36' },
+    weights: { patron: 1.3, golem: 1.3 }, enemyTypes: { eel: 1.1, boat: 1.2 }, unlockShift: 6, eliteBonus: 0.14, eliteCap: 0.42, budgetBoost: 1.14, gapMult: 0.66, floorHue: 198, rug: '#0e2c36' },
 ];
 
 /** Which act a wing belongs to (1 or 2; later acts add more). */
@@ -127,7 +128,7 @@ export function difficulty(wing, room) {
     budget,
     hpMult: (1 + 0.08 * (r - 1)) * wingHp(w) * STORY_HP_MULT,
     speedMult: (1 + Math.min(0.35, r * 0.015)) * (1 + 0.02 * w),
-    eliteChance: kind === 'elite' ? 1 : Math.min(0.5, 0.025 * w + 0.008 * (r - 1) + Math.max(...WINGS.slice(0, w + 1).map((x) => x.eliteBonus || 0))),
+    eliteChance: kind === 'elite' ? 1 : Math.min(def.eliteCap || 0.5, 0.025 * w + 0.008 * (r - 1) + Math.max(...WINGS.slice(0, w + 1).map((x) => x.eliteBonus || 0))),
     hazardSpeed: 1 + 0.03 * w + 0.01 * (r - 1),
     // Spawn pressure never relaxes: a wing keeps the tightest pacing of any wing before it.
     gapMult: Math.max(0.65, Math.min(...WINGS.slice(0, w + 1).map((x) => x.gapMult || 1)) * (1 - 0.015 * w)),

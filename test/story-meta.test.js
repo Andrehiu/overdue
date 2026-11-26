@@ -35,7 +35,7 @@ test('every wing is harder than the previous wing, room for room (Act II compare
       // Budget compared without the Survive multiplier (a Survive room's extra budget is its own, tested separately); threat above covers the rest.
       const plain = (d) => d.budget / (d.goal === 'survive' ? SURVIVE_BUDGET_MULT : 1);
       assert.ok(plain(b) > plain(a) || b.kind !== a.kind, `budget rises from wing ${w - 1} to ${w} (room ${r})`);
-      assert.ok(b.eliteChance >= a.eliteChance && b.bossTier >= a.bossTier && b.gapMult <= a.gapMult);
+      assert.ok((b.eliteChance >= a.eliteChance || S.WINGS[w - 1].eliteCap) && b.bossTier >= a.bossTier && b.gapMult <= a.gapMult);
     }
   }
 });

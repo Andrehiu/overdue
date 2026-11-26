@@ -5,6 +5,7 @@
 export const HM = {
   channelRows: 2,            // each channel is 2 cells deep (src/arena.js `harbour` shape)
   name: 'THE HARBOURMASTER',
+  hpMult: 0.85,              // v1.17.0 owner call: the Harbourmaster has 15% less HP than the boss formula (this boss only)
   scale: 1.35,               // hit radius = tome radius x this
   sail: 95,                  // px/s along a channel
   swap: 330,                 // px/s when it changes channel along a side wall (no attacks, no contact)

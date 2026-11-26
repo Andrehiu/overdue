@@ -96,3 +96,12 @@ test('sailing: laps along a channel, changes channel after a lap; contact is sma
   assert.ok(swapped && lanes.size === 2);
   h.mode = 'sail'; assert.ok(H.contactRadius(h, 59) < 59); h.mode = 'ram'; assert.equal(H.contactRadius(h, 59), 59);
 });
+
+test('Harbourmaster HP is the boss formula x 0.85; wings 14-15 cap the random-elite chance but stay harder by threat', async () => {
+  const H = await load('harbour'), S = await load('story');
+  assert.equal(H.HM.hpMult, 0.85);
+  for (const w of [14, 15]) {
+    assert.equal(S.WINGS[w - 1].eliteCap, 0.42);
+    for (let r = 1; r <= 9; r++) { const d = S.difficulty(w, r); assert.ok(d.kind === 'elite' || d.eliteChance <= 0.42); assert.ok(S.threat(d) > S.threat(S.difficulty(w - 1, r))); }
+  }
+});
