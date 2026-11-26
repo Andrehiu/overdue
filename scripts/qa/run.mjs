@@ -154,6 +154,12 @@ const FIT_CHECK = (id) => {
   return bad;
 };
 
+// v1.16.3: deterministic auto-aim measurements. Right before measuring: the room is live ('playing'), whatever was left over or still queued is gone,
+// and ONE unkillable, stunned bunny stands in line of sight, so the room can't clear mid-measurement (CI saw state 'waveclear', 0 enemies, 0 throws).
+const LIVE_TARGET = `if (O.game.state !== 'playing') { O.startWave(O.game.wave); O.god(); }
+        O.killAll(); O.game.bannerT = 0; O.game.freeze = 0; O.game.timeScale = 1;   // clear killAll's hit-stop too (it swallows steps)
+        { const tb = O.makeEnemy('bunny', O.W / 2 + 260, 60); tb.hp = tb.maxHp = 1e9; tb.stun = 1e9; }`;
+
 // v1.13.0: menus appear as they're earned, so flows that tap Endless / Renovations / Hall of Fame / Codex start as a RETURNING player.
 // (A fresh save shows only Story / How to play / Settings: the new-player flow checks that separately.)
 const RETURNING_SAVE = () => {
@@ -638,20 +644,22 @@ async function screensFlow(name, opts, full) {
         const { aF, aN, wx, wy, was } = pick;
         const far = O.makeEnemy('bunny', pick.fx, pick.fy), near = O.makeEnemy('bunny', pick.nx, pick.ny);
         for (const e of [far, near]) { e.hp = e.maxHp = 999; e.stun = 99; }
+        O.enemies.splice(0, O.enemies.length, far, near);   // v1.16.3: nobody else may be a target (CI/local runs sometimes still had 2-4 leftovers or fresh spawns here)
         if (O.game.state !== 'playing') O.game.state = 'playing';   // v1.16.2: killAll + a step can clear the wave (state 'waveclear': no aiming at all); that depended on how far the wave had got = flaky
+        O.game.freeze = 0; O.game.timeScale = 1;   // killAll's hit-stop (game.freeze) would swallow these 4 steps: no aim update, 0 throws = the flake
         O.setSetting('autoaim', true); O.touch.aimId = null; O.books.length = 0; p.throws = 0; O.stepN(4);
         const d = Math.abs(Math.atan2(Math.sin(p.aim - aF), Math.cos(p.aim - aF))), dn = Math.abs(Math.atan2(Math.sin(p.aim - aN), Math.cos(p.aim - aN)));
         const moved = [Math.hypot(far.x - pick.fx, far.y - pick.fy), Math.hypot(near.x - pick.nx, near.y - pick.ny)].map((v) => +v.toFixed(1)), others = O.enemies.length - 2;
         O.setSolid(wx, wy, was); O.freeze(false); return { skipped: false, toFar: +d.toFixed(2), toNear: +dn.toFixed(2), throws: p.throws, moved, others, touchOn: O.touch.enabled, aimId: O.touch.aimId, state: O.game.state, autoaim: O.settings.autoaim };`);
       record(area, 'auto-aim: a far enemy in line of sight is chosen over a nearer one behind a shelf', vis.skipped === true || vis.toFar < 0.1, JSON.stringify(vis));
       const over = await sim(`${angOff} const p = O.player;
-        if (O.game.state !== 'playing') { O.startWave(O.game.wave); O.god(); O.killAll(); }   // the room can already be cleared if the check above found no free spot
-        if (!O.enemies.length) { const b = O.makeEnemy('bunny', O.W / 2 + 260, 60); b.hp = b.maxHp = 999; b.stun = 99; } O.touch.aimId = 99; O.touch.ax0 = p.x + 300; O.touch.ay0 = p.y; O.touch.ax = O.touch.ax0 - 60; O.touch.ay = O.touch.ay0; const t0 = p.throws;
+        ${LIVE_TARGET}
+        O.touch.aimId = 99; O.touch.ax0 = p.x + 300; O.touch.ay0 = p.y; O.touch.ax = O.touch.ax0 - 60; O.touch.ay = O.touch.ay0; const t0 = p.throws;
         O.stepN(60); const st = { state: O.game.state, en: O.enemies.length, fireT: +p.fireT.toFixed(2), hp: p.hp, dash: p.dashT }; O.touch.aimId = null; return { throws: p.throws - t0, diff: dd(p.lastThrow, Math.PI), st };`);
       record(area, 'auto-aim on + deflected stick: throws follow the stick', over.throws >= 1 && over.diff < 0.15, JSON.stringify(over));
       const idleStick = await sim(`const p = O.player;
-        if (O.game.state !== 'playing') { O.startWave(O.game.wave); O.god(); O.killAll(); }   // deterministic: a live room with a target to auto-aim at
-        if (!O.enemies.length) { const b = O.makeEnemy('bunny', O.W / 2 + 260, 60); b.hp = b.maxHp = 999; b.stun = 99; } O.touch.aimId = 99; O.touch.ax0 = O.touch.ax = p.x + 300; O.touch.ay0 = O.touch.ay = p.y; p.autoAim = { n: 0, nearest: true }; const t0 = p.throws;
+        ${LIVE_TARGET}
+        O.touch.aimId = 99; O.touch.ax0 = O.touch.ax = p.x + 300; O.touch.ay0 = O.touch.ay = p.y; p.autoAim = { n: 0, nearest: true }; const t0 = p.throws;
         O.stepN(120); O.touch.aimId = null; return { throws: p.throws - t0, aimedFrames: p.autoAim.n };`);
       record(area, 'auto-aim on + stick inside deadzone: auto-aim keeps working', idleStick.throws >= 1 && idleStick.aimedFrames >= 1, JSON.stringify(idleStick));
       await page.evaluate(() => { __overdue.touch.enabled = false; __overdue.setSetting('autoaim', true); });
