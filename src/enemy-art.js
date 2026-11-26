@@ -466,3 +466,42 @@ export function drawWorms(ctx, enemies) {
   ctx.stroke();
   ctx.restore();
 }
+
+// ---------------------------------------------------------------- The Harbourmaster (v1.17.0, wing 15 boss): a huge folded-paper flagship in the Paper Boat palette
+/** Drawn at the boss's position (main.js already translated and scaled). About 2.5x the tome's width; in the top channel it hangs sails-down into the room. */
+export function drawHarbourmaster(ctx, e, look, white) {
+  const c = COL.boat, h = e.h, flip = h && h.lane === 0 && (h.mode === 'sail' || h.mode === 'swap' || h.mode === 'back');
+  const P = (fill) => (white ? '#fff' : fill), bob = Math.sin(e.t * 2) * 1.5, k = 1;
+  ctx.save(); ctx.lineJoin = 'round';
+  if (h && h.mode === 'windup') ctx.translate((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3);
+  ctx.translate(0, (flip ? 12 : -12) + bob);   // the hull sits on the middle of its channel
+  if (flip) ctx.scale(1, -1);
+  const path = (pts, fill, lw = 3.4) => { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); if (lw) { ctx.lineWidth = lw; ctx.strokeStyle = OL; ctx.stroke(); } ctx.fillStyle = fill; ctx.fill(); };
+  // hull
+  path([[-104, -6], [104, -6], [78, 30], [-78, 30]], P(c.paper));
+  path([[-98, 2], [98, 2], [90, 12], [-90, 12]], P(c.stripe), 0);
+  // two sails (folded halves darker)
+  for (const [mx, top, side] of [[-38, -78, 1], [38, -66, 1]]) {
+    path([[mx, -6], [mx, top], [mx + 52 * side, -14]], P(c.paper));
+    path([[mx, -6], [mx, top], [mx - 40 * side, -14]], P(c.fold), 1.6);
+    ctx.strokeStyle = OL; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(mx, -6); ctx.lineTo(mx, top - 6); ctx.stroke();
+  }
+  // bow flag
+  path([[0, -6], [0, -40], [22, -33], [0, -26]], P(c.stripe), 2);
+  ctx.restore();
+  // the angry eye on the hull (never flipped), looking at the player
+  ctx.save(); ctx.translate(0, (flip ? 12 : -12) + bob);
+  const ey = flip ? -12 : 12;
+  ctx.fillStyle = OL; ctx.beginPath(); ctx.ellipse(0, ey, 17, 12, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(0, ey, 15.5, 10.5, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = e.phase === 3 ? '#ff2d55' : '#e0344a'; ctx.beginPath(); ctx.arc(Math.cos(look) * 5, ey + Math.sin(look) * 3.5, 6.5, 0, TAU); ctx.fill();
+  ctx.fillStyle = OL; ctx.beginPath(); ctx.arc(Math.cos(look) * 6, ey + Math.sin(look) * 4, 3, 0, TAU); ctx.fill();
+  ctx.strokeStyle = OL; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(-20, ey - 9); ctx.lineTo(16, ey - 16); ctx.stroke();   // angry brow
+  // name plate
+  ctx.font = 'bold 9px ui-monospace, Menlo, monospace';
+  const label = 'THE HARBOURMASTER', pw = ctx.measureText(label).width + 14, py = flip ? 8 : -26;
+  ctx.fillStyle = OL; ctx.beginPath(); ctx.roundRect(-pw / 2 - 1.5, py - 1.5, pw + 3, 17, 4); ctx.fill();
+  ctx.fillStyle = '#8f1d2e'; ctx.beginPath(); ctx.roundRect(-pw / 2, py, pw, 14, 3); ctx.fill();
+  ctx.fillStyle = '#ffe9a8'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, 0, py + 7.5); ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+}

@@ -124,6 +124,7 @@ function overlapsSafe(x, y, w, h) {
  * Deterministic for a given (seed, wave). `shelvesPerHalf` overrides the density (story wings).
  */
 export function generateArena(seed, wave, shelvesPerHalf = null, shape = 'scatter') {
+  if (shape === 'harbour') return harbourArena(seed, wave, shelvesPerHalf);
   if (WATER_SHAPES.includes(shape)) {
     const a = waterArena(seed, wave, shelvesPerHalf, shape);
     if (a) return a;
@@ -334,6 +335,45 @@ export function isWide(solid) {
 }
 
 /**
+ * v1.17.0: every 2x2 free block must link to the others through shared PAIRS of cells (a step of one cell sideways or up/down), so no two parts of the
+ * room join through a single cell (a 30 px pinch). isWide() alone allowed that where a shelf stood next to the mouth of a 2-wide bridge, and big walkers
+ * (golems, patrons) on the far side could never reach the player (wing 11 room 2 never cleared for the bot).
+ */
+export function isWideLinked(solid) {
+  const free = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS && !solid[idx(x, y)];
+  const block = (x, y) => free(x, y) && free(x + 1, y) && free(x, y + 1) && free(x + 1, y + 1);
+  let total = 0, start = -1;
+  for (let y = 0; y < ROWS - 1; y++) for (let x = 0; x < COLS - 1; x++) if (block(x, y)) { total++; if (start < 0) start = idx(x, y); }
+  if (!total) return true;
+  const seen = new Uint8Array(COLS * ROWS), stack = [start]; seen[start] = 1; let reached = 0;
+  while (stack.length) {
+    const i = stack.pop(); reached++;
+    const x = i % COLS, y = (i / COLS) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= COLS - 1 || ny >= ROWS - 1 || seen[idx(nx, ny)] || !block(nx, ny)) continue;
+      seen[idx(nx, ny)] = 1; stack.push(idx(nx, ny));
+    }
+  }
+  return reached === total;
+}
+
+/**
+ * v1.17.0: true when two neighbouring free cells are NOT part of a common free 2x2 block, i.e. the way from one to the other is one cell (30 px) wide.
+ * The flow field happily routes through such a pinch, and big walkers (golems, patrons) then jam at it for good (wing 14 room 4: a shelf next to water).
+ */
+export function hasPinch(solid) {
+  const free = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS && !solid[idx(x, y)];
+  const block = (x, y) => free(x, y) && free(x + 1, y) && free(x, y + 1) && free(x + 1, y + 1);
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    if (!free(x, y)) continue;
+    if (free(x + 1, y) && !block(x, y - 1) && !block(x, y)) return true;
+    if (free(x, y + 1) && !block(x - 1, y) && !block(x, y)) return true;
+  }
+  return false;
+}
+
+/**
  * Merge shelf rects (grid cells) that sit on the same row or column and touch or overlap, so a wall built
  * from several pieces is one continuous shelf when drawn. Same cells covered, so `solid` is unaffected.
  */
@@ -472,7 +512,7 @@ function waterArena(seed, wave, shelvesPerHalf, shape) {
       }
     if (!ok) continue;
     for (const s of [r, mirrorRect(r)]) for (let yy = s.y; yy < s.y + s.h; yy++) for (let xx = s.x; xx < s.x + s.w; xx++) { solid[idx(xx, yy)] = 1; walk[idx(xx, yy)] = 1; }
-    if (!isConnected(walk) || !isWide(walk)) {
+    if (!isConnected(walk) || !isWide(walk) || !isWideLinked(walk) || hasPinch(walk)) {
       for (const s of [r, mirrorRect(r)]) for (let yy = s.y; yy < s.y + s.h; yy++) for (let xx = s.x; xx < s.x + s.w; xx++) { solid[idx(xx, yy)] = 0; walk[idx(xx, yy)] = water[idx(xx, yy)]; }
       continue;
     }
@@ -484,6 +524,26 @@ function waterArena(seed, wave, shelvesPerHalf, shape) {
   const rects = px(merged);
   const waterRects = px(rectsOf(Array.from(water.keys()).filter((i) => water[i])));
   return { seed, wave, shape, shelves: merged, rects, solid, water, walk, waterRects, wrects: [...rects, ...waterRects] };
+}
+
+/**
+ * v1.17.0: the Harbourmaster's room (wing 15 boss). The open 'pillars' floor plus two water channels, 2 cells deep, along the whole top and bottom walls
+ * (the boss sails in them; walkers and the player can't enter). Pillars keep 2 stone cells from a channel, so the middle is always walkable and
+ * connected, entry points are on the left and right walls, and spawn points are on stone. Same result shape as a water room.
+ */
+export const HARBOUR_ROWS = 2;
+function harbourArena(seed, wave, shelvesPerHalf) {
+  const base = shapedArena(seed, wave, shelvesPerHalf, 'pillars');
+  const water = new Uint8Array(COLS * ROWS), solid = new Uint8Array(COLS * ROWS);
+  for (let x = 0; x < COLS; x++) for (let k = 0; k < HARBOUR_ROWS; k++) { water[idx(x, k)] = 1; water[idx(x, ROWS - 1 - k)] = 1; }
+  const keep = (base ? base.shelves : []).filter((s) => s.y >= HARBOUR_ROWS + AISLE && s.y + s.h <= ROWS - HARBOUR_ROWS - AISLE);
+  for (const s of keep) for (let yy = s.y; yy < s.y + s.h; yy++) for (let xx = s.x; xx < s.x + s.w; xx++) solid[idx(xx, yy)] = 1;
+  const walk = new Uint8Array(COLS * ROWS);
+  for (let i = 0; i < walk.length; i++) walk[i] = solid[i] | water[i];
+  const px = (list) => list.map((s) => ({ x: s.x * CELL, y: s.y * CELL, w: s.w * CELL, h: s.h * CELL }));
+  const rects = px(keep);
+  const waterRects = [{ x: 0, y: 0, w: COLS * CELL, h: HARBOUR_ROWS * CELL }, { x: 0, y: (ROWS - HARBOUR_ROWS) * CELL, w: COLS * CELL, h: HARBOUR_ROWS * CELL }];
+  return { seed, wave, shape: 'harbour', shelves: keep, rects, solid, water, walk, waterRects, wrects: [...rects, ...waterRects] };
 }
 
 /** Free cells on the outer ring, used as enemy entry points (pass `arena.walk || arena.solid` so water cells are skipped). */

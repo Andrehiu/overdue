@@ -72,14 +72,14 @@ test('tips store keeps its shape: flags are plain ids in `seen`', () => {
 
 test("What's new: once for a returning player, never for a fresh install, never on small releases", () => {
   const ret = { seen: [], played: true }, fresh = { seen: [], played: false }, done = { seen: [whatsNewFlag()], played: true };
-  assert.equal(whatsNewAction(ret, '1.16.0'), 'show');
-  assert.equal(whatsNewAction(fresh, '1.16.0'), 'stamp', 'fresh install: recorded, not shown');
-  assert.equal(whatsNewAction(done, '1.16.0'), null, 'only once');
-  assert.equal(whatsNewAction(done, '1.16.1'), null, 'a small release after it shows nothing');
-  assert.equal(whatsNewAction(ret, '1.15.4'), null, 'older build: no card yet');
-  assert.equal(whatsNewAction(ret, '1.16.1'), 'show', 'a 1.15 player jumping to 1.16.1 still sees it once');
+  assert.equal(whatsNewAction(ret, '1.17.0'), 'show');
+  assert.equal(whatsNewAction(fresh, '1.17.0'), 'stamp', 'fresh install: recorded, not shown');
+  assert.equal(whatsNewAction(done, '1.17.0'), null, 'only once');
+  assert.equal(whatsNewAction(done, '1.17.1'), null, 'a small release after it shows nothing');
+  assert.equal(whatsNewAction(ret, '1.16.9'), null, 'older build: no card yet');
+  assert.equal(whatsNewAction(ret, '1.17.1'), 'show', 'a 1.16 player jumping to 1.17.1 still sees it once');
   assert.equal(whatsNewAction(ret, 'dev'), 'show');
-  assert.ok(WHATS_NEW.lines.length >= 2 && WHATS_NEW.lines.length <= 3 && WHATS_NEW.title.includes('Act II') && WHATS_NEW.release === '1.16.0');
+  assert.ok(WHATS_NEW.lines.length >= 2 && WHATS_NEW.lines.length <= 3 && WHATS_NEW.title.includes('Harbourmaster') && WHATS_NEW.release === '1.17.0');
   assert.equal(cmpVersion('1.9.0', '1.15.0'), -1);
 });
 

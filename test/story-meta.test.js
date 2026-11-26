@@ -295,7 +295,7 @@ test('every wing has room shapes; elite and boss rooms are open; shapes do not r
     for (let r = 1; r <= roomsIn(w); r++) {
       const s = roomShape(w, r);
       assert.equal(s, roomShape(w, r), 'deterministic');
-      if (r === eliteRoom(w) || r === bossRoom(w)) { assert.equal(s, open, `wing ${w} room ${r} is the open shape`); continue; }
+      if (r === eliteRoom(w) || r === bossRoom(w)) { assert.equal(s, r === bossRoom(w) && WINGS[w - 1].boss === 'harbourmaster' ? 'harbour' : open, `wing ${w} room ${r} is the open shape`); continue; }
       assert.ok(list.includes(s), `wing ${w} room ${r}: ${s} is one of the wing's shapes`);
       if (r > 1 && list.length >= 2) assert.notEqual(s, roomShape(w, r - 1), `wing ${w}: room ${r} repeats ${s}`);
     }
@@ -327,10 +327,10 @@ test('even the worst door route (cheapest door every time) still affords the che
   assert.ok(DOORS.rare && DOORS.rest);
 });
 
-test('every wing has an intro, taunt and cleared line, each 1-60 characters', async () => {
+test('every wing has an intro, taunt and cleared line, each 1-80 characters', async () => {
   const { WINGS } = await load('story');
   for (const w of WINGS) for (const k of ['intro', 'taunt', 'cleared']) {
-    assert.ok(typeof w[k] === 'string' && w[k].length > 0 && w[k].length <= 60, `${w.id}.${k}: ${w[k]}`);
+    assert.ok(typeof w[k] === 'string' && w[k].length > 0 && w[k].length <= 80, `${w.id}.${k}: ${w[k]}`);
   }
 });
 

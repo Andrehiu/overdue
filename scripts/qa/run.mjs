@@ -1010,7 +1010,7 @@ async function act2Flow() {
   await page.click('#title [data-act="story"]'); await page.waitForTimeout(250);
   await page.click('#actNext'); await page.waitForTimeout(150);
   const open = await page.evaluate(() => [...document.querySelectorAll('#wingGrid .wing:not(.soon)')].map((b) => !b.disabled));
-  record('act2', 'tester mode opens wings 11 and 12', open.length === 2 && open.every(Boolean), JSON.stringify(open));
+  record('act2', 'tester mode opens wings 11-15', open.length === 5 && open.every(Boolean), JSON.stringify(open));
   // a tester run banks fines but never unlocks, clears or sets a best room
   await page.evaluate(() => { const O = __overdue; O.startRun('story', 11); O.startWave(3); O.game.fines = 12; O.die(); });
   await page.waitForTimeout(2500);
@@ -1046,7 +1046,7 @@ async function act2Flow() {
   const stuck = await page.evaluate(() => {
     const O = __overdue, bad = [], realRandom = Math.random, sfx0 = O.settings.sfx;
     O.setSetting('sfx', false);   // v1.16.2: sound effects draw from Math.random when audio is live, which shifted the seeded stream (flaky); muted = same result every run
-    for (const [w, room] of [[11, 2], [11, 4], [11, 6], [12, 6]]) for (const seed of [1, 2, 3, 6, 9, 22, 23, 32, 35, 40]) {   // v1.16.2: 3 -> 10 seeds; 6/9/22/23/32/35/40 are ones that used to freeze golems
+    for (const [w, room] of [[11, 2], [11, 4], [11, 6], [12, 6], [13, 3], [14, 4], [15, 6]]) for (const seed of [1, 2, 3, 6, 9, 22, 23, 32, 35, 40]) {   // v1.16.2: 3 -> 10 seeds; 6/9/22/23/32/35/40 are ones that used to freeze golems
       let a = (seed * 2654435761) >>> 0; Math.random = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
       O.unlockAll(); O.startRun('story', w); O.startWave(room); O.god(); O.drive(true); O.setBotInput({ x: 0, y: 0 });
       O.stepN(40 * 120);                                         // spawns done and everyone has walked for a while
@@ -1056,7 +1056,7 @@ async function act2Flow() {
     }
     Math.random = realRandom; O.drive(false); O.setSetting('sfx', sfx0); return bad;
   });
-  record('act2', 'no ground enemy stands still at a shore in Act II water rooms (player standing still, 10 seeds x 4 rooms)', stuck.length === 0, stuck.slice(0, 4).join(' | '));
+  record('act2', 'no ground enemy stands still at a shore in Act II water rooms (player standing still, 10 seeds x 7 rooms (wings 11-15))', stuck.length === 0, stuck.slice(0, 4).join(' | '));
 
   // 3. an Act II water room: renders, the player can't step into water, books fly over it
   const pick = (() => { for (const w of [11, 12]) for (let r = 1; r <= roomsIn(w); r++) if (WATER_SHAPES.includes(roomShape(w, r))) return [w, r]; return null; })();
@@ -1176,6 +1176,34 @@ async function act2Flow() {
 }
 
 // ---------------------------------------------------------------- v1.15.0: status effects (ink, chill, static, pop) look right on a phone
+// ---------------------------------------------------------------- v1.17.0: the Harbourmaster (wing 15 boss): room, tells, a screenshot per phase on two devices
+async function harbourFlow(name, opts) {
+  const record = recorder(), area = `harbour/${name}`;
+  const ctx = await browser.newContext(opts), page = await ctx.newPage(), errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  await page.goto(URL0 + (URL0.includes('?') ? '&' : '?') + 'debug=1'); await page.waitForTimeout(500);
+  await page.evaluate(() => { const O = __overdue; O.unlockAll(); O.startRun('story', 15); O.startWave(9); O.god(); });
+  await page.waitForTimeout(4500);
+  const info = await page.evaluate(() => { const O = __overdue, b = O.game.boss; return { shape: O.arena.shape, boss: !!b && !!b.harbour, name: b && b.name, y: b && Math.round(b.y), water: O.arena.water.reduce((a, v) => a + v, 0), grid: O.grid() }; });
+  record(area, 'wing 15 boss room is the harbour with two channels and the Harbourmaster in a channel', info.shape === 'harbour' && info.boss && info.name === 'The Harbourmaster' && info.y < 70 && info.water > 0, JSON.stringify(info));
+  await shot(page, `${name}-harbour-phase1`);
+  const tells = await page.evaluate(async () => { const O = __overdue, b = O.game.boss; let wall = false, pages = 0; O.drive(true); O.setBotInput({ x: 0, y: 0 });
+    for (let i = 0; i < 600; i++) { O.stepN(1); if (b.h.wall) wall = true; pages = Math.max(pages, O.hazards.length); } O.drive(false); return { wall, pages }; });
+  record(area, 'phase 1: broadside walls show a tell and pages fly', tells.wall && tells.pages > 10, JSON.stringify(tells));
+  for (const [ph, hp] of [[2, 0.6], [3, 0.3]]) {
+    await page.evaluate((f) => { const O = __overdue, b = O.game.boss; b.hp = b.maxHp * f; O.drive(true); O.setBotInput({ x: 0, y: 0 }); O.stepN(130); O.drive(false); }, hp);
+    await page.evaluate(() => __overdue.stepN(240)); await page.waitForTimeout(150);
+    const st = await page.evaluate(() => { const b = __overdue.game.boss; return { phase: b.phase, mode: b.h.mode, boats: __overdue.enemies.filter((e) => e.type === 'boat').length }; });
+    record(area, `phase ${ph} reached`, st.phase === ph, JSON.stringify(st));
+    await shot(page, `${name}-harbour-phase${ph}`);
+  }
+  const rest = await page.evaluate(() => { const O = __overdue, b = O.game.boss, W = O.W, H = O.H; let off = 0, inWater = 0; O.drive(true); O.setBotInput({ x: 1, y: 1 });
+    for (let i = 0; i < 1500; i++) { O.stepN(1); if (b.x < 0 || b.x > W || b.y < 0 || b.y > H) off++; if (O.isSolid(O.player.x, O.player.y)) inWater++; } O.drive(false); return { off, inWater }; });
+  record(area, 'the ship stays in the room and the player never enters a channel (phase 3, 12 s)', rest.off === 0 && rest.inWater === 0, JSON.stringify(rest));
+  record(area, 'no page errors', errs.length === 0, errs.slice(0, 2).join(' | '));
+  await ctx.close();
+  return record.list;
+}
 async function statusFlow() {
   const record = recorder();
   const ctx = await browser.newContext(devices['iPhone 13 landscape']);
@@ -1408,13 +1436,13 @@ async function newPerksFlow(name, opts) {
       const tester = await page.evaluate(() => localStorage.getItem('overdue.tester.v1'));
       record(area, "version line stays visible and tappable with the What's-new card open (7 taps = tester mode)", hit && tester === '{"on":true}', JSON.stringify({ hit, tester }));
       for (let i = 0; i < 7; i++) await page.click('#title .version-label');
-      record(area, "What's new card shows for a returning save, on screen, 2-3 lines", !vis.hidden && /New in 1\.16: Act II, The Sunken Stacks/.test(vis.text) && vis.inView && vis.items >= 2 && vis.items <= 3, JSON.stringify({ ...vis, text: vis.text.slice(0, 60) }));
+      record(area, "What's new card shows for a returning save, on screen, 2-3 lines", !vis.hidden && /New in 1\.17: three new wings and the Harbourmaster/.test(vis.text) && vis.inView && vis.items >= 2 && vis.items <= 3, JSON.stringify({ ...vis, text: vis.text.slice(0, 60) }));
       await page.click('#btnWnOk'); await page.waitForTimeout(200);
       record(area, "What's new card closes with its one button", await page.evaluate(() => document.getElementById('whatsNew').hidden));
       await page.reload(); await page.waitForTimeout(1100);
-      record(area, "What's new card never shows twice", await page.evaluate(() => document.getElementById('whatsNew').hidden && __overdue.tipsSeen().includes('whatsnew-1.16.0')));
+      record(area, "What's new card never shows twice", await page.evaluate(() => document.getElementById('whatsNew').hidden && __overdue.tipsSeen().includes('whatsnew-1.17.0')));
       // NEW badges on the first offer; this player has not been stamped as fresh, so the badges are still pending
-      await page.evaluate(() => { localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.16.0","perk-stack"]}'); }); await page.reload(); await page.waitForTimeout(700);
+      await page.evaluate(() => { localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.17.0","perk-stack"]}'); }); await page.reload(); await page.waitForTimeout(700);
       await page.evaluate(() => { __overdue.startRun('endless'); __overdue.game.banished.add('margin'); __overdue.game.banished.add('librarycat'); __overdue.showUpgrades(); __overdue.showCards(['margin', 'hardcover', 'librarycat']); }); await page.waitForTimeout(900);
       const cls = () => page.evaluate(() => [...document.querySelectorAll('#cards .card')].map((c) => c.classList.contains('new')));
       const first = await cls(); await shot(page, `${name}-perk-new-badge`);
@@ -1428,13 +1456,13 @@ async function newPerksFlow(name, opts) {
     // fresh install: nothing shown, everything stamped
     { const { ctx, page, errors } = await mk(false);
       await page.goto(URL0); await page.waitForTimeout(1100);
-      record(area, "What's new card never shows on a fresh install", await page.evaluate(() => document.getElementById('whatsNew').hidden && __overdue.tipsSeen().includes('whatsnew-1.16.0') && __overdue.tipsSeen().includes('badge-margin')));
+      record(area, "What's new card never shows on a fresh install", await page.evaluate(() => document.getElementById('whatsNew').hidden && __overdue.tipsSeen().includes('whatsnew-1.17.0') && __overdue.tipsSeen().includes('badge-margin')));
       await page.evaluate(() => { __overdue.startRun('endless'); __overdue.showCards(['margin', 'hardcover', 'librarycat']); }); await page.waitForTimeout(500);
       record(area, 'a brand-new player sees no NEW badge on new perks', await page.evaluate(() => document.querySelectorAll('#cards .card').length === 3 && !document.querySelector('#cards .card.new')));
       await ctx.close(); }
     // the cat and Margin Notes books in a room
     { const { ctx, page, errors } = await mk(true);
-      await page.goto(URL0); await page.evaluate(() => localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.16.0"]}')); await page.reload(); await page.waitForTimeout(900);
+      await page.goto(URL0); await page.evaluate(() => localStorage.setItem('overdue.tips.v1', '{"seen":["a2hs-off","whatsnew-1.17.0"]}')); await page.reload(); await page.waitForTimeout(900);
       await page.evaluate(() => { const O = __overdue; O.startRun('endless'); O.god(); O.grant('librarycat'); for (let i = 0; i < 3; i++) O.grant('margin'); O.grant('dewey'); });
       // Deterministic: hand-step the sim (real loop paused) until 4+ Margin books are airborne AND the cat has hit something, and take the
       // numbers at that very step. (v1.15.4 fix: the old version waited in real time, then screenshotted, then re-read the books: under load
@@ -1642,6 +1670,7 @@ async function basicsFlow() {
   if (want('screens')) { tasks.push(() => rotateOverlayFlow()); for (const r of ROTATIONS) tasks.push(() => rotationFlow(...r)); }
   if (want('shapes')) tasks.push(() => shapesFlow());
   if (want('status')) tasks.push(() => statusFlow());
+  if (want('act2')) for (const [name, opts] of [TARGETS[0], TARGETS.find(([n]) => /ipad/i.test(n) && !/mini/i.test(n)) || TARGETS[1]]) tasks.push(() => harbourFlow(name, opts));
   if (want('act2')) tasks.push(() => act2Flow());
   if (want('lookfeel')) tasks.push(() => lookFeelFlow());
   if (want('newplayer')) for (const [name, opts] of TARGETS) tasks.push(() => newPlayerFlow(name, opts));
@@ -1762,6 +1791,19 @@ if (want('perf')) {
 
   record('perf', `status-stacked boss game speed ≥ ${PERF.sim}x`, st.sim >= PERF.sim, perfDetail(st));
   await perfChecks(page, 'status-stacked boss', st);
+  // v1.17.0: wing 15 boss (the Harbourmaster: walls of pages, boats, anchors, rams) with the stacked build
+  await page.evaluate(() => {
+    const O = __overdue; O.unlockAll(); O.startRun('story', 15);
+    for (const id of ['hardcover', 'hardcover', 'hardcover', 'speedreader', 'speedreader', 'speedreader', 'trilogy', 'trilogy', 'trilogy', 'plottwist', 'plottwist', 'plottwist',
+      'footnotes', 'footnotes', 'audiobook', 'audiobook', 'bookmark', 'spinebreaker', 'm_tome', 'm_zone', 'm_saga', 'm_twist', 'm_biblio', 'unreliable', 'annotated']) O.grant(id);
+    O.startWave(9); O.god();
+    O.game.boss && (O.game.boss.hp = O.game.boss.maxHp * 0.3);
+  });
+  await page.waitForTimeout(3500);
+  const hm = await perfSample(page);
+  await shot(page, 'perf-harbourmaster');
+  record('perf', `wing 15 boss (Harbourmaster) game speed ≥ ${PERF.sim}x`, hm.sim >= PERF.sim, perfDetail(hm));
+  await perfChecks(page, 'wing 15 boss (Harbourmaster)', hm);
   // Story late game: wing 10 room 6, a crowd of elites firing fans of pages.
   await page.evaluate(() => { const O = __overdue; O.unlockAll(); O.startRun('story', 10); O.startWave(6); O.god(); });
   await page.waitForTimeout(5000);

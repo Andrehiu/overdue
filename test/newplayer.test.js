@@ -82,5 +82,5 @@ test('Survive rooms: at most one per wing, never room 1 / elite / boss, later ro
   const table = {};
   for (let w = 1; w <= WINGS.length; w++) table[w] = Array.from({ length: roomsIn(w) }, (_, i) => i + 1).filter((r) => roomGoal(w, r) === 'survive');
   for (const [w, rooms] of Object.entries(table)) assert.ok(rooms.length <= 1, `wing ${w}: ${rooms}`);
-  assert.deepEqual(table, { 1: [3], 2: [], 3: [5], 4: [6], 5: [6], 6: [], 7: [5], 8: [3], 9: [], 10: [6], 11: [7], 12: [3] });
+  assert.deepEqual(table, { 1: [3], 2: [], 3: [5], 4: [6], 5: [6], 6: [], 7: [5], 8: [3], 9: [], 10: [6], 11: [7], 12: [3], 13: [], 14: [6], 15: [] });
 });
