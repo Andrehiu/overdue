@@ -101,3 +101,10 @@ test('per-wing tuning dials never make a wing easier (budgetBoost >= 1)', async 
   const S = await load('story');
   for (const w of S.WINGS) assert.ok((w.budgetBoost || 1) >= 1, `${w.id} budgetBoost`);
 });
+
+test('v1.16.2: walkers are at most 0.7 cells wide for walls, so a golem fits the 2-cell gaps the flow field plans through', async () => {
+  const { wallRadius } = await load('flowfield'), { CELL } = await load('arena');
+  assert.equal(wallRadius(12, CELL), 12, 'small walkers keep their size');
+  assert.equal(wallRadius(30, CELL), 21, 'a big golem is capped at 0.7 cells');
+  for (const r of [12, 15, 22, 24, 30, 40]) assert.ok(wallRadius(r, CELL) * 2 <= CELL * 2 * 0.75, `r ${r} fits a 2-cell gap with slack`);
+});

@@ -7,7 +7,7 @@ import { RUN_KEY, newCounters, addDealt, addTaken, bookEnded, sampleFlight, buil
 import { createBackend } from './backend.js';
 import { BUILD, versionLabel, fetchLatestBuild } from './version.js';
 import { CATALOGUE } from './catalogue.js';
-import { computeFlowField, lineOfSight } from './flowfield.js';
+import { computeFlowField, lineOfSight, wallRadius } from './flowfield.js';
 import { composeWave } from './waves.js';
 import { isWaterType, DRY_SWAP, EEL, BOAT, eelInit, eelStep, boatInit, boatStep, moveInWater, discInWater, inWater, waterSpawn, nearestWalkway, hasWater, HUNT, huntActive, labelPonds, nearestInPond } from './water-enemies.js';
 import { NEW_IN_1_15, baseStats, rollUpgrades, UPGRADES, byId, masterworkFor, gainText, comboPartners, combosInReach, pips, buildChips, specialReason, levelInfo, perkTip, normalizeTips, TIPS } from './upgrades.js';
@@ -1719,6 +1719,7 @@ function updateEnemies(dt) {
     for (let j = i + 1; j < enemies.length; j++) {
       const b = enemies[j];
       if (a.type === 'worm' && b.type === 'worm') continue;
+      if (a.ghostT > 0 || b.ghostT > 0) continue;   // v1.16.2 stuck recovery: a walker that made no progress passes through others for a moment
       const dx = b.x - a.x, dy = b.y - a.y, min = a.r + b.r, d2 = dx * dx + dy * dy;
       if (d2 < min * min && d2 > 0.01) {
         const d = Math.sqrt(d2), push = (min - d) / 2, nx = dx / d, ny = dy / d;
@@ -1733,10 +1734,19 @@ function updateEnemies(dt) {
     else if (isWaterType(e.type)) {   // separation may nudge them: if that left the water, go back to the last good spot
       if (discInWater(arena.water, COLS, ROWS, CELL, e.x, e.y, e.r * 0.6)) { e.wx = e.x; e.wy = e.y; } else { e.x = e.wx; e.y = e.wy; }
     }
-    else if (!(e.type === 'worm' && e.leader)) collideWorld(e, e.r);
+    else if (!(e.type === 'worm' && e.leader)) collideWorld(e, isStory() ? wallRadius(e.r, CELL) : e.r);   // v1.16.2: story only, Endless stays as it was
     // observed velocity (smoothed) for auto-aim lead; capped so teleports/boss charges stay sane
     if (e.lx !== undefined && dt > 0) { const k = 0.4; e.pvx = clamp((e.pvx || 0) * (1 - k) + ((e.x - e.lx) / dt) * k, -450, 450); e.pvy = clamp((e.pvy || 0) * (1 - k) + ((e.y - e.ly) / dt) * k, -450, 450); }
     e.lx = e.x; e.ly = e.y;
+    // v1.16.2 stuck recovery (story only; Endless stays as it was): big walkers jam head-on in 2-cell gaps (separation cancels each pair's forward step
+    // and nobody moves). A walker that moved < 10 px in a second while it could walk passes through other enemies for the next second.
+    if (isStory() && e.type !== 'boss' && !isWaterType(e.type) && !(e.type === 'worm' && e.leader)) {
+      e.ghostT = Math.max(0, (e.ghostT || 0) - dt); e.sT = (e.sT || 0) + dt;
+      if (e.sT >= 1) {
+        if (e.sx !== undefined && e.stun <= 0 && game.state === 'playing' && Math.hypot(e.x - e.sx, e.y - e.sy) < 10) e.ghostT = 1;
+        e.sx = e.x; e.sy = e.y; e.sT = 0;
+      }
+    }
     // Contact damage
     if (game.state === 'playing' || game.state === 'waveclear') {
       const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy);

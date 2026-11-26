@@ -617,6 +617,7 @@ async function screensFlow(name, opts, full) {
         const { aF, aN, wx, wy, was } = pick;
         const far = O.makeEnemy('bunny', pick.fx, pick.fy), near = O.makeEnemy('bunny', pick.nx, pick.ny);
         for (const e of [far, near]) { e.hp = e.maxHp = 999; e.stun = 99; }
+        if (O.game.state !== 'playing') O.game.state = 'playing';   // v1.16.2: killAll + a step can clear the wave (state 'waveclear': no aiming at all); that depended on how far the wave had got = flaky
         O.setSetting('autoaim', true); O.touch.aimId = null; O.books.length = 0; p.throws = 0; O.stepN(4);
         const d = Math.abs(Math.atan2(Math.sin(p.aim - aF), Math.cos(p.aim - aF))), dn = Math.abs(Math.atan2(Math.sin(p.aim - aN), Math.cos(p.aim - aN)));
         const moved = [Math.hypot(far.x - pick.fx, far.y - pick.fy), Math.hypot(near.x - pick.nx, near.y - pick.ny)].map((v) => +v.toFixed(1)), others = O.enemies.length - 2;
@@ -943,8 +944,9 @@ async function act2Flow() {
   // v1.16.1: no walker gets stuck at a shore. In water rooms (islands/causeway) with the player standing still, every ground enemy keeps moving
   // toward them (before the fix, enemies across a pond walked into the water edge and stood there for good).
   const stuck = await page.evaluate(() => {
-    const O = __overdue, bad = [], realRandom = Math.random;
-    for (const [w, room] of [[11, 2], [11, 4], [11, 6], [12, 6]]) for (const seed of [1, 2, 3]) {
+    const O = __overdue, bad = [], realRandom = Math.random, sfx0 = O.settings.sfx;
+    O.setSetting('sfx', false);   // v1.16.2: sound effects draw from Math.random when audio is live, which shifted the seeded stream (flaky); muted = same result every run
+    for (const [w, room] of [[11, 2], [11, 4], [11, 6], [12, 6]]) for (const seed of [1, 2, 3, 6, 9, 22, 23, 32, 35, 40]) {   // v1.16.2: 3 -> 10 seeds; 6/9/22/23/32/35/40 are ones that used to freeze golems
       let a = (seed * 2654435761) >>> 0; Math.random = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
       O.unlockAll(); O.startRun('story', w); O.startWave(room); O.god(); O.drive(true); O.setBotInput({ x: 0, y: 0 });
       O.stepN(40 * 120);                                         // spawns done and everyone has walked for a while
@@ -952,9 +954,9 @@ async function act2Flow() {
       O.stepN(15 * 120);
       for (const e of O.enemies) { const b = before.get(e); if (!b || ['eel', 'boat', 'coin', 'worm', 'boss', 'patron'].includes(e.type)) continue; if (Math.hypot(e.x - b[0], e.y - b[1]) < 12 && Math.hypot(e.x - O.player.x, e.y - O.player.y) > 140) bad.push(`w${w} r${room} s${seed} ${e.type}@${Math.round(e.x)},${Math.round(e.y)}`); }
     }
-    Math.random = realRandom; O.drive(false); return bad;
+    Math.random = realRandom; O.drive(false); O.setSetting('sfx', sfx0); return bad;
   });
-  record('act2', 'no ground enemy stands still at a shore in Act II water rooms (player standing still, 3 seeds x 4 rooms)', stuck.length === 0, stuck.slice(0, 4).join(' | '));
+  record('act2', 'no ground enemy stands still at a shore in Act II water rooms (player standing still, 10 seeds x 4 rooms)', stuck.length === 0, stuck.slice(0, 4).join(' | '));
 
   // 3. an Act II water room: renders, the player can't step into water, books fly over it
   const pick = (() => { for (const w of [11, 12]) for (let r = 1; r <= roomsIn(w); r++) if (WATER_SHAPES.includes(roomShape(w, r))) return [w, r]; return null; })();
@@ -1007,10 +1009,10 @@ async function act2Flow() {
       out.phases.add(eel.ph);
       if (eel.under) {
         out.under++;
-        // while submerged: a book sitting on it and a direct damage call must do nothing
+        // while submerged: a book sitting on it and a direct damage call must do nothing (v1.16.2: the test book is marked as already hit on every other enemy, so a boat spawned next to the eel can't be killed by it: that was a flake)
         if (i % 7 === 0 && bookHpChecks < 12) {
           const hp = eel.hp;
-          O.books.push({ x: eel.x, y: eel.y, vx: 0, vy: 0, r: 6, life: 1, age: 0, hitAny: false, rot: 0, dmgMult: 1, scale: 1, spin: 0, bounces: 0, pierce: 0, wraps: 0, child: false, hit: new Set(), color: '#3f7fd6', title: 'x', look: null });
+          O.books.push({ x: eel.x, y: eel.y, vx: 0, vy: 0, r: 6, life: 1, age: 0, hitAny: false, rot: 0, dmgMult: 1, scale: 1, spin: 0, bounces: 0, pierce: 0, wraps: 0, child: false, hit: new Set(O.enemies.filter((x) => x !== eel)), color: '#3f7fd6', title: 'x', look: null });
           O.damageEnemy(eel, 5, 0, 0, false, 'throw'); O.stepN(1);
           bookHpChecks++; if (eel.hp === hp && !eel.dead) bookHpOk++;
         }

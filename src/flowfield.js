@@ -99,3 +99,10 @@ export function lineOfSight(solid, cols, rows, cell, x0, y0, x1, y1) {
   }
   return true;
 }
+
+/**
+ * v1.16.2: the flow field plans over whole cells, so a walker must be able to follow it through the narrowest gap it plans (2 cells =
+ * 2 x cell). Big walkers (Ledger Golem, r up to 30 = one cell) are wider than that gap and wedged in it for good, taking the queue behind
+ * them along (Act II islands rooms). Walls see a walker as at most 0.7 cells wide (r 21 at CELL 30): the body can still look bigger.
+ */
+export const wallRadius = (r, cell) => Math.min(r, cell * 0.7);
