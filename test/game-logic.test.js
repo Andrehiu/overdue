@@ -614,3 +614,27 @@ test('v1.11.2 touching collinear shelves merge into one rect: same cells as soli
     }
   } finally { A.setOrientation(false); }
 });
+
+test('v1.16.4: Head Start never hands out a cursed book (cursed books are only ever an offered choice)', async () => {
+  const { rollUpgrades } = await load('upgrades');
+  const { runBonuses } = await load('meta');
+  const { Rng } = await load('util');
+  let rolled = 0;
+  for (const lvl of [0, 1, 2]) {
+    const n = runBonuses({ reno: lvl ? { headstart: lvl } : {} }).startPerks;
+    for (let seed = 1; seed <= 600; seed++) for (const lights of [true, false]) {
+      const picks = n ? rollUpgrades(new Rng(seed), {}, n, { noSpecial: true, noCursed: true, lights }) : [];
+      rolled += picks.length;
+      assert.ok(!picks.some((p) => p.kind === 'cursed'), `seed ${seed} level ${lvl} gave a cursed book`);
+    }
+  }
+  assert.ok(rolled > 1000);
+  // the same roll without the flag does hand them out, so the test can fail
+  let leaks = 0;
+  for (let seed = 1; seed <= 600; seed++) if (rollUpgrades(new Rng(seed), {}, 2, { noSpecial: true }).some((p) => p.kind === 'cursed')) leaks++;
+  assert.ok(leaks > 0);
+  // an offered choice still includes them
+  let offered = 0;
+  for (let seed = 1; seed <= 600; seed++) if (rollUpgrades(new Rng(seed), {}, 3).some((p) => p.kind === 'cursed')) offered++;
+  assert.ok(offered > 0);
+});

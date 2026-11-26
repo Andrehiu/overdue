@@ -211,6 +211,20 @@ const endPointer = (e) => {
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
 addEventListener('pointerup', (e) => { if (e.pointerType !== 'touch' && e.button === 0) mouse.down = false; });
+// v1.16.4: a stick whose finger is gone must never linger (touchcancel, system gestures, a finger lifted over a menu).
+function releaseTouches() { touch.moveId = null; touch.aimId = null; }
+addEventListener('pointerup', (e) => { if (e.pointerType === 'touch') endPointer(e); }, true);
+addEventListener('pointercancel', (e) => { if (e.pointerType === 'touch') endPointer(e); }, true);
+canvas.addEventListener('lostpointercapture', (e) => { if (e.pointerType === 'touch') endPointer(e); });
+// Safety net: more sticks held than fingers on the screen means one never got its end event. Drop the aim stick first.
+function syncTouches(e) {
+  const n = e.touches ? e.touches.length : 0, held = (touch.moveId !== null) + (touch.aimId !== null);
+  if (n >= held) return;
+  if (n === 0) releaseTouches(); else if (touch.aimId !== null) touch.aimId = null; else touch.moveId = null;
+}
+for (const t of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) addEventListener(t, syncTouches, { capture: true, passive: true });
+addEventListener('blur', releaseTouches);
+document.addEventListener('visibilitychange', () => { if (document.hidden) releaseTouches(); });
 
 function enableTouch() {
   if (touch.enabled) return;
@@ -317,7 +331,7 @@ function startRun(mode = 'endless', wing = 1, opts = {}) {
   player.hp = stats.maxHp;
   player.revives = bonus.revives;
   // Head Start: free random perks (never specials) before room/wave 1.
-  const head = bonus.startPerks ? rollUpgrades(rng, game.owned, bonus.startPerks, rollOpts({ noSpecial: true })) : [];
+  const head = bonus.startPerks ? rollUpgrades(rng, game.owned, bonus.startPerks, rollOpts({ noSpecial: true, noCursed: true })) : [];
   freeQueue.length = 0; hideFreePerk();
   for (const u of head) { queueFreePerk(u, 'Head Start'); game.owned[u.id] = (game.owned[u.id] || 0) + 1; game.picks.push(u.id); u.apply(stats, player); }
   // v1.13.0: the very first story run opens with a short guided room (skippable). Debug hooks pass noGuide.
@@ -333,6 +347,7 @@ function clearWorld() {
 }
 
 function startWave(n) {
+  releaseTouches();
   game.wave = n;
   clearWorld();
   game.diff = isStory() ? applyDoor(difficulty(game.wingN, n), game.door) : null;
@@ -910,6 +925,7 @@ function renderCodex() {
 function pause() {
   if (game.state !== 'playing') return;
   game.state = 'paused';
+  releaseTouches();
   sound.setMuffled(true);
   mouse.down = false;
   renderBuild($('#pauseBuild'));
@@ -2464,7 +2480,7 @@ function render() {
   if (game.state === 'playing' || game.state === 'waveclear' || game.state === 'dying') drawHUD();
   ctx.setTransform(s, 0, 0, s, 0, 0);               // sticks and crosshair follow the finger in world coordinates (sizes scaled by uiK)
   if (touch.enabled && touch.moveId !== null) drawStick();
-  if (touch.enabled && touch.aimId !== null) drawAimStick();
+  if (aimStickShown()) drawAimStick();
   if (!touch.enabled && mouse.seen && (game.state === 'playing' || game.state === 'waveclear')) drawCrosshair();
 }
 
@@ -2851,6 +2867,11 @@ function drawStick() {
   ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(touch.mx0 + dx * k, touch.my0 + dy * k, 18 * uiK, 0, TAU); ctx.fill();
 }
 
+/** v1.16.4: with auto-aim, the aim stick appears only once a finger has dragged past the deadzone; manual aim shows it from the first touch. */
+function aimStickShown() {
+  if (!touch.enabled || touch.aimId === null) return false;
+  return settings.autoaim === false || Math.hypot(touch.ax - touch.ax0, touch.ay - touch.ay0) > touch.dead;
+}
 /** The aim stick: same ring + knob as the move stick, in library blue, with a tick on the ring showing the aim direction. */
 function drawAimStick() {
   const { ax0: x0, ay0: y0 } = touch, dx = touch.ax - x0, dy = touch.ay - y0, d = Math.hypot(dx, dy), k = d > 45 * uiK ? 45 * uiK / d : 1;
@@ -2871,6 +2892,7 @@ function drawAimStick() {
 const SCREENS = ['title', 'howto', 'settings', 'leaderboard', 'upgrade', 'doors', 'pause', 'gameover', 'codex', 'story', 'shop', 'backup'];
 let settingsReturn = 'title', shopReturn = 'title', currentScreen = 'title';
 function showScreen(id) {
+  if (id) releaseTouches();   // a menu opened: any finger still on the stick is no longer steering
   for (const s of SCREENS) $('#' + s).hidden = s !== id;
   if (id !== currentScreen) $('#whatsNew').hidden = true;   // v1.16.1: no screen change leaves the What's-new card drawn on top
   currentScreen = id;
@@ -3427,7 +3449,7 @@ if (DEBUG) {
     showFreePerk: (id, label) => { queueFreePerk(byId(id), label); flushFreePerks(); }, showUpgrades, showDoors, nextRoom, texts, get cursedOffer() { return game.cursedOffer; }, takeCursed: (take) => { cardsArmedAt = 0; resolveCursedOffer(take); }, get rareId() { return game.rareId; }, get door() { return game.door; },
     // isSolid = what WALKERS can't enter (shelves + Act II water): bot steering and QA
     // ---- balance bot (scripts/balance.mjs): drives the sim headless, faster than real time ----
-    actions, hazards, STEP, books, touch, settings, setSetting, get W() { return W; }, get H() { return H; }, isSolid: (x, y) => isSolidPx(walkGrid(), x, y), setAimVariant: (v) => { aimVariant = v; autoTarget = null; }, setSolid: (x, y, v) => { const [cx, cy] = cellOf(x, y); arena.solid[cy * COLS + cx] = v ? 1 : 0; },
+    aimStickShown, releaseTouches, actions, hazards, STEP, books, touch, settings, setSetting, get W() { return W; }, get H() { return H; }, isSolid: (x, y) => isSolidPx(walkGrid(), x, y), setAimVariant: (v) => { aimVariant = v; autoTarget = null; }, setSolid: (x, y, v) => { const [cx, cy] = cellOf(x, y); arena.solid[cy * COLS + cx] = v ? 1 : 0; },
     get choices() { return currentChoices; }, get doors() { return currentDoors; },
     setBotInput: (mv) => { botInput = mv; }, drive: (on) => { botDrive = !!on; if (!on) botInput = null; },
     stepN: (n) => { for (let i = 0; i < n; i++) step(STEP); },

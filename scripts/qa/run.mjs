@@ -625,6 +625,35 @@ async function screensFlow(name, opts, full) {
       const auto = await sim(`O.setSetting('autoaim', true); O.touch.enabled = true; O.touch.aimId = null; const p = O.player; const t0 = p.throws; p.autoAim = { n: 0, ok: true }; O.stepN(120);
         return { throws: p.throws - t0, aimedFrames: p.autoAim.n, ok: p.autoAim.ok };`);
       record(area, 'auto-aim on: throws with no finger, at a visible enemy (or the nearest when none is visible)', auto.throws >= 1 && auto.aimedFrames >= 1 && auto.ok, JSON.stringify(auto));
+      // v1.16.4: a stuck second finger must never leave the blue aim circle behind, and a resting finger must not override auto-aim.
+      const ptr = (type, id, x, y) => page.evaluate(([type, id, x, y]) => { const c = document.getElementById('game') || document.querySelector('canvas'); const r = c.getBoundingClientRect();
+        c.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', clientX: r.left + x * r.width / __overdue.W, clientY: r.top + y * r.height / __overdue.H, bubbles: true, cancelable: true, isPrimary: id === 11 })); }, [type, id, x, y]);
+      const tc = (type, n) => page.evaluate(([type, n]) => { document.dispatchEvent(new TouchEvent(type, { touches: [], changedTouches: [], bubbles: true })); }, [type, n]);
+      await page.evaluate(() => { const O = __overdue; O.setSetting('autoaim', true); O.releaseTouches(); O.touch.enabled = true; });
+      const shown = () => page.evaluate(() => ({ aimId: __overdue.touch.aimId, shown: __overdue.aimStickShown() }));
+      await ptr('pointerdown', 11, 200, 300); await ptr('pointerdown', 12, 700, 300);
+      const rest = await shown();
+      record(area, 'v1.16.4: auto-aim on, a resting second finger (inside the deadzone) draws no aim circle', rest.aimId === 12 && rest.shown === false, JSON.stringify(rest));
+      const restThrows = await sim(`const p = O.player; const t0 = p.throws; O.stepN(120); return { throws: p.throws - t0 };`);
+      record(area, 'v1.16.4: ...and auto-aim keeps throwing', restThrows.throws >= 1, JSON.stringify(restThrows));
+      await ptr('pointermove', 12, 760, 300);
+      const drag = await shown();
+      record(area, 'v1.16.4: dragging that finger past the deadzone shows the circle', drag.shown === true, JSON.stringify(drag));
+      await page.evaluate(() => { document.dispatchEvent(new TouchEvent('touchcancel', { touches: [], changedTouches: [], bubbles: true })); });
+      const afterCancel = await page.evaluate(() => ({ aimId: __overdue.touch.aimId, moveId: __overdue.touch.moveId, shown: __overdue.aimStickShown() }));
+      record(area, 'v1.16.4: touchcancel clears both sticks, no circle', afterCancel.aimId === null && afterCancel.moveId === null && !afterCancel.shown, JSON.stringify(afterCancel));
+      await page.evaluate(() => { const O = __overdue; O.settings.autoaim = false; });   // manual aim: the circle shows from the first touch, as before
+      await ptr('pointerdown', 21, 200, 300); await ptr('pointerdown', 22, 700, 300);
+      const manualShown = await shown();
+      record(area, 'v1.16.4: manual aim (auto-aim off) still shows the stick from the first touch', manualShown.shown === true, JSON.stringify(manualShown));
+      await page.evaluate(`(() => { const O = __overdue; ${LIVE_TARGET} O.releaseTouches(); O.settings.autoaim = true; })()`);   // pause only works in a live room (CI-style flake otherwise)
+      await ptr('pointerdown', 31, 200, 300); await ptr('pointerdown', 32, 700, 300); await ptr('pointermove', 32, 760, 300);
+      await page.evaluate(() => { document.getElementById('btnPause').click(); });
+      const paused = await page.evaluate(() => ({ state: __overdue.game.state, aimId: __overdue.touch.aimId, moveId: __overdue.touch.moveId }));
+      await page.evaluate(() => { document.querySelector('#pause [data-act=resume]')?.click(); });
+      const resumed = await page.evaluate(() => ({ state: __overdue.game.state, shown: __overdue.aimStickShown() }));
+      record(area, 'v1.16.4: pausing mid-touch drops both fingers; after resume no circle', paused.state === 'paused' && paused.aimId === null && paused.moveId === null && !resumed.shown, JSON.stringify({ paused, resumed }));
+      await page.evaluate(() => { __overdue.releaseTouches(); });
       // v1.15.3: a far enemy in the open is chosen over a nearer one behind a shelf
       // The two bunnies must stand still: enemies get pushed out of walls/shelves they overlap, and a moving target shifts the 50% lead aim (that was
       // the flake). So pick a direction where both discs are free of solid cells (also with the extra shelf cell in place), and report how far they moved.
@@ -743,6 +772,8 @@ async function menusFlow(name, opts) {
       const dec = decodeStats(st.code);
       record(area, 'v1.14.0: Share stats makes a valid OVS1: code (fallback box shown when the clipboard is refused)', st.shown && dec.ok && dec.runs.length === 1, st.code.slice(0, 40));
       await shot(page, `${name}-menu-settings-stats`);
+      const sFit = await page.evaluate(`(${FIT_CHECK})('settings')`);   // v1.16.4: unscrolled, so the version line counts too
+      record(area, 'v1.16.4: settings with the stats box open fits without scrolling (version line clear of Back)', !sFit.length, sFit.join('; '));
       const sBad = await page.evaluate(`(${PINNED_CHECK})('settings')`);
       record(area, 'v1.14.0: settings with the stats box open: pinned row covers nothing and fits', !sBad.length, sBad.join('; '));
       await page.click('#settings [data-act=back]'); await page.waitForTimeout(200);
@@ -1629,13 +1660,28 @@ async function basicsFlow() {
 const PERF_SAMPLES = 5, PERF_SAMPLE_MS = 2000;
 const PERF_SAMPLE_JS = `(async (N, MS) => {
   const O = __overdue, out = [];
-  const reset = () => { const b = O.enemies.find((e) => e.type === 'boss'); if (b) { b.hp = b.maxHp; O.player.x = b.x; O.player.y = Math.min(b.y + 160, 900); } };
-  const run = (ms) => new Promise((res) => { reset(); const t0 = performance.now(), sim0 = O.game.playTime; let frames = 0;
-    const tick = (now) => { frames++; const b = O.enemies.find((e) => e.type === 'boss'); if (b && b.hp < b.maxHp * 0.5) b.hp = b.maxHp; if (now - t0 < ms) requestAnimationFrame(tick); else res({ sim: (O.game.playTime - sim0) / ((performance.now() - t0) / 1000), fps: frames / ((now - t0) / 1000), books: O.counts().books, hazards: O.counts().hazards }); };
+  // v1.16.4: speed is measured only over ticks where the game is 'playing' with a live boss that is not transforming (BOSS_TRANS), and
+  // a boss that died (wave clear / upgrade screen stop game time) is replaced, so the median can't be dragged down by a phase change or a clear.
+  const bossOf = () => O.enemies.find((e) => e.type === 'boss' && !e.dead);
+  const bossRun = !!bossOf();   // the story-room sample has no boss: it only needs state 'playing'
+  // The boss is held inside ONE phase band per sample (heal to the top of the band when it drops near the bottom), so it never flips phase
+  // (every flip is a 1 s BOSS_TRANS) and never dies (death ends the room and stops game time). Samples rotate through phases 1, 2, 3.
+  const BAND = [[0.70, 1], [0.37, 0.66], [0.25, 0.33]];
+  const reset = (ph = 0) => { if (bossRun && (!bossOf() || O.game.state !== 'playing')) { O.startWave(15); O.god(); } const b = bossOf(); if (b) { b.hp = b.maxHp * BAND[ph][1]; O.player.x = b.x; O.player.y = Math.min(b.y + 160, 900); } };
+  const settle = async () => { for (let i = 0; i < 400 && bossRun && !(bossOf() && O.game.state === 'playing'); i++) await new Promise((r) => setTimeout(r, 25)); };   // a restarted room needs its intro + boss spawn
+  const run = async (ms, ph = 0) => { reset(ph); await settle(); reset(ph); return runOnce(ms, ph); };
+  const runOnce = (ms, ph = 0) => new Promise((res) => { const t0 = performance.now(); let prevT = t0, prevP = O.game.playTime, wall = 0, play = 0, frames = 0, skipped = 0;
+    const ok = () => { const b = bossOf(); return O.game.state === 'playing' && (!bossRun || (b && !(b.trans > 0))); };
+    let prevOk = ok();
+    const tick = (now) => { frames++; const b = bossOf(); if (b && b.hp < b.maxHp * BAND[ph][0]) b.hp = b.maxHp * BAND[ph][1];
+      const okNow = ok(), p = O.game.playTime;
+      if (prevOk && okNow) { wall += (now - prevT) / 1000; play += p - prevP; } else skipped++;
+      prevT = now; prevP = p; prevOk = okNow;
+      if (now - t0 < ms) requestAnimationFrame(tick); else res({ sim: wall > 0 ? play / wall : 0, fps: frames / ((now - t0) / 1000), books: O.counts().books, hazards: O.counts().hazards, skipped, measured: wall, why: O.game.state + "/" + (bossOf() ? "boss hp" + (bossOf().hp / bossOf().maxHp).toFixed(2) + " trans" + (bossOf().trans || 0).toFixed(2) + " ph" + bossOf().phase : "noboss")}); };
     requestAnimationFrame(tick); });
   await run(4000); // warm-up, discarded (fps climbs for the first few seconds as caches and JIT settle)
   for (let s = 0; s < N; s++) {
-    const r = await run(MS);
+    const r = await run(MS, s % 3);
     // game-update time alone (no canvas): 60 steps with the real loop paused
     O.drive(true);
     try { reset(); O.game.freeze = 0; const t0 = performance.now(); for (let i = 0; i < 60; i++) { O.game.freeze = 0; O.stepN(1); } r.upd = (performance.now() - t0) / 60; } finally { O.drive(false); }
@@ -1646,10 +1692,12 @@ const PERF_SAMPLE_JS = `(async (N, MS) => {
 const perfSample = async (page) => {
   const r = await page.evaluate(`${PERF_SAMPLE_JS}(${PERF_SAMPLES}, ${PERF_SAMPLE_MS})`);
   const col = (k) => r.out.map((x) => x[k]);
-  return { sim: median(col('sim')), fps: median(col('fps')), books: Math.max(...col('books')), hazards: Math.max(...col('hazards')), upd: median(col('upd')),
-    simS: col('sim'), fpsS: col('fps'), updS: col('upd') };
+  // a sample with under 0.5 s of qualifying game time (the boss died, the room restarted) says nothing about speed: left out, and fewer than 3 valid samples fails
+  const valid = r.out.filter((x) => x.measured >= 0.5);
+  return { valid: valid.length, sim: valid.length >= 3 ? median(valid.map((x) => x.sim)) : 0, fps: median(col('fps')), books: Math.max(...col('books')), hazards: Math.max(...col('hazards')), upd: median(col('upd')),
+    skipped: col('skipped'), why: col('why'), measured: col('measured'), simS: col('sim'), fpsS: col('fps'), updS: col('upd') };
 };
-const perfDetail = (m) => `median ${m.fps.toFixed(0)} fps, ${m.sim.toFixed(2)}x · game update median ${m.upd.toFixed(2)} ms/frame · fps samples ${m.fpsS.map((v) => v.toFixed(0)).join(', ')}`;
+const perfDetail = (m) => `median ${m.fps.toFixed(0)} fps, ${m.sim.toFixed(2)}x · game update median ${m.upd.toFixed(2)} ms/frame · fps samples ${m.fpsS.map((v) => v.toFixed(0)).join(', ')} · valid samples ${m.valid}/${m.simS.length} · speed samples ${m.simS.map((v) => v.toFixed(2)).join(', ')} · ticks skipped (not playing / boss transforming) ${m.skipped.join(', ')} · end ${(m.why || []).join(' ; ')}`;
 
 // Update time and sim speed always fail QA. fps fails only when a GPU is present; with software rendering (SwiftShader/llvmpipe) it is a ⚠️ warning
 // (canvas raster dominates there, ~78% of frame time, so fps swings 35-59 on one commit).

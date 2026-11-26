@@ -295,7 +295,8 @@ export function rollUpgrades(rng, owned = {}, n = 3, ctx = {}) {
   const specials = [...unlockedMasterworks(owned), ...unlockedCombos(owned)].filter((u) => !exclude.has(u.id));
   if (specials.length && !ctx.noSpecial) out.push(rng.pick(specials));
   const pool = UPGRADES.filter((u) => u.kind !== 'combo' && u.kind !== 'master' && (owned[u.id] || 0) < u.max
-    && !(u.needsLights && ctx.lights === false) && !banned.has(u.id) && !exclude.has(u.id));
+    && !(u.needsLights && ctx.lights === false) && !banned.has(u.id) && !exclude.has(u.id)
+    && !(ctx.noCursed && u.kind === 'cursed'));   // v1.16.4: free perks are never cursed books
   while (out.length < n && pool.length) {
     const pick = rng.weighted(pool.map((u) => ({ u, w: u.weight * partnerBias(u, owned) })), 'w').u;
     out.push(pick);
