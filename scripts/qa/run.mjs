@@ -628,7 +628,8 @@ async function screensFlow(name, opts, full) {
       // v1.15.3: a far enemy in the open is chosen over a nearer one behind a shelf
       // The two bunnies must stand still: enemies get pushed out of walls/shelves they overlap, and a moving target shifts the 50% lead aim (that was
       // the flake). So pick a direction where both discs are free of solid cells (also with the extra shelf cell in place), and report how far they moved.
-      const vis = await sim(`O.freeze(true); O.killAll(); O.stepN(1); O.killAll(); O.stepN(1); const p = O.player;   // killAll only marks enemies dead; a step removes them (a golem leaves coins: twice) p.x = O.W / 2; p.y = O.H / 2; p.vx = p.vy = 0;   // arena centre: a far point is then inside the room (line of sight is false outside the grid)
+      const vis = await sim(`O.freeze(true); O.killAll(); O.stepN(1); O.killAll(); O.stepN(1);   // killAll only marks enemies dead; a step removes them (a golem leaves coins: twice)
+        const p = O.player; p.x = O.W / 2; p.y = O.H / 2; p.vx = p.vy = 0;   // arena centre: a far point is then inside the room (line of sight is false outside the grid). v1.16.3: this used to sit inside the comment above and never ran, so the player stood wherever the last check left them = the flake
         const inside = (x, y) => x > 30 && y > 30 && x < O.W - 30 && y < O.H - 30;
         const freeDisc = (x, y, r) => inside(x, y) && [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r], [r * .7, r * .7], [-r * .7, r * .7], [r * .7, -r * .7], [-r * .7, -r * .7]].every(([dx, dy]) => !O.isSolid(x + dx, y + dy));
         const clear = (a, d) => { for (let r = 10; r <= d; r += 8) if (O.isSolid(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r)) return false; return true; };
