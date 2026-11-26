@@ -88,10 +88,10 @@ export const WINGS = [
     weights: { worm: 1 }, enemyTypes: { eel: 1.3, boat: 0.8 }, unlockShift: 6, eliteBonus: 0.14, budgetBoost: 1.19, gapMult: 0.7, floorHue: 188, rug: '#12343c' },
   { act: 2, id: 'drydock', shapes: ['causeway', 'islands', 'reading'], icon: '⚓', name: 'The Dry Dock', blurb: 'Long causeways, boats everywhere, golems on the quay.',
     intro: "The boats are in. The captain is not.", taunt: "Anchors aweigh. Fines too.", cleared: "The Dry Dock empties. Somewhere, a bell.",
-    weights: { golem: 1.2, patron: 1 }, enemyTypes: { boat: 1.4, eel: 0.9 }, unlockShift: 6, eliteBonus: 0.15, budgetBoost: 1.17, gapMult: 0.68, floorHue: 192, rug: '#103038' },
+    weights: { golem: 1.2, patron: 1 }, enemyTypes: { boat: 1.4, eel: 0.9 }, unlockShift: 6, eliteBonus: 0.14, budgetBoost: 1.16, gapMult: 0.68, floorHue: 192, rug: '#103038' },
   { act: 2, id: 'harbour', boss: 'harbourmaster', shapes: ['islands', 'causeway', 'reading'], icon: '🏮', name: 'The Lantern Harbour', blurb: 'The last light on the water. The Harbourmaster is on duty.',
     intro: "Lanterns lit. The harbour is open for business.", taunt: "No ship leaves this harbour with an overdue book. Including yours.", cleared: "The Lantern Harbour goes dark. Quiet tide.",
-    weights: { patron: 1.3, golem: 1.3 }, enemyTypes: { eel: 1.1, boat: 1.2 }, unlockShift: 6, eliteBonus: 0.16, budgetBoost: 1.16, gapMult: 0.66, floorHue: 198, rug: '#0e2c36' },
+    weights: { patron: 1.3, golem: 1.3 }, enemyTypes: { eel: 1.1, boat: 1.2 }, unlockShift: 6, eliteBonus: 0.14, budgetBoost: 1.14, gapMult: 0.66, floorHue: 198, rug: '#0e2c36' },
 ];
 
 /** Which act a wing belongs to (1 or 2; later acts add more). */
