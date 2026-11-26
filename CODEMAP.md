@@ -39,7 +39,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `src/doors.js` | 88 | Story doors: after most rooms you pick the next room from 2 doors. Pure module (no DOM) so it is unit-tested. |
 | `src/enemy-art.js` | 508 | Enemy art (v1.12.0): every enemy except the boss is drawn here. Look "Blend": library characters (own face per type) |
 | `src/flowfield.js` | 114 | Dijkstra flow field: one search from the player gives every enemy a path around the shelves. |
-| `src/harbour.js` | 145 | The Harbourmaster (v1.17.0): the wing-15 boss. A huge folded-paper flagship that sails in two water channels along the top and bottom walls. |
+| `src/harbour.js` | 149 | The Harbourmaster (v1.17.0): the wing-15 boss. A huge folded-paper flagship that sails in two water channels along the top and bottom walls. |
 | `src/main.js` | 3522 | OVERDUE! — Night Shift at the Meme Library |
 | `src/meta.js` | 104 | Late fees: permanent progression between runs. Pure module (no DOM) so it is unit-tested. |
 | `src/newplayer.js` | 95 | New-player help (v1.13.0): which menus a player has earned, and the scripted first room. Pure module (no DOM), unit-tested. |
@@ -60,7 +60,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/doors.test.js` | 173 | Story doors (v1.7.0): pure rules, no DOM. |
 | `test/enemy-art.test.js` | 35 | Enemy art colours and the patron ripple (pure data from src/enemy-art.js; no canvas needed). |
 | `test/game-logic.test.js` | 641 | Unit tests for the game's pure, DOM-free modules (ES modules loaded via dynamic import). |
-| `test/harbour.test.js` | 108 | The Harbourmaster (v1.17.0): the harbour room and the boss's timers. Pure rules, deterministic with a seeded Rng. |
+| `test/harbour.test.js` | 120 | The Harbourmaster (v1.17.0): the harbour room and the boss's timers. Pure rules, deterministic with a seeded Rng. |
 | `test/new-perks.test.js` | 90 | v1.15.0 part B: Margin Notes, Last Chapter, Library Cat, Crossfire, plus the "What's new" card and NEW badges. Pure rules, no DOM. |
 | `test/newplayer.test.js` | 87 | New-player help (v1.13.0): menu unlock rules from saves, the guided-room flag, the Survive room table. Pure rules, no DOM. |
 | `test/privacy-scan.test.js` | 39 |  |
@@ -70,7 +70,7 @@ Line numbers are `name:line`. `npm test` fails if this file is stale; run `npm r
 | `test/status.test.js` | 146 | Status effects (v1.15.0 part A): freeze rule, boss immunity, chain rule, proc scaling, ink/chill/zap maths. Pure, no DOM. |
 | `test/story-meta.test.js` | 353 | Story wings (C) + late-fee Renovations (A): pure rules, no DOM. |
 | `test/water-enemies.test.js` | 130 | Act II water enemies (v1.16.0 part B): eel surface/dive timer, boat drop cadence, spawn and movement only on water, endless/Act I untouched. Pure rules, no DOM. |
-| `scripts/qa/run.mjs` | 1857 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
+| `scripts/qa/run.mjs` | 1866 | OVERDUE! QA suite: `npm run qa` (full) or `npm run qa -- --ci` (relaxed perf thresholds for slow CI runners). |
 | `scripts/build.mjs` | 50 | Bundles the game into ONE self-contained HTML file (dist/overdue.html) plus dist/version.json. |
 | `scripts/serve.mjs` | 20 | Zero-dependency static server for local play: `npm run dev` then open http://localhost:5173 |
 | `scripts/codemap.mjs` | 113 | Generates CODEMAP.md: a token-cheap index of the code, so a session (person or AI) can jump straight |
@@ -117,7 +117,7 @@ NEIGH:4 · canStep:44 · computeFlowField:59 · lineOfSight:96 · wallRadius:113
 
 ## src/harbour.js
 
-HM:5 · laneYs:24 · newHarbour:26 · harbourPhase:33 · planWall:39 · wallPages:53 · contactRadius:60 · harbourStep:72
+HM:5 · laneYs:27 · channelYs:28 · newHarbour:30 · harbourPhase:37 · planWall:43 · wallPages:57 · contactRadius:64 · harbourStep:76
 
 ## src/main.js
 
@@ -297,8 +297,9 @@ ENEMY_TYPES:3 · isBossWave:14 · baseBudget:17 · waveBudget:19 · composeWave:
 - 56: phase 1: a wall about every 2.2 s, each with a 0.5 s tell first; no boats, anchors or rams
 - 65: phase 2: broadside every ~2.6 s, 3 boats every ~8 s (cap 5 in total), an anchor every ~5 s that lands 0.9 s later
 - 78: phase 3: leaves the channel, rams with a broadside from both sides, returns to a channel; anchors every ~3.5 s
-- 89: sailing: laps along a channel, changes channel after a lap; contact is small in a channel, full while ramming, none while changing channel
+- 89: sailing: laps along a channel, changes channel after a lap; contact is none in a channel, full while ramming, none while changing channel
 - 100: Harbourmaster HP is the boss formula x 0.85; wings 14-15 cap the random-elite chance but stay harder by threat
+- 109: the first broadside waits for the boss banner (>= 2.5 s, and never while the banner is up)
 
 ## test/new-perks.test.js
 
@@ -406,7 +407,7 @@ ENEMY_TYPES:3 · isBossWave:14 · baseBudget:17 · waveBudget:19 · composeWave:
 
 ## scripts/qa/run.mjs
 
-results:29 · record:30 · want:34 · recorder:36 · pool:38 · sh:41 · TYPES:57 · TARGETS:67 · FULL_TARGETS:80 · FILL_JS:83 · TITLE_FIT_JS:84 · shot:96 · PINNED_CHECK:104 · FIT_CHECK:139 · RETURNING_SAVE:165 · TITLE_MENUS_JS:171 · screensFlow:175 · menusFlow:709 · rotateOverlayFlow:854 · ROTATIONS:894 · rotationFlow:899 · shapesFlow:930 · act2Flow:959 · harbourFlow:1180 · statusFlow:1207 · lookFeelFlow:1239 · newPlayerFlow:1317 · newPerksFlow:1412 · steadyContext:1485 · basicsFlow:1503 · perfSample:1721 · perfDetail:1729 · perfChecks:1735 · md:1844
+results:29 · record:30 · want:34 · recorder:36 · pool:38 · sh:41 · TYPES:57 · TARGETS:67 · FULL_TARGETS:80 · FILL_JS:83 · TITLE_FIT_JS:84 · shot:96 · PINNED_CHECK:104 · FIT_CHECK:139 · RETURNING_SAVE:165 · TITLE_MENUS_JS:171 · screensFlow:175 · menusFlow:709 · rotateOverlayFlow:854 · ROTATIONS:894 · rotationFlow:899 · shapesFlow:930 · act2Flow:959 · harbourFlow:1180 · statusFlow:1216 · lookFeelFlow:1248 · newPlayerFlow:1326 · newPerksFlow:1421 · steadyContext:1494 · basicsFlow:1512 · perfSample:1730 · perfDetail:1738 · perfChecks:1744 · md:1853
 
 ## scripts/build.mjs
 

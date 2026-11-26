@@ -86,7 +86,7 @@ test('phase 3: leaves the channel, rams with a broadside from both sides, return
   assert.ok(['sail', 'back', 'windup', 'ram'].includes(h.mode));
 });
 
-test('sailing: laps along a channel, changes channel after a lap; contact is small in a channel, full while ramming, none while changing channel', () => {
+test('sailing: laps along a channel, changes channel after a lap; contact is none in a channel, full while ramming, none while changing channel', () => {
   const H = require_h, rng = new require_rng(1), h = H.newHarbour(1200, 660, 30), lanes = new Set(); let swapped = false;
   for (let t = 0; t < 60; t += 1 / 60) {
     H.harbourStep(h, 1 / 60, { phase: 1, W: 1200, H: 660, cell: 30, r: 59, player: { x: 600, y: 330, r: 11 }, boats: 0, rng });
@@ -94,7 +94,7 @@ test('sailing: laps along a channel, changes channel after a lap; contact is sma
     assert.ok(h.x >= 0 && h.x <= 1200);
   }
   assert.ok(swapped && lanes.size === 2);
-  h.mode = 'sail'; assert.ok(H.contactRadius(h, 59) < 59); h.mode = 'ram'; assert.equal(H.contactRadius(h, 59), 59);
+  h.mode = 'sail'; assert.equal(H.contactRadius(h, 59), 0); h.mode = 'ram'; assert.equal(H.contactRadius(h, 59), 59);
 });
 
 test('Harbourmaster HP is the boss formula x 0.85; wings 14-15 cap the random-elite chance but stay harder by threat', async () => {
@@ -104,4 +104,16 @@ test('Harbourmaster HP is the boss formula x 0.85; wings 14-15 cap the random-el
     assert.equal(S.WINGS[w - 1].eliteCap, 0.42);
     for (let r = 1; r <= 9; r++) { const d = S.difficulty(w, r); assert.ok(d.kind === 'elite' || d.eliteChance <= 0.42); assert.ok(S.threat(d) > S.threat(S.difficulty(w - 1, r))); }
   }
+});
+
+test('the first broadside waits for the boss banner (>= 2.5 s, and never while the banner is up)', () => {
+  const H = require_h, rng = new require_rng(5), h = H.newHarbour(1200, 660, 30), env = (hold) => ({ phase: 1, W: 1200, H: 660, cell: 30, r: 59, player: { x: 600, y: 330, r: 11 }, boats: 0, rng, hold });
+  let first = null;
+  for (let t = 0; t < 6 && first === null; t += 1 / 60) if (H.harbourStep(h, 1 / 60, env(t < 4)).some((e) => e.type === 'wallTell')) first = t;
+  assert.ok(first >= 4, 'held while the banner is up');
+  const h2 = H.newHarbour(1200, 660, 30); let f2 = null;
+  for (let t = 0; t < 6 && f2 === null; t += 1 / 60) if (H.harbourStep(h2, 1 / 60, env(false)).some((e) => e.type === 'wallTell')) f2 = t;
+  assert.ok(f2 >= 2.5);
+  const [top, bot] = H.laneYs(660, 30), [c0, c1] = H.channelYs(660, 30);
+  assert.ok(top >= 60 && bot <= 660 - 60 && c0 === 30 && c1 === 630);
 });

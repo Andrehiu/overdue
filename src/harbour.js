@@ -16,12 +16,16 @@ export const HM = {
   boat: { every: 8, cap: 5, drop: 3 },
   anchor: { every: [0, 5, 3.5], delay: 0.9, r: 34, pages: 12, speed: 170 },
   ramEvery: 3.4,             // phase 3: seconds in a channel between rams
-  first: { wall: 1.4, boat: 3, anchor: 2.6, ram: 2.4 },
-  contactK: 0.55,            // contact radius while sailing in a channel (fraction of r); full size while it rams
+  first: { wall: 3.0, boat: 3, anchor: 2.6, ram: 2.4 },
+  contactK: 0,               // contact radius while it sails in a channel (fraction of r): none, so standing at a channel's edge is safe; full size while it rams
+  laneBottomInset: 30,       // the bottom lane sits this far above the channel's inner edge, clear of the boss HP bar
 };
 
 /** Y of the two sailing lanes (the middle of each channel) for a room of height H (px) and cell size c. */
-export const laneYs = (H, c, rows = HM.channelRows) => [(rows * c) / 2, H - (rows * c) / 2];
+// v1.17.0 cosmetic fix: the ship sails on the inner edge of each channel (not its middle), so the whole hull and eye stay on screen below the ROOM label (top)
+// and above the boss HP bar (bottom). Boats still go in the middle of the water (channelYs).
+export const laneYs = (H, c, rows = HM.channelRows) => [rows * c, H - rows * c - HM.laneBottomInset];
+export const channelYs = (H, c, rows = HM.channelRows) => [(rows * c) / 2, H - (rows * c) / 2];
 
 export function newHarbour(W, H, cell) {
   const [top] = laneYs(H, cell);
@@ -57,7 +61,7 @@ export function wallPages(plan, W, opts = {}) {
 }
 
 /** Radius of the part of the ship that hurts on contact: small while it sails in a channel, none while it changes channel, full while it rams. */
-export const contactRadius = (h, r) => (h.mode === 'ram' || h.mode === 'windup' ? r : h.mode === 'swap' ? 0 : r * HM.contactK);
+export const contactRadius = (h, r) => (h.mode === 'ram' || h.mode === 'windup' ? r : r * HM.contactK);
 
 /**
  * Advance the Harbourmaster by dt. `h` is its state (x, y included: main.js copies them to the enemy),
@@ -72,7 +76,7 @@ export const contactRadius = (h, r) => (h.mode === 'ram' || h.mode === 'windup' 
 export function harbourStep(h, dt, env) {
   const ev = [], { W, H, cell, r, player: p, rng } = env, phase = env.phase || 1;
   if (h.phase !== phase) harbourPhase(h, phase);
-  const [yTop, yBot] = laneYs(H, cell), laneY = [yTop, yBot], margin = r * 0.9 + 6;
+  const [yTop, yBot] = laneYs(H, cell), laneY = [yTop, yBot], chY = channelYs(H, cell), margin = r * 0.9 + 6;
   // pending anchors land first (they were thrown earlier)
   for (let i = h.anchors.length - 1; i >= 0; i--) {
     const a = h.anchors[i]; a.t += dt;
@@ -91,7 +95,7 @@ export function harbourStep(h, dt, env) {
     const every = HM.wall.every[phase - 1];
     if (every) {
       h.wallT -= dt;
-      if (h.wallT <= 0 && !h.wall && h.mode === 'sail') {
+      if (h.wallT <= 0 && !h.wall && h.mode === 'sail' && !env.hold) {
         h.wallT = every;
         const plan = planWall(rng, p.x, W, p.r * 2), dy = h.lane === 0 ? 1 : -1;
         h.wall = { plan, y: h.y + dy * (r * 0.35 + 6), dy, t: 0 };
@@ -135,7 +139,7 @@ export function harbourStep(h, dt, env) {
     if (h.boatT <= 0) {
       h.boatT = HM.boat.every;
       const n = Math.max(0, Math.min(HM.boat.drop, HM.boat.cap - (env.boats || 0)));
-      if (n > 0) ev.push({ type: 'boats', list: Array.from({ length: n }, (_, i) => ({ x: W * (0.2 + 0.6 * rng.next()), y: laneY[(i + (rng.chance(0.5) ? 1 : 0)) % 2] })) });
+      if (n > 0) ev.push({ type: 'boats', list: Array.from({ length: n }, (_, i) => ({ x: W * (0.2 + 0.6 * rng.next()), y: chY[(i + (rng.chance(0.5) ? 1 : 0)) % 2] })) });
     }
     h.anchorT -= dt;
     if (h.anchorT <= 0) { h.anchorT = HM.anchor.every[phase - 1]; const a = { x: p.x, y: p.y, t: 0 }; h.anchors.push(a); ev.push({ type: 'anchor', x: a.x, y: a.y }); }

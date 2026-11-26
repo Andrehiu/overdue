@@ -1187,6 +1187,15 @@ async function harbourFlow(name, opts) {
   const info = await page.evaluate(() => { const O = __overdue, b = O.game.boss; return { shape: O.arena.shape, boss: !!b && !!b.harbour, name: b && b.name, y: b && Math.round(b.y), water: O.arena.water.reduce((a, v) => a + v, 0), grid: O.grid() }; });
   record(area, 'wing 15 boss room is the harbour with two channels and the Harbourmaster in a channel', info.shape === 'harbour' && info.boss && info.name === 'The Harbourmaster' && info.y < 70 && info.water > 0, JSON.stringify(info));
   await shot(page, `${name}-harbour-phase1`);
+  // v1.17.0 cosmetic: the whole ship (hull + eye) on screen and clear of the ROOM label (top lane) and the boss HP bar (bottom lane)
+  for (const [lane, tag] of [[0, 'top'], [1, 'bottom']]) {
+    await page.evaluate((l) => { const O = __overdue, b = O.game.boss; O.freeze(true); b.h.lane = l; b.h.mode = 'sail'; b.h.dir = 1; b.h.wall = null; b.x = O.W / 2; b.h.x = O.W / 2; b.y = b.h.y = l ? O.H - 90 : 60; O.stepN(2); O.freeze(false); O.game.bannerT = 0; O.game.freeze = 0; }, lane);
+    await page.waitForTimeout(60);
+    const pos = await page.evaluate(() => { const O = __overdue, b = O.game.boss, u = O.ui(); return { y: Math.round(b.y), top: Math.round(b.y - 36), bottom: Math.round(b.y + 36), H: O.H, uiK: +u.uiK.toFixed(2) }; });
+    record(area, `${tag} lane: ship hull + eye inside the room's height`, pos.top >= 0 && pos.bottom <= pos.H, JSON.stringify(pos));
+    await shot(page, `${name}-harbour-${tag}-lane`);
+  }
+  await page.evaluate(() => { const b = __overdue.game.boss; b.h.lane = 0; b.y = b.h.y = 60; });
   const tells = await page.evaluate(async () => { const O = __overdue, b = O.game.boss; let wall = false, pages = 0; O.drive(true); O.setBotInput({ x: 0, y: 0 });
     for (let i = 0; i < 600; i++) { O.stepN(1); if (b.h.wall) wall = true; pages = Math.max(pages, O.hazards.length); } O.drive(false); return { wall, pages }; });
   record(area, 'phase 1: broadside walls show a tell and pages fly', tells.wall && tells.pages > 10, JSON.stringify(tells));
@@ -1670,7 +1679,7 @@ async function basicsFlow() {
   if (want('screens')) { tasks.push(() => rotateOverlayFlow()); for (const r of ROTATIONS) tasks.push(() => rotationFlow(...r)); }
   if (want('shapes')) tasks.push(() => shapesFlow());
   if (want('status')) tasks.push(() => statusFlow());
-  if (want('act2')) for (const [name, opts] of [TARGETS[0], TARGETS.find(([n]) => /ipad/i.test(n) && !/mini/i.test(n)) || TARGETS[1]]) tasks.push(() => harbourFlow(name, opts));
+  if (want('act2')) for (const [name, opts] of [TARGETS[0], TARGETS.find(([n]) => /ipad/i.test(n) && !/mini/i.test(n)) || TARGETS[1], TARGETS.find(([n]) => /iphone-se/i.test(n)) || TARGETS[0]]) tasks.push(() => harbourFlow(name, opts));
   if (want('act2')) tasks.push(() => act2Flow());
   if (want('lookfeel')) tasks.push(() => lookFeelFlow());
   if (want('newplayer')) for (const [name, opts] of TARGETS) tasks.push(() => newPlayerFlow(name, opts));
